@@ -445,19 +445,19 @@ processors:
 #### Step 3: Local Debugging, Remote Errors
 
 ```javascript
-// Development: Full traces locally
+// Development: Full traces to console
 if (process.env.NODE_ENV === 'development') {
-  // Export to local Jaeger
-  exporter = new OTLPTraceExporter({
-    url: 'http://localhost:4318/v1/traces'
-  });
+  exporter = new ConsoleSpanExporter();
   sampler = new AlwaysOnSampler();
 }
 
-// Production: Errors only to paid backend
+// Production: Errors only to Dash0
 if (process.env.NODE_ENV === 'production') {
   exporter = new OTLPTraceExporter({
-    url: process.env.OTEL_ENDPOINT
+    url: process.env.DASH0_ENDPOINT,
+    headers: {
+      'Authorization': `Bearer ${process.env.DASH0_AUTH_TOKEN}`
+    }
   });
   sampler = new ErrorOnlySampler();
 }
@@ -468,13 +468,13 @@ if (process.env.NODE_ENV === 'production') {
 ```yaml
 # Use free tiers strategically
 free_options:
+  - Dash0 Free Trial: Full features during trial
   - Grafana Cloud Free: 10k series, 50GB logs
   - Honeycomb Free: 20M events/month
-  - Jaeger (self-hosted): Unlimited (just compute costs)
 
 strategy:
   metrics: Grafana Cloud Free (sufficient for golden signals)
-  traces: Self-hosted Jaeger (errors only)
+  traces: Dash0 (errors only, sampled)
   logs: Local files + Grafana Loki (free tier)
 ```
 
@@ -483,7 +483,7 @@ strategy:
 ```yaml
 cost_breakdown:
   metrics: $0 (Grafana free tier)
-  traces: $0 (self-hosted Jaeger on existing infra)
+  traces: $0-50 (Dash0 with aggressive sampling)
   logs: $0 (Loki free tier)
   total: $0-50/month
 

@@ -2,51 +2,94 @@
 
 Expert guidance for implementing high-quality, cost-efficient observability with OpenTelemetry.
 
+## New to OpenTelemetry?
+
+**Start here:** [GETTING-STARTED.md](./GETTING-STARTED.md) - See your first trace in 5 minutes.
+
+Then follow the [LEARNING-PATH.md](./LEARNING-PATH.md) for a structured progression from beginner to production-ready.
+
+Stuck? Check [COMMON-MISTAKES.md](./COMMON-MISTAKES.md) for solutions to common problems.
+
+## What is OpenTelemetry?
+
+OpenTelemetry (OTel) is the standard for collecting observability data from your applications:
+
+```
+┌─────────────────────────────────────────┐
+│  Your Application                       │
+│                                         │
+│  TRACES    METRICS    LOGS              │
+│  "Request  "How many  "What             │
+│   paths"    & how     happened"         │
+│             fast"                       │
+└────────────────┬────────────────────────┘
+                 │
+                 ▼
+┌────────────────────────────────────────┐
+│  OTel SDK → Collector → Backend        │
+│  (collect)   (process)   (store/view)  │
+└────────────────────────────────────────┘
+```
+
+- **Traces** show one request's journey through your system
+- **Metrics** are numbers over time (requests/sec, latency)
+- **Logs** are timestamped events
+
 ## Available Skills
 
 | Skill | Description |
 |-------|-------------|
-| `@otel-telemetry` | Core concepts, signals, sampling strategies, and best practices |
-| `@otel-nodejs` | Node.js/TypeScript SDK setup, instrumentation, and examples |
+| `@otel-telemetry` | Core concepts, signals, sampling strategies, cost optimization |
+| `@otel-nodejs` | Node.js/TypeScript SDK setup, instrumentation, examples |
 
-## Quick Start
+## Quickstart Guides
 
-### 1. Install the Core Skill
+| Guide | Time | What You'll Learn |
+|-------|------|-------------------|
+| [01-first-trace.md](./quickstart/01-first-trace.md) | 10 min | Console output, understanding spans |
+| [02-send-to-dash0.md](./quickstart/02-send-to-dash0.md) | 10 min | See traces in Dash0 |
+| [03-add-custom-spans.md](./quickstart/03-add-custom-spans.md) | 15 min | Track your business logic |
+
+## Choose Your Backend
+
+Before going to production, pick where your data goes:
+
+| Backend | Setup | Cost | Best For |
+|---------|-------|------|----------|
+| Console | 0 min | Free | Learning, debugging |
+| [Dash0](./quickstart/02-send-to-dash0.md) | 10 min | Free trial | Development & Production |
+| Grafana Cloud | 15 min | Free tier | Small projects |
+
+## Install Skills
 
 ```bash
+# Core concepts and best practices
 npx skills add mthines/skills/otel-telemetry
-```
 
-### 2. Install a Language Skill
-
-```bash
+# Node.js implementation
 npx skills add mthines/skills/otel-nodejs
 ```
 
-### 3. Ask for Help
+## File Organization
 
 ```
-"Help me add tracing to my Express API"
-"Set up metrics for my Node.js service"
-"Configure OpenTelemetry for cost efficiency"
+skills/
+├── GETTING-STARTED.md      ← Start here
+├── LEARNING-PATH.md        ← Reading order
+├── COMMON-MISTAKES.md      ← Troubleshooting
+├── quickstart/             ← Hands-on tutorials
+│   ├── 01-first-trace.md
+│   ├── 02-send-to-dash0.md
+│   └── 03-add-custom-spans.md
+├── @otel-telemetry/        ← Core skill (concepts)
+│   ├── SKILL.md            ← Signal selection, sampling
+│   ├── references/         ← Per-signal deep dives
+│   └── examples/           ← Cost optimization scenarios
+└── @otel-nodejs/           ← Language skill (Node.js)
+    ├── SKILL.md            ← SDK setup, framework guides
+    ├── references/         ← Auto/manual instrumentation
+    └── examples/           ← Express, Next.js examples
 ```
-
-## Learning Path
-
-1. **Start with concepts** - Use `@otel-telemetry` to understand signals, sampling, and cost optimization
-2. **Choose your signal** - Traces for requests, metrics for aggregates, logs for events
-3. **Implement** - Use your language skill for SDK setup and instrumentation
-4. **Optimize** - Apply sampling strategies and cardinality controls
-
-## What These Skills Do
-
-The skills guide you through:
-
-- **Requirements gathering** - Understanding what you need to observe
-- **Signal selection** - Choosing between traces, metrics, and logs
-- **Implementation** - Setting up SDK and instrumentation
-- **Cost optimization** - Sampling strategies and cardinality management
-- **Verification** - Testing that telemetry is working correctly
 
 ## Key Principles
 
@@ -56,10 +99,15 @@ The skills guide you through:
 - **Environment-specific** - Different policies for prod vs dev
 - **Cost as a constraint** - Define your budget, optimize until it fits
 
+## Official Documentation
+
+- [OpenTelemetry Docs](https://opentelemetry.io/docs/)
+- [OTel JavaScript](https://opentelemetry.io/docs/languages/js/)
+- [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)
+
 ## Future Language Skills
 
 Coming soon:
-
 - `@otel-python` - Python with Django/FastAPI/Flask
 - `@otel-go` - Go with chi/gin/fiber
 - `@otel-java` - Java with Spring Boot

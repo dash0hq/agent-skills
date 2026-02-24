@@ -481,29 +481,24 @@ const sdk = new NodeSDK({
 ### Local Development Setup
 
 ```bash
-# Run local collector + Jaeger
-docker run -d --name jaeger \
-  -p 16686:16686 \
-  -p 4317:4317 \
-  -p 4318:4318 \
-  jaegertracing/all-in-one:latest
-
-# Set environment
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+# Set Dash0 credentials
+export DASH0_AUTH_TOKEN="your-dash0-token"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer $DASH0_AUTH_TOKEN"
 export OTEL_SERVICE_NAME=my-service
 
 # Run your app
 node --import ./instrumentation.js app.js
 
-# Open Jaeger UI
-open http://localhost:16686
+# Open Dash0 UI
+open https://app.dash0.com
 ```
 
 ### Verification Checklist
 
 ```yaml
 checklist:
-  - [ ] Traces appear in Jaeger/backend
+  - [ ] Traces appear in Dash0
   - [ ] Spans have correct names (verb.object pattern)
   - [ ] Attributes are present and correct
   - [ ] Errors are recorded with stack traces

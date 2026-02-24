@@ -10,6 +10,10 @@ Comprehensive guide to OpenTelemetry Collector configuration.
 - [Collector Components](https://opentelemetry.io/docs/collector/configuration/)
 - [Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
 
+## Tools
+
+- [OTelBin](https://www.otelbin.io/) - Free editing, visualization, and validation tool for OpenTelemetry Collector configurations. Use this to validate and debug your collector configs before deploying.
+
 ## Why Use a Collector
 
 ### Benefits

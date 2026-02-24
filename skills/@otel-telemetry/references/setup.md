@@ -378,12 +378,12 @@ OTEL_EXPORTER_OTLP_ENDPOINT: https://otlp.nr-data.net:4317
 OTEL_EXPORTER_OTLP_HEADERS: "api-key=your-new-relic-key"
 ```
 
-### Self-Hosted (Jaeger + Prometheus)
+### Self-Hosted (Tempo + Prometheus)
 
 ```yaml
-# Traces to Jaeger
+# Traces to Grafana Tempo
 traces:
-  endpoint: http://jaeger-collector:4317
+  endpoint: http://tempo:4317
 
 # Metrics to Prometheus
 metrics:

@@ -55,7 +55,7 @@ Before I help with your telemetry setup, I need to understand your requirements:
 - [ ] Datadog
 - [ ] New Relic
 - [ ] Honeycomb
-- [ ] Self-hosted (Jaeger, Prometheus, Elasticsearch)
+- [ ] Self-hosted (Prometheus, Elasticsearch)
 - [ ] Not decided yet
 
 **What are your constraints?**
@@ -338,9 +338,10 @@ Checklist:
 
 For detailed guidance on each signal type:
 
-- [Spans Reference](./references/spans.md) - Traces and spans best practices
-- [Metrics Reference](./references/metrics.md) - Metrics instrumentation guide
-- [Logs Reference](./references/logs.md) - Structured logging with OTel
+- [Telemetry Quality](./references/telemetry-quality.md) - Cardinality, attribute hygiene, signal density
+- [Spans Reference](./references/signals/spans.md) - Traces and spans best practices
+- [Metrics Reference](./references/signals/metrics.md) - Metrics instrumentation guide
+- [Logs Reference](./references/signals/logs.md) - Structured logging with OTel
 - [Collector Reference](./references/collector.md) - Collector configuration
 - [Setup Reference](./references/setup.md) - SDK setup and backend integration
 

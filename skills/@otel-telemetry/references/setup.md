@@ -333,6 +333,19 @@ dashboards:
 - [OTLP Integration Guide](https://www.dash0.com/documentation/opentelemetry)
 - [Dash0 Support](https://www.dash0.com/support)
 
+### Dash0 AI-Powered Features
+
+Dash0 provides AI-powered tools to help you understand and query your telemetry data:
+
+- **Agent0**: Built-in AI assistant with 5 specialized agents for incident investigation,
+  query optimization, and dashboard creation. Access with `Cmd+Shift+0` (macOS) or
+  `Ctrl+Shift+0` (Windows/Linux) in the Dash0 UI.
+
+- **MCP Server**: Connect your AI coding assistants (Claude Code, Cursor, Windsurf, etc.)
+  directly to your observability data for natural language queries.
+
+See the [Dash0 Platform Guide](./dash0/README.md) for detailed documentation.
+
 ---
 
 ## Other Backend Integrations

@@ -65,13 +65,13 @@ Before going to production, pick where your data goes:
 
 ```bash
 # Core concepts and best practices
-npx skills add mthines/skills/otel-telemetry
+npx skills add dash0/skills/otel-telemetry
 
 # Node.js implementation
-npx skills add mthines/skills/otel-nodejs
+npx skills add dash0/skills/otel-nodejs
 
 # Browser/client-side implementation
-npx skills add mthines/skills/otel-browser
+npx skills add dash0/skills/otel-browser
 ```
 
 ## File Organization

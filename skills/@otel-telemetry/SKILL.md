@@ -3,7 +3,7 @@ name: '@otel-telemetry'
 description: Expert guidance for emitting high-quality, cost-efficient OpenTelemetry telemetry. Use when instrumenting applications with traces, metrics, or logs. Triggers on requests for observability, telemetry, tracing, metrics collection, logging integration, or OTel setup. Critical skill that asks clarifying questions to understand exact tracking requirements.
 license: MIT
 metadata:
-  author: mthines
+  author: dash0
   version: '1.0.0'
   workflow_type: 'advisory'
   signals:

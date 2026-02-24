@@ -48,7 +48,7 @@ If you're new to OpenTelemetry, start with [GETTING-STARTED.md](../GETTING-START
 ## Installation
 
 ```bash
-npx skills add mthines/skills/otel-telemetry
+npx skills add dash0/skills/otel-telemetry
 ```
 
 ## Usage

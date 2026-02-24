@@ -3,7 +3,7 @@ name: '@otel-browser'
 description: OpenTelemetry implementation for browser/client-side applications. Use when setting up Real User Monitoring (RUM), tracking user interactions, measuring Web Vitals, or correlating frontend traces with backend services. Triggers on browser observability, client-side tracing, React/Vue/Angular instrumentation, or frontend performance monitoring.
 license: MIT
 metadata:
-  author: mthines
+  author: dash0
   version: '1.0.0'
   requires:
     - '@otel-telemetry'

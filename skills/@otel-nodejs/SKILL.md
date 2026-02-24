@@ -3,7 +3,7 @@ name: '@otel-nodejs'
 description: OpenTelemetry implementation for Node.js and TypeScript applications. Use when setting up OTel SDK, configuring auto-instrumentation, or adding manual spans/metrics/logs in Node.js projects. Triggers on Node.js observability, Express/Fastify/NestJS instrumentation, TypeScript telemetry, or pino/winston integration.
 license: MIT
 metadata:
-  author: mthines
+  author: dash0
   version: '1.0.0'
   requires:
     - '@otel-telemetry'

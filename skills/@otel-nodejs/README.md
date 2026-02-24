@@ -110,7 +110,7 @@ sdk.start();
 ## Installation
 
 ```bash
-npx skills add mthines/skills/otel-nodejs
+npx skills add dash0/skills/otel-nodejs
 ```
 
 ## Usage

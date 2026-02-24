@@ -51,14 +51,17 @@ Browser: page.load ────────────────────�
 ## Installation
 
 ```bash
-# Core concepts and best practices
+# Core concepts only
 npx skills add dash0/skills/otel-telemetry
 
-# Node.js implementation
-npx skills add dash0/skills/otel-nodejs
+# Node.js backend (includes core)
+npx skills add dash0/skills/otel-nodejs dash0/skills/otel-telemetry
 
-# Browser/client-side implementation
-npx skills add dash0/skills/otel-browser
+# Browser frontend (includes core)
+npx skills add dash0/skills/otel-browser dash0/skills/otel-telemetry
+
+# Full-stack (all skills)
+npx skills add dash0/skills/otel-telemetry dash0/skills/otel-nodejs dash0/skills/otel-browser
 ```
 
 ## Repository Structure

@@ -37,41 +37,44 @@ OpenTelemetry (OTel) is the standard for collecting observability data from your
 
 ## Available Skills
 
-| Skill | Description |
-|-------|-------------|
-| `@otel-telemetry` | Core concepts, signals, sampling strategies, cost optimization |
-| `@otel-nodejs` | Node.js/TypeScript SDK setup, instrumentation, examples |
-| `@otel-browser` | Browser/client-side instrumentation, Web Vitals, server correlation |
+| Skill             | Description                                                         |
+| ----------------- | ------------------------------------------------------------------- |
+| `@otel-telemetry` | Core concepts, signals, sampling strategies, cost optimization      |
+| `@otel-nodejs`    | Node.js/TypeScript SDK setup, instrumentation, examples             |
+| `@otel-browser`   | Browser/client-side instrumentation, Web Vitals, server correlation |
 
 ## Quickstart Guides
 
-| Guide | Time | What You'll Learn |
-|-------|------|-------------------|
-| [01-first-trace.md](./quickstart/01-first-trace.md) | 10 min | Console output, understanding spans |
-| [02-send-to-dash0.md](./quickstart/02-send-to-dash0.md) | 10 min | See traces in Dash0 |
-| [03-add-custom-spans.md](./quickstart/03-add-custom-spans.md) | 15 min | Track your business logic |
+| Guide                                                         | Time   | What You'll Learn                   |
+| ------------------------------------------------------------- | ------ | ----------------------------------- |
+| [01-first-trace.md](./quickstart/01-first-trace.md)           | 10 min | Console output, understanding spans |
+| [02-send-to-dash0.md](./quickstart/02-send-to-dash0.md)       | 10 min | See traces in Dash0                 |
+| [03-add-custom-spans.md](./quickstart/03-add-custom-spans.md) | 15 min | Track your business logic           |
 
 ## Choose Your Backend
 
 Before going to production, pick where your data goes:
 
-| Backend | Setup | Cost | Best For |
-|---------|-------|------|----------|
-| Console | 0 min | Free | Learning, debugging |
+| Backend                                   | Setup  | Cost       | Best For                 |
+| ----------------------------------------- | ------ | ---------- | ------------------------ |
+| Console                                   | 0 min  | Free       | Learning, debugging      |
 | [Dash0](./quickstart/02-send-to-dash0.md) | 10 min | Free trial | Development & Production |
-| Grafana Cloud | 15 min | Free tier | Small projects |
+| Grafana Cloud                             | 15 min | Free tier  | Small projects           |
 
 ## Install Skills
 
 ```bash
-# Core concepts and best practices
+# Core concepts only
 npx skills add dash0/skills/otel-telemetry
 
-# Node.js implementation
-npx skills add dash0/skills/otel-nodejs
+# Node.js backend (includes core)
+npx skills add dash0/skills/otel-nodejs dash0/skills/otel-telemetry
 
-# Browser/client-side implementation
-npx skills add dash0/skills/otel-browser
+# Browser frontend (includes core)
+npx skills add dash0/skills/otel-browser dash0/skills/otel-telemetry
+
+# Full-stack (all skills)
+npx skills add dash0/skills/otel-telemetry dash0/skills/otel-nodejs dash0/skills/otel-browser
 ```
 
 ## File Organization
@@ -134,6 +137,7 @@ See [@otel-browser/references/server-correlation.md](./@otel-browser/references/
 ## Future Language Skills
 
 Coming soon:
+
 - `@otel-python` - Python with Django/FastAPI/Flask
 - `@otel-go` - Go with chi/gin/fiber
 - `@otel-java` - Java with Spring Boot

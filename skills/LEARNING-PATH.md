@@ -5,10 +5,10 @@ A structured guide to learning OpenTelemetry, from your first trace to productio
 ## Overview
 
 ```
-Day 1          Week 1              Week 2+            Production
-─────────────────────────────────────────────────────────────────
-First trace → Auto-instrumentation → Custom spans → Cost optimization
-Console out → Dash0               → Metrics/logs → Sampling strategies
+Day 1          Week 1              Week 2+            Week 3+           Production
+────────────────────────────────────────────────────────────────────────────────────
+First trace → Auto-instrumentation → Custom spans → Full-stack    → Cost optimization
+Console out → Dash0               → Metrics/logs → Browser+Server → Sampling strategies
 ```
 
 ---
@@ -104,6 +104,29 @@ You should be able to:
 
 ---
 
+## Full-Stack Tracing (Browser + Server)
+
+**Goal:** Connect frontend and backend traces for complete visibility.
+
+### Reading Order
+
+| Step | File | Time | What You'll Learn |
+|------|------|------|-------------------|
+| 1 | [@otel-browser/SKILL.md](./@otel-browser/SKILL.md) | 30 min | Browser SDK, auto-instrumentation |
+| 2 | [@otel-browser/references/server-correlation.md](./@otel-browser/references/server-correlation.md) | 25 min | Connecting browser to server traces |
+| 3 | [@otel-browser/references/auto-instrumentation.md](./@otel-browser/references/auto-instrumentation.md) | 20 min | Document load, fetch, user interactions |
+| 4 | [@otel-browser/examples/react-spa.md](./@otel-browser/examples/react-spa.md) | 30 min | Complete React example |
+
+### Checkpoint
+
+You should be able to:
+- [ ] Set up OTel in a React/Vue/Next.js client
+- [ ] See browser spans as children of server spans (same trace ID)
+- [ ] Track Web Vitals (LCP, CLS, INP)
+- [ ] Track user interactions and route changes
+
+---
+
 ## Quick Reference by Task
 
 ### "I want to..."
@@ -113,7 +136,11 @@ You should be able to:
 | See my first trace | [GETTING-STARTED.md](./GETTING-STARTED.md) |
 | Debug why traces aren't appearing | [COMMON-MISTAKES.md](./COMMON-MISTAKES.md) |
 | Add tracing to Express app | [@otel-nodejs/examples/express-api.md](./@otel-nodejs/examples/express-api.md) |
-| Add tracing to Next.js | [@otel-nodejs/examples/nextjs-app.md](./@otel-nodejs/examples/nextjs-app.md) |
+| Add tracing to Next.js (server) | [@otel-nodejs/examples/nextjs-app.md](./@otel-nodejs/examples/nextjs-app.md) |
+| Add tracing to React SPA | [@otel-browser/examples/react-spa.md](./@otel-browser/examples/react-spa.md) |
+| Add tracing to Next.js (client) | [@otel-browser/examples/nextjs-client.md](./@otel-browser/examples/nextjs-client.md) |
+| Connect browser to server traces | [@otel-browser/references/server-correlation.md](./@otel-browser/references/server-correlation.md) |
+| Track Web Vitals | [@otel-browser/SKILL.md](./@otel-browser/SKILL.md#web-vitals-integration) |
 | Track custom business operations | [quickstart/03-add-custom-spans.md](./quickstart/03-add-custom-spans.md) |
 | Add metrics (counters, histograms) | [@otel-telemetry/references/signals/metrics.md](./@otel-telemetry/references/signals/metrics.md) |
 | Correlate logs with traces | [@otel-telemetry/references/signals/logs.md](./@otel-telemetry/references/signals/logs.md) |
@@ -129,15 +156,18 @@ You should be able to:
 ### Tutorials (Follow Along)
 - `GETTING-STARTED.md` - First trace in 5 minutes
 - `quickstart/*.md` - Progressive hands-on guides
-- `@otel-nodejs/examples/*.md` - Complete application examples
+- `@otel-nodejs/examples/*.md` - Server application examples
+- `@otel-browser/examples/*.md` - Browser application examples
 
 ### Procedural Guides (How To)
 - `@otel-telemetry/SKILL.md` - Requirements gathering, signal selection
 - `@otel-nodejs/SKILL.md` - Node.js setup procedures
+- `@otel-browser/SKILL.md` - Browser setup procedures
 
 ### Reference (Look Up)
 - `@otel-telemetry/references/*.md` - Signal-specific details
 - `@otel-nodejs/references/*.md` - Node.js SDK details
+- `@otel-browser/references/*.md` - Browser SDK details
 
 ### Troubleshooting
 - `COMMON-MISTAKES.md` - FAQ and debugging
@@ -151,4 +181,5 @@ You should be able to:
 | Basic traces | 1-2 hours | Console/Dash0 traces working |
 | Auto-instrumentation | 3-4 hours | Production-like Express app |
 | All signals | 6-8 hours | Traces + metrics + logs |
-| Production ready | 10-12 hours | Sampling, collector, cost control |
+| Full-stack tracing | 8-10 hours | Browser + server connected |
+| Production ready | 12-14 hours | Sampling, collector, cost control |

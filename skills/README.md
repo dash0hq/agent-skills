@@ -41,6 +41,7 @@ OpenTelemetry (OTel) is the standard for collecting observability data from your
 |-------|-------------|
 | `@otel-telemetry` | Core concepts, signals, sampling strategies, cost optimization |
 | `@otel-nodejs` | Node.js/TypeScript SDK setup, instrumentation, examples |
+| `@otel-browser` | Browser/client-side instrumentation, Web Vitals, server correlation |
 
 ## Quickstart Guides
 
@@ -68,6 +69,9 @@ npx skills add mthines/skills/otel-telemetry
 
 # Node.js implementation
 npx skills add mthines/skills/otel-nodejs
+
+# Browser/client-side implementation
+npx skills add mthines/skills/otel-browser
 ```
 
 ## File Organization
@@ -85,10 +89,14 @@ skills/
 │   ├── SKILL.md            ← Signal selection, sampling
 │   ├── references/         ← Per-signal deep dives
 │   └── examples/           ← Cost optimization scenarios
-└── @otel-nodejs/           ← Language skill (Node.js)
-    ├── SKILL.md            ← SDK setup, framework guides
-    ├── references/         ← Auto/manual instrumentation
-    └── examples/           ← Express, Next.js examples
+├── @otel-nodejs/           ← Language skill (Node.js)
+│   ├── SKILL.md            ← SDK setup, framework guides
+│   ├── references/         ← Auto/manual instrumentation
+│   └── examples/           ← Express, Next.js examples
+└── @otel-browser/          ← Browser skill (client-side)
+    ├── SKILL.md            ← Browser SDK, Web Vitals
+    ├── references/         ← Server correlation, auto-instrumentation
+    └── examples/           ← React SPA, Next.js client
 ```
 
 ## Key Principles
@@ -104,6 +112,24 @@ skills/
 - [OpenTelemetry Docs](https://opentelemetry.io/docs/)
 - [OTel JavaScript](https://opentelemetry.io/docs/languages/js/)
 - [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)
+
+## Full-Stack Tracing
+
+Connect browser to server for complete visibility:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Single Trace                             │
+├─────────────────────────────────────────────────────────────────┤
+│ Browser: page.load ──────────────────────────────────  200ms    │
+│   └─ Browser: button.click ───────────────────────────  50ms    │
+│       └─ Browser: fetch /api/order ──────────────────  150ms    │
+│           └─ Server: POST /api/order ────────────────  140ms    │
+│               └─ Server: db.query ───────────────────   80ms    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+See [@otel-browser/references/server-correlation.md](./@otel-browser/references/server-correlation.md) for setup.
 
 ## Future Language Skills
 

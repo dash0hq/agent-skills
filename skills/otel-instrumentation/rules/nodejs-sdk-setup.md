@@ -9,215 +9,184 @@ tags:
   - typescript
 ---
 
-# SDK Setup Reference
+# Node.js SDK Setup Reference
 
-Detailed guide to OpenTelemetry SDK initialization for Node.js.
+## Quick Start (Environment Variables)
+
+The simplest way to instrument a Node.js application:
+
+```bash
+npm install @opentelemetry/auto-instrumentations-node
+```
+
+```bash
+export OTEL_SERVICE_NAME="my-service"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${DASH0_AUTH_TOKEN}"
+export OTEL_RESOURCE_ATTRIBUTES="service.version=1.0.0,deployment.environment.name=production"
+export NODE_OPTIONS="--import @opentelemetry/auto-instrumentations-node/register"
+
+node app.js
+```
+
+That's it. Auto-instrumentation handles HTTP, databases, and most frameworks automatically.
+
+---
+
+## Production Environment Variables
+
+| Variable | Priority | Example | Purpose |
+|----------|----------|---------|---------|
+| `OTEL_SERVICE_NAME` | MUST | `payment-service` | Identifies your service |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | MUST | `https://ingress.eu-west-1.dash0.com:4317` | Where to send telemetry |
+| `OTEL_EXPORTER_OTLP_HEADERS` | MUST | `Authorization=Bearer token` | Authentication |
+| `OTEL_RESOURCE_ATTRIBUTES` | SHOULD | `service.version=1.0.0,deployment.environment.name=prod` | Resource context |
+| `OTEL_TRACES_SAMPLER` | SHOULD | `parentbased_traceidratio` | Sampling strategy |
+| `OTEL_TRACES_SAMPLER_ARG` | SHOULD | `0.1` | Sample 10% of traces |
+| `OTEL_LOG_LEVEL` | MAY | `info` | SDK logging verbosity |
+| `OTEL_PROPAGATORS` | MAY | `tracecontext,baggage` | Context propagation |
+
+---
+
+## Startup Verification
+
+When correctly configured, you should see:
+
+```
+@opentelemetry/instrumentation-http Applying instrumentation patch
+@opentelemetry/instrumentation-express Applying instrumentation patch
+...
+```
+
+Enable debug logging to verify:
+
+```bash
+export OTEL_LOG_LEVEL=debug
+```
+
+### Quick Verification Test
+
+```bash
+# Start your app
+node --import @opentelemetry/auto-instrumentations-node/register app.js
+
+# In another terminal, hit an endpoint
+curl http://localhost:3000/health
+
+# Check your observability backend for the span
+```
+
+---
 
 ## Official Documentation
 
 - [Node.js SDK Documentation](https://opentelemetry.io/docs/languages/js/getting-started/nodejs/)
-- [SDK Configuration](https://opentelemetry.io/docs/languages/js/instrumentation/)
 - [Environment Variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/)
+
+---
 
 ## Package Installation
 
-### Core Packages
-
 ```bash
-# Essential SDK
-npm install @opentelemetry/sdk-node
+# Core (required)
+npm install @opentelemetry/sdk-node @opentelemetry/api
 
-# API (peer dependency, may already be installed)
-npm install @opentelemetry/api
-
-# Exporters (choose based on your backend)
-npm install @opentelemetry/exporter-trace-otlp-proto    # Traces
-npm install @opentelemetry/exporter-metrics-otlp-proto  # Metrics
-npm install @opentelemetry/exporter-logs-otlp-proto     # Logs
-
-# Auto-instrumentation
+# Auto-instrumentation (recommended)
 npm install @opentelemetry/auto-instrumentations-node
 
-# Resources
-npm install @opentelemetry/resources
-npm install @opentelemetry/semantic-conventions
+# Exporters (choose based on protocol)
+npm install @opentelemetry/exporter-trace-otlp-proto    # HTTP/protobuf
+npm install @opentelemetry/exporter-metrics-otlp-proto
+npm install @opentelemetry/exporter-logs-otlp-proto
 ```
 
-### Optional Packages
+---
 
-```bash
-# Specific instrumentations (if not using auto-instrumentations-node)
-npm install @opentelemetry/instrumentation-http
-npm install @opentelemetry/instrumentation-express
-npm install @opentelemetry/instrumentation-pg
-npm install @opentelemetry/instrumentation-pino
+## Custom instrumentation.ts (When Needed)
 
-# Console exporters (for debugging)
-npm install @opentelemetry/sdk-trace-node
-npm install @opentelemetry/sdk-metrics
-
-# Propagators
-npm install @opentelemetry/propagator-b3  # If using Zipkin
-```
-
-## instrumentation.ts File Pattern
-
-### Complete Example
+Use a custom setup when you need:
+- Custom samplers
+- Specific instrumentation configuration
+- Multiple exporters
+- Programmatic resource detection
 
 ```typescript
 // instrumentation.ts
-import { NodeSDK } from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-proto';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
-import { Resource } from '@opentelemetry/resources';
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { Resource } from "@opentelemetry/resources";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
-  ATTR_DEPLOYMENT_ENVIRONMENT
-} from '@opentelemetry/semantic-conventions';
-import {
-  ParentBasedSampler,
-  TraceIdRatioBasedSampler,
-  AlwaysOnSampler
-} from '@opentelemetry/sdk-trace-node';
+  ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
+  ATTR_SERVICE_NAMESPACE
+} from "@opentelemetry/semantic-conventions";
 
-// Determine environment
-const isProduction = process.env.NODE_ENV === 'production';
-
-// Configure sampler based on environment
-const sampler = isProduction
-  ? new ParentBasedSampler({
-      root: new TraceIdRatioBasedSampler(0.1) // 10% in prod
-    })
-  : new AlwaysOnSampler(); // 100% in dev
-
-// Build resource
 const resource = new Resource({
-  [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'my-service',
-  [ATTR_SERVICE_VERSION]: process.env.npm_package_version || '0.0.0',
-  [ATTR_DEPLOYMENT_ENVIRONMENT]: process.env.NODE_ENV || 'development'
+  [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || "my-service",
+  [ATTR_SERVICE_VERSION]: process.env.npm_package_version || "0.0.0",
+  [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: process.env.NODE_ENV || "development",
+  [ATTR_SERVICE_NAMESPACE]: "my-team"
 });
 
-// Configure exporters
-const traceExporter = new OTLPTraceExporter({
-  url: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ||
-       process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-  headers: parseHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS)
-});
-
-const metricExporter = new OTLPMetricExporter({
-  url: process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT ||
-       process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-  headers: parseHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS)
-});
-
-const logExporter = new OTLPLogExporter({
-  url: process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT ||
-       process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-  headers: parseHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS)
-});
-
-// Initialize SDK
 const sdk = new NodeSDK({
   resource,
-  sampler,
-  traceExporter,
+  traceExporter: new OTLPTraceExporter(),
   metricReader: new PeriodicExportingMetricReader({
-    exporter: metricExporter,
-    exportIntervalMillis: isProduction ? 60000 : 10000
+    exporter: new OTLPMetricExporter(),
+    exportIntervalMillis: 60000
   }),
-  logRecordProcessor: new BatchLogRecordProcessor(logExporter),
   instrumentations: [
     getNodeAutoInstrumentations({
-      '@opentelemetry/instrumentation-fs': { enabled: false },
-      '@opentelemetry/instrumentation-http': {
-        ignoreIncomingPaths: ['/health', '/ready', '/live']
+      "@opentelemetry/instrumentation-fs": { enabled: false },
+      "@opentelemetry/instrumentation-http": {
+        ignoreIncomingPaths: ["/health", "/ready", "/metrics"]
       }
     })
   ]
 });
 
-// Start SDK
 sdk.start();
-console.log('OpenTelemetry SDK initialized');
 
 // Graceful shutdown
 const shutdown = async () => {
-  console.log('Shutting down OpenTelemetry SDK...');
-  try {
-    await sdk.shutdown();
-    console.log('OpenTelemetry SDK shut down successfully');
-  } catch (err) {
-    console.error('Error shutting down OpenTelemetry SDK', err);
-  }
+  await sdk.shutdown();
+  process.exit(0);
 };
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-
-// Helper to parse header string
-function parseHeaders(headerString?: string): Record<string, string> {
-  if (!headerString) return {};
-
-  return headerString.split(',').reduce((acc, pair) => {
-    const [key, value] = pair.split('=');
-    if (key && value) acc[key.trim()] = value.trim();
-    return acc;
-  }, {} as Record<string, string>);
-}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 ```
 
-## --import Flag Usage
-
-### Why --import?
-
-Node.js loads modules before your code runs. Instrumentation must be in place before those modules load.
+### Running with Custom Setup
 
 ```bash
-# Correct: Instrumentation loads first
-node --import ./instrumentation.js app.js
-
-# Wrong: App loads before instrumentation
-node app.js  # With require('./instrumentation') inside app.js
-```
-
-### TypeScript with tsx
-
-```bash
-# Using tsx loader
+# TypeScript with tsx
 node --import tsx --import ./instrumentation.ts app.ts
 
-# Or with tsx directly
-tsx --import ./instrumentation.ts app.ts
+# Compiled JavaScript
+node --import ./dist/instrumentation.js dist/app.js
 ```
 
-### TypeScript with ts-node
-
-```bash
-# Using ts-node loader
-node --import ts-node/register --import ./instrumentation.ts app.ts
-```
-
-### Package.json Scripts
+### package.json Scripts
 
 ```json
 {
   "scripts": {
     "start": "node --import ./dist/instrumentation.js dist/app.js",
-    "dev": "tsx --import ./instrumentation.ts src/app.ts",
-    "start:debug": "OTEL_LOG_LEVEL=debug node --import ./dist/instrumentation.js dist/app.js"
+    "dev": "tsx --import ./instrumentation.ts src/app.ts"
   }
 }
 ```
 
-### Docker
+---
+
+## Docker Configuration
 
 ```dockerfile
-# Dockerfile
 FROM node:20-alpine
 
 WORKDIR /app
@@ -225,294 +194,100 @@ COPY package*.json ./
 RUN npm ci --only=production
 COPY dist ./dist
 
-# Use --import in CMD
-CMD ["node", "--import", "./dist/instrumentation.js", "dist/app.js"]
+# Environment variables (set in deployment, not Dockerfile)
+ENV NODE_OPTIONS="--import ./dist/instrumentation.js"
+
+CMD ["node", "dist/app.js"]
 ```
 
-## Environment Variable Configuration
+```yaml
+# docker-compose.yml or Kubernetes
+environment:
+  - OTEL_SERVICE_NAME=my-service
+  - OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com:4317
+  - OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ${DASH0_AUTH_TOKEN}
+  - OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production
+  - NODE_OPTIONS=--import ./dist/instrumentation.js
+```
 
-### Standard OTel Environment Variables
+---
+
+## Sampling Configuration
+
+### Via Environment Variables (Recommended)
 
 ```bash
-# Service identification
-OTEL_SERVICE_NAME=my-service
-OTEL_RESOURCE_ATTRIBUTES="service.version=1.0.0,deployment.environment=production"
-
-# Exporter configuration
-OTEL_EXPORTER_OTLP_ENDPOINT=https://collector:4317
-OTEL_EXPORTER_OTLP_HEADERS="authorization=Bearer token"
-OTEL_EXPORTER_OTLP_PROTOCOL=grpc  # or http/protobuf
-
-# Signal-specific endpoints (override general endpoint)
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://traces:4317
-OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://metrics:4317
-OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://logs:4317
-
-# Sampling
-OTEL_TRACES_SAMPLER=parentbased_traceidratio
-OTEL_TRACES_SAMPLER_ARG=0.1
-
-# Propagation
-OTEL_PROPAGATORS=tracecontext,baggage
-
-# Debug
-OTEL_LOG_LEVEL=info  # debug, info, warn, error
+export OTEL_TRACES_SAMPLER=parentbased_traceidratio
+export OTEL_TRACES_SAMPLER_ARG=0.1  # 10%
 ```
-
-### Node.js-Specific Variables
-
-```bash
-# Batch span processor
-OTEL_BSP_SCHEDULE_DELAY=5000           # Export delay (ms)
-OTEL_BSP_MAX_QUEUE_SIZE=2048           # Max queued spans
-OTEL_BSP_MAX_EXPORT_BATCH_SIZE=512     # Spans per batch
-OTEL_BSP_EXPORT_TIMEOUT=30000          # Export timeout (ms)
-
-# Metric export
-OTEL_METRIC_EXPORT_INTERVAL=60000      # Collection interval (ms)
-OTEL_METRIC_EXPORT_TIMEOUT=30000       # Export timeout (ms)
-
-# Attribute limits
-OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT=1024 # Max attribute value length
-OTEL_ATTRIBUTE_COUNT_LIMIT=128         # Max attributes per span
-```
-
-## Resource Attributes Setup
-
-### Automatic Detection
-
-```typescript
-import { Resource, detectResources } from '@opentelemetry/resources';
-import {
-  hostDetector,
-  processDetector,
-  envDetector
-} from '@opentelemetry/resources';
-
-const resource = await detectResources({
-  detectors: [
-    hostDetector,
-    processDetector,
-    envDetector
-  ]
-});
-```
-
-### Manual Configuration
-
-```typescript
-import { Resource } from '@opentelemetry/resources';
-import {
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-  ATTR_DEPLOYMENT_ENVIRONMENT,
-  ATTR_SERVICE_NAMESPACE,
-  ATTR_SERVICE_INSTANCE_ID
-} from '@opentelemetry/semantic-conventions';
-
-const resource = new Resource({
-  // Required
-  [ATTR_SERVICE_NAME]: 'payment-service',
-
-  // Highly recommended
-  [ATTR_SERVICE_VERSION]: '2.1.0',
-  [ATTR_DEPLOYMENT_ENVIRONMENT]: 'production',
-
-  // Optional but useful
-  [ATTR_SERVICE_NAMESPACE]: 'checkout',
-  [ATTR_SERVICE_INSTANCE_ID]: process.env.HOSTNAME || 'unknown',
-
-  // Custom attributes
-  'team.name': 'platform',
-  'cloud.region': 'us-west-2'
-});
-```
-
-### Merging Resources
-
-```typescript
-const detectedResource = await detectResources({ ... });
-const manualResource = new Resource({ ... });
-
-const mergedResource = detectedResource.merge(manualResource);
-```
-
-## Sampler Configuration
 
 ### Available Samplers
 
-```typescript
-import {
-  AlwaysOnSampler,
-  AlwaysOffSampler,
-  TraceIdRatioBasedSampler,
-  ParentBasedSampler
-} from '@opentelemetry/sdk-trace-node';
+| Sampler | Use Case |
+|---------|----------|
+| `always_on` | Development, debugging |
+| `always_off` | Disable tracing |
+| `traceidratio` | Sample X% of all traces |
+| `parentbased_always_on` | Follow parent, default on |
+| `parentbased_traceidratio` | Follow parent, default X% (recommended for production) |
 
-// Always sample (development)
-const alwaysOn = new AlwaysOnSampler();
+---
 
-// Never sample
-const alwaysOff = new AlwaysOffSampler();
+## Resource Attributes
 
-// Sample 10% of traces
-const ratioSampler = new TraceIdRatioBasedSampler(0.1);
+### Essential Attributes
 
-// Respect parent decision, default to 10%
-const parentBased = new ParentBasedSampler({
-  root: new TraceIdRatioBasedSampler(0.1),
-  remoteParentSampled: new AlwaysOnSampler(),
-  remoteParentNotSampled: new AlwaysOffSampler(),
-  localParentSampled: new AlwaysOnSampler(),
-  localParentNotSampled: new AlwaysOffSampler()
-});
+| Attribute | Required | Example |
+|-----------|----------|---------|
+| `service.name` | Yes | `payment-service` |
+| `service.version` | Recommended | `2.1.0` |
+| `deployment.environment.name` | Recommended | `production` |
+| `service.namespace` | Optional | `checkout-team` |
+| `service.instance.id` | Optional | `pod-abc-123` |
+
+### Setting via Environment
+
+```bash
+export OTEL_SERVICE_NAME="payment-service"
+export OTEL_RESOURCE_ATTRIBUTES="service.version=2.1.0,deployment.environment.name=production,service.namespace=checkout"
 ```
 
-### Custom Sampler (Error-Aware)
+---
 
-```typescript
-import { Sampler, SamplingDecision, Context, Link, Attributes } from '@opentelemetry/api';
+## Pre-Deployment Checklist
 
-class ErrorAwareSampler implements Sampler {
-  private readonly fallback: Sampler;
+- [ ] `OTEL_SERVICE_NAME` set (not "unknown_service")
+- [ ] `OTEL_EXPORTER_OTLP_ENDPOINT` correct for environment
+- [ ] Auth token configured and valid
+- [ ] `--import` flag added to `NODE_OPTIONS` or start command
+- [ ] Graceful shutdown handler registered
+- [ ] Sampling rate appropriate (1-10% prod, 100% dev)
+- [ ] Health endpoints excluded from tracing
+- [ ] Test span sent and verified in backend
 
-  constructor(fallbackSampleRate: number) {
-    this.fallback = new TraceIdRatioBasedSampler(fallbackSampleRate);
-  }
+---
 
-  shouldSample(
-    context: Context,
-    traceId: string,
-    spanName: string,
-    spanKind: SpanKind,
-    attributes: Attributes,
-    links: Link[]
-  ): SamplingResult {
-    // Always sample if error attribute present
-    if (attributes['error'] === true) {
-      return { decision: SamplingDecision.RECORD_AND_SAMPLED };
-    }
+## Troubleshooting
 
-    // Always sample critical operations
-    if (spanName.startsWith('payment.') || spanName.startsWith('order.')) {
-      return { decision: SamplingDecision.RECORD_AND_SAMPLED };
-    }
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| No spans in backend | SDK not initialized | Verify `--import` flag in startup |
+| "unknown_service" in traces | `OTEL_SERVICE_NAME` not set | Set the environment variable |
+| Connection refused | Wrong endpoint | Check `OTEL_EXPORTER_OTLP_ENDPOINT` URL and port |
+| 401/403 errors | Auth failure | Verify `OTEL_EXPORTER_OTLP_HEADERS` format |
+| Missing HTTP spans | Instrumentation not loaded | Ensure `--import` runs before app code |
+| Spans not flushed on exit | No shutdown handler | Add SIGTERM/SIGINT handlers |
+| High memory usage | Too many spans | Enable sampling, check for span loops |
 
-    // Fallback to ratio sampling
-    return this.fallback.shouldSample(
-      context, traceId, spanName, spanKind, attributes, links
-    );
-  }
+### Debug Commands
 
-  toString(): string {
-    return 'ErrorAwareSampler';
-  }
-}
-```
+```bash
+# Enable verbose SDK logging
+export OTEL_LOG_LEVEL=debug
 
-## Exporter Protocols
+# Test endpoint connectivity
+curl -v https://ingress.eu-west-1.dash0.com:4317
 
-### gRPC (Default, Recommended)
-
-```typescript
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-
-const exporter = new OTLPTraceExporter({
-  url: 'https://collector:4317',
-  credentials: credentials.createSsl(),
-  metadata: new Metadata()
-});
-```
-
-### HTTP/Protobuf
-
-```typescript
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
-
-const exporter = new OTLPTraceExporter({
-  url: 'https://collector:4318/v1/traces',
-  headers: {
-    'Authorization': 'Bearer token'
-  }
-});
-```
-
-### Console (Local Development)
-
-```typescript
-import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node';
-
-const sdk = new NodeSDK({
-  traceExporter: new ConsoleSpanExporter(),
-  // ... rest of config
-});
-```
-
-## Multiple Exporters
-
-### Sending to Multiple Backends
-
-```typescript
-import { SimpleSpanProcessor, BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
-import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-
-const provider = new NodeTracerProvider();
-
-// Primary backend (batched for efficiency)
-provider.addSpanProcessor(
-  new BatchSpanProcessor(
-    new OTLPTraceExporter({ url: 'https://primary:4317' })
-  )
-);
-
-// Secondary backend (also batched)
-provider.addSpanProcessor(
-  new BatchSpanProcessor(
-    new OTLPTraceExporter({ url: 'https://secondary:4317' })
-  )
-);
-
-// Console for debugging (simple processor for immediate output)
-if (process.env.DEBUG_OTEL) {
-  provider.addSpanProcessor(
-    new SimpleSpanProcessor(new ConsoleSpanExporter())
-  );
-}
-
-provider.register();
-```
-
-## Shutdown Handling
-
-### Graceful Shutdown
-
-```typescript
-async function gracefulShutdown(signal: string) {
-  console.log(`${signal} received, shutting down gracefully...`);
-
-  // Stop accepting new requests
-  server.close();
-
-  try {
-    // Flush and shut down OTel (this exports pending telemetry)
-    await sdk.shutdown();
-    console.log('OTel SDK shut down successfully');
-  } catch (err) {
-    console.error('Error during OTel shutdown', err);
-  }
-
-  process.exit(0);
-}
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-```
-
-### Force Flush (for Testing)
-
-```typescript
-import { trace } from '@opentelemetry/api';
-
-// Force export all pending spans
-await trace.getTracerProvider().forceFlush();
+# Verify instrumentation loading
+node --import @opentelemetry/auto-instrumentations-node/register -e "console.log('OK')"
 ```

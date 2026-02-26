@@ -11,620 +11,237 @@ tags:
 
 # Telemetry Quality Reference
 
-Comprehensive guide to emitting high-quality, actionable telemetry that serves your observability goals without breaking the bank.
+## The Quality Hierarchy
+
+Follow this order when instrumenting:
+
+| Level | Focus | Key Question |
+|-------|-------|--------------|
+| 1. **Correctness** | Data accuracy, timestamps, context propagation | "Is the data right?" |
+| 2. **Actionability** | Every signal helps detect, localize, or explain | "Will this help diagnose issues?" |
+| 3. **Efficiency** | Bounded cardinality, normalized attributes | "Is this sustainable?" |
+| 4. **Cost** | Sampling, retention, query performance | "Can we afford this at scale?" |
+
+**The golden rule**: For every piece of telemetry, ask: "When did we last look at this?" If never, remove it.
+
+---
+
+## 5-Minute Cardinality Check
+
+Run this before deploying new instrumentation:
+
+### Step 1: List Your Metric Attributes
+
+```
+metric: http.server.duration
+attributes: [method, route, status_code]
+```
+
+### Step 2: Count Maximum Combinations
+
+```
+method:      5 values (GET, POST, PUT, DELETE, PATCH)
+route:       50 values (your API endpoints, normalized)
+status_code: 5 values (bucket to 2xx, 3xx, 4xx, 5xx, other)
+instances:   10 (pods/containers)
+
+Total: 5 × 50 × 5 × 10 = 12,500 series ✓ Ideal Zone
+```
+
+### Cardinality Budget Zones
+
+```
+Series Count    │ Zone        │ Action
+────────────────┼─────────────┼─────────────────────────────────
+< 1,000         │ Minimal     │ Room to add more dimensions
+1,000 - 10,000  │ ✓ Ideal     │ Good balance of detail vs cost
+10,000 - 50,000 │ Acceptable  │ Monitor growth, review monthly
+50,000 - 100,000│ Caution     │ Review attributes, consider sampling
+> 100,000       │ Danger      │ Remove unbounded attributes immediately
+> 1,000,000     │ Critical    │ Backend instability, massive costs
+```
+
+**Target the Ideal Zone (1K-10K series per metric)** - enough dimensions for debugging without exploding costs.
+
+### Step 3: Check for Unbounded Attributes
+
+**Red flags** - these will explode:
+- `user.id` → millions of users
+- `request.id` → unique per request
+- `url.full` → includes query params
+- `timestamp` → infinite values
+- `ip.address` → millions of IPs
+
+**Safe** - bounded by design:
+- `http.method` → ~10 values
+- `http.route` → known endpoints
+- `error.type` → categorized errors
+- `customer.tier` → few tiers
+
+### Step 4: Apply the Budget
+
+| Cardinality | Impact | Action |
+|-------------|--------|--------|
+| < 10K series | Safe | Proceed |
+| 10K-100K | Caution | Review attributes |
+| > 100K | Danger | Remove unbounded attributes |
+
+---
 
 ## Official Documentation
 
 - [OpenTelemetry Metrics Data Model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/)
-- [Attribute Specification](https://opentelemetry.io/docs/specs/otel/common/#attribute)
 - [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)
 
-## What is Telemetry Quality?
-
-High-quality telemetry has three characteristics:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    HIGH-QUALITY TELEMETRY                       │
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  ACTIONABLE │  │  EFFICIENT  │  │ SUSTAINABLE │             │
-│  │             │  │             │  │             │             │
-│  │ Helps you   │  │ Minimal     │  │ Costs stay  │             │
-│  │ detect,     │  │ overhead,   │  │ predictable │             │
-│  │ localize,   │  │ bounded     │  │ as you      │             │
-│  │ explain     │  │ cardinality │  │ scale       │             │
-│  └─────────────┘  └─────────────┘  └─────────────┘             │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**The quality test:** For every piece of telemetry, ask:
-1. Will this help me detect a problem?
-2. Will this help me localize a problem?
-3. Will this help me explain why a problem occurred?
-
-If the answer to all three is "no," don't emit it.
-
 ---
 
-## Understanding Cardinality
+## Attribute Placement Guide
 
-### What is Cardinality?
+| Signal | Cardinality Tolerance | Safe Attributes | Avoid |
+|--------|----------------------|-----------------|-------|
+| **Metrics** | Very low | method, route, status_bucket, error_type | user.id, request.id |
+| **Spans** | Medium | All metric attributes + user.id, order.id | request.body, full URLs |
+| **Logs** | Higher | All span attributes + request.id | Secrets, credentials |
 
-Cardinality = the number of unique combinations of label/attribute values.
-
-```
-Simple example:
-  metric{method="GET"}                    → 1 series
-  metric{method="GET", status="200"}      → 1 series
-  metric{method="POST", status="200"}     → 1 series (total: 2)
-  metric{method="GET", status="404"}      → 1 series (total: 3)
-
-With 5 methods × 10 status codes = 50 series (manageable)
-```
-
-### The Cardinality Problem
+### Where to Put What
 
 ```
-Dangerous example:
-  metric{method="GET", user_id="user_1"}   → 1 series
-  metric{method="GET", user_id="user_2"}   → 1 series
-  ...
-  metric{method="GET", user_id="user_1000000"}  → 1,000,000 series!
+RESOURCE (set once at startup)
+  service.name, service.version, deployment.environment.name
 
-With 5 methods × 1,000,000 users = 5,000,000 series = $$$$$
-```
+SPAN (per-operation)
+  http.method, http.route, user.id, error.type
 
-### Why Cardinality Matters
-
-| Cardinality | Impact |
-|-------------|--------|
-| Low (< 10K series) | Fast queries, low cost |
-| Medium (10K-100K) | Acceptable for most backends |
-| High (100K-1M) | Slow queries, high cost |
-| Explosive (> 1M) | Backend failures, massive bills |
-
-### Cardinality Sources
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  CARDINALITY SOURCES                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  BOUNDED (Safe)              UNBOUNDED (Dangerous)              │
-│  ─────────────               ──────────────────                 │
-│  http.method (~10)           user.id (millions)                 │
-│  http.status_code (~50)      request.id (unique)                │
-│  service.name (known)        session.id (millions)              │
-│  environment (3-5)           order.id (unbounded)               │
-│  region (< 20)               timestamp (infinite)               │
-│  error.type (< 100)          ip.address (millions)              │
-│                              url.full (infinite with params)    │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+METRIC (bounded only!)
+  http.method, http.route, status_bucket
+  NO: user.id, request.id, timestamps
 ```
 
 ---
 
-## Cardinality Management Strategies
+## Cardinality Management
 
-### Strategy 1: Attribute Whitelisting
-
-Only allow known, bounded attributes:
-
-```yaml
-# Define allowed attributes per signal
-traces:
-  allowed_attributes:
-    - http.method
-    - http.status_code
-    - http.route          # Normalized, not http.url
-    - db.system
-    - db.operation
-    - error.type
-    - service.name
-    - deployment.environment
-
-metrics:
-  # More restrictive for metrics (cardinality hits hardest here)
-  allowed_attributes:
-    - http.method
-    - http.route
-    - status_bucket       # "2xx", "4xx", "5xx" not exact codes
-    - service.name
-
-logs:
-  # Can be more permissive (logs are sampled differently)
-  allowed_attributes:
-    - All trace attributes
-    - user.id             # OK in logs, dangerous in metrics
-    - request.id          # OK in logs for correlation
-```
-
-### Strategy 2: Value Normalization
-
-Transform unbounded values into bounded ones:
+### Strategy 1: Normalize URLs
 
 ```javascript
-// URL Path Normalization
 function normalizePath(path) {
   return path
-    // IDs become placeholders
-    .replace(/\/\d+/g, '/{id}')
-    // UUIDs become placeholders
-    .replace(/\/[a-f0-9-]{36}/g, '/{uuid}')
-    // Tokens become placeholders
-    .replace(/\/[a-zA-Z0-9]{20,}/g, '/{token}')
-    // Query params stripped
-    .split('?')[0];
+    .replace(/\/\d+/g, "/{id}")           // /users/123 → /users/{id}
+    .replace(/\/[a-f0-9-]{36}/g, "/{uuid}") // UUIDs
+    .split("?")[0];                         // Strip query params
 }
-
-// Before: /users/12345/orders/abc-def-ghi
-// After:  /users/{id}/orders/{uuid}
 ```
 
+### Strategy 2: Bucket Status Codes
+
 ```javascript
-// Status Code Bucketing
 function bucketStatus(code) {
-  if (code >= 200 && code < 300) return '2xx';
-  if (code >= 300 && code < 400) return '3xx';
-  if (code >= 400 && code < 500) return '4xx';
-  if (code >= 500) return '5xx';
-  return 'other';
-}
-
-// For important codes, keep them explicit
-function bucketStatusSelective(code) {
-  const keepExact = [200, 201, 400, 401, 403, 404, 500, 502, 503];
-  return keepExact.includes(code) ? String(code) : bucketStatus(code);
+  if (code >= 200 && code < 300) return "2xx";
+  if (code >= 400 && code < 500) return "4xx";
+  if (code >= 500) return "5xx";
+  return "other";
 }
 ```
+
+### Strategy 3: Categorize Errors
 
 ```javascript
-// Error Type Normalization
-function normalizeErrorType(error) {
-  // Map specific errors to categories
-  const categories = {
-    'ECONNREFUSED': 'connection_error',
-    'ETIMEDOUT': 'timeout_error',
-    'ENOTFOUND': 'dns_error',
-    'ValidationError': 'validation_error',
-    'AuthenticationError': 'auth_error',
-    'AuthorizationError': 'auth_error',
-  };
-
-  return categories[error.name] || categories[error.code] || 'unknown_error';
-}
-```
-
-### Strategy 3: Cardinality Limits
-
-Set hard limits to prevent explosions:
-
-```yaml
-# Collector configuration
-processors:
-  # Limit unique attribute values
-  attributes:
-    actions:
-      - key: http.route
-        action: limit
-        limit: 100  # Max 100 unique routes
-        overflow_value: "other"
-
-  # Limit total metric series
-  filter/cardinality:
-    metrics:
-      datapoint:
-        - 'metric.name == "http.server.duration" and count(attributes) > 1000'
-```
-
-```javascript
-// SDK-side cardinality tracking
-const seenValues = new Map();
-const MAX_VALUES = 100;
-
-function safeAttribute(key, value) {
-  if (!seenValues.has(key)) {
-    seenValues.set(key, new Set());
-  }
-
-  const values = seenValues.get(key);
-
-  if (values.size >= MAX_VALUES && !values.has(value)) {
-    return 'other';  // Bucket overflow
-  }
-
-  values.add(value);
-  return value;
-}
-```
-
-### Strategy 4: Cardinality Budgeting
-
-Calculate your budget before deploying:
-
-```javascript
-function calculateCardinality(config) {
-  let total = 0;
-
-  for (const metric of config.metrics) {
-    let combinations = 1;
-
-    for (const label of metric.labels) {
-      combinations *= label.maxValues;
-    }
-
-    // Multiply by number of instances
-    combinations *= config.instances;
-
-    total += combinations;
-
-    console.log(`${metric.name}: ${combinations} series`);
-  }
-
-  return total;
-}
-
-// Example
-const config = {
-  instances: 10,
-  metrics: [
-    {
-      name: 'http.server.duration',
-      labels: [
-        { name: 'method', maxValues: 5 },
-        { name: 'route', maxValues: 50 },
-        { name: 'status', maxValues: 5 }  // Bucketed
-      ]
-    },
-    {
-      name: 'db.query.duration',
-      labels: [
-        { name: 'operation', maxValues: 10 },
-        { name: 'table', maxValues: 20 }
-      ]
-    }
-  ]
+const errorCategories = {
+  ECONNREFUSED: "connection_error",
+  ETIMEDOUT: "timeout_error",
+  ValidationError: "validation_error",
+  AuthenticationError: "auth_error"
 };
 
-console.log(`Total: ${calculateCardinality(config)} series`);
-// http.server.duration: 12,500 series
-// db.query.duration: 2,000 series
-// Total: 14,500 series
-```
-
----
-
-## Attribute Hygiene
-
-### The Attribute Quality Checklist
-
-For every attribute you add, verify:
-
-```
-[ ] Is it bounded? (finite number of possible values)
-[ ] Is it useful? (helps detect, localize, or explain)
-[ ] Is it stable? (won't change meaning over time)
-[ ] Is it standardized? (uses semantic conventions)
-[ ] Is it safe? (no PII, secrets, or sensitive data)
-```
-
-### Good vs Bad Attributes
-
-```yaml
-# GOOD ATTRIBUTES
-http.method: "GET"           # Bounded, standard, useful
-http.route: "/users/{id}"    # Normalized, bounded
-http.status_code: 200        # Bounded, standard
-error.type: "validation"     # Categorized, bounded
-customer.tier: "premium"     # Bounded business context
-feature.flag: "new_checkout" # Bounded, useful for debugging
-cache.hit: true              # Boolean, bounded
-
-# BAD ATTRIBUTES - Don't use on metrics
-user.id: "usr_abc123"        # Unbounded (millions of users)
-request.id: "req_xyz789"     # Unique per request (infinite)
-timestamp: "2024-01-15..."   # Infinite values
-url.full: "/users?page=1"    # Includes query params (unbounded)
-email: "user@example.com"    # PII risk
-request.body: "{...}"        # Large, potentially sensitive
-password: "..."              # NEVER log credentials
-api_key: "..."               # NEVER log secrets
-```
-
-### Attribute Placement Guide
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                WHERE TO PUT ATTRIBUTES                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  RESOURCE ATTRIBUTES (set once at startup)                      │
-│  ─────────────────────────────────────────                      │
-│  service.name, service.version, deployment.environment          │
-│  host.name, cloud.region, k8s.pod.name                          │
-│                                                                 │
-│  SPAN ATTRIBUTES (per-operation context)                        │
-│  ─────────────────────────────────────────                      │
-│  http.method, http.route, db.operation                          │
-│  user.id (OK on spans), order.id (OK on spans)                  │
-│  error.type, error.message                                      │
-│                                                                 │
-│  METRIC ATTRIBUTES (bounded only!)                              │
-│  ─────────────────────────────────────────                      │
-│  http.method, http.route, status_bucket                         │
-│  service.name, error.type (categorized)                         │
-│  NO user.id, request.id, or unbounded values                    │
-│                                                                 │
-│  LOG ATTRIBUTES (most permissive)                               │
-│  ─────────────────────────────────────────                      │
-│  All of the above + request.id, user.id                         │
-│  Correlation IDs, detailed error info                           │
-│  Still no PII without proper handling                           │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Semantic Conventions
-
-Always prefer standard attribute names:
-
-```yaml
-# HTTP (https://opentelemetry.io/docs/specs/semconv/http/)
-http.request.method: GET          # Not: method, http_method
-http.response.status_code: 200    # Not: status, statusCode
-url.path: /api/users              # Not: path, http.path
-url.scheme: https                 # Not: protocol, scheme
-
-# Database (https://opentelemetry.io/docs/specs/semconv/database/)
-db.system: postgresql             # Not: database, db_type
-db.name: users                    # Not: database_name
-db.operation: SELECT              # Not: query_type, operation
-
-# Errors
-error.type: ValidationError       # Not: error_class, exception_type
-exception.message: "Invalid..."   # Not: error_message
-exception.stacktrace: "..."       # Not: stack, stacktrace
-```
-
----
-
-## Signal Density
-
-### The Density Principle
-
-```
-HIGH DENSITY (Good)                 LOW DENSITY (Bad)
-─────────────────                   ─────────────────
-Few signals, high value             Many signals, low value
-Each helps diagnose issues          Most are noise
-Focused on what matters             "Just in case" mentality
-Scales sustainably                  Costs explode with growth
-```
-
-### Measuring Signal Density
-
-```javascript
-// Calculate your signal density score
-function calculateDensity(telemetry) {
-  const metrics = {
-    traces: {
-      total: telemetry.traces.count,
-      usedInIncidents: telemetry.traces.usedInDiagnosis,
-      // What % of traces helped diagnose an issue?
-      density: telemetry.traces.usedInDiagnosis / telemetry.traces.count
-    },
-    metrics: {
-      total: telemetry.metrics.series,
-      inDashboards: telemetry.metrics.dashboarded,
-      inAlerts: telemetry.metrics.alerted,
-      // What % of metrics are actually used?
-      density: (telemetry.metrics.dashboarded + telemetry.metrics.alerted)
-               / telemetry.metrics.series
-    }
-  };
-
-  return metrics;
+function categorizeError(error) {
+  return errorCategories[error.name] || errorCategories[error.code] || "unknown";
 }
-
-// Target densities:
-// Traces: > 10% should be referenced in incident diagnosis
-// Metrics: > 50% should be in dashboards or alerts
-// If lower, you're over-instrumenting
-```
-
-### Improving Density
-
-```yaml
-# Questions to ask for each metric/span:
-
-1. "When did we last look at this?"
-   - Never → Consider removing
-   - Monthly → Keep but sample heavily
-   - Weekly → Keep
-   - Daily → Essential, never sample
-
-2. "What decision would this inform?"
-   - None → Remove
-   - Capacity planning → Keep at low resolution
-   - Incident response → Keep at high resolution
-
-3. "Could we get this from another signal?"
-   - Derive from existing data → Remove duplicate
-   - Unique insight → Keep
 ```
 
 ---
 
 ## Quality Anti-Patterns
 
-### Anti-Pattern 1: "Log Everything"
+### Don't: Metric per Entity
 
 ```javascript
-// BAD: Logging every variable "just in case"
-logger.debug('Processing started', {
-  user, request, config, state, timestamp,
-  sessionId, correlationId, parentId, ...everything
-});
+// BAD - infinite metrics
+meter.createCounter(`orders.${orderId}.processed`);
 
-// GOOD: Log what you need for diagnosis
-logger.info('order.processing.started', {
-  order_id: order.id,
-  customer_tier: order.customer.tier,
-  items_count: order.items.length
-});
+// GOOD - attributes for dimensions
+ordersProcessed.add(1, { order_type: order.type });
 ```
 
-### Anti-Pattern 2: "Metric Per Entity"
+### Don't: Span per Iteration
 
 ```javascript
-// BAD: Creating metrics with entity IDs
-meter.createCounter(`orders.${orderId}.processed`);  // Infinite metrics!
-meter.createHistogram(`user.${userId}.latency`);     // Millions of histograms!
-
-// GOOD: Use attributes for dimensions
-ordersProcessed.add(1, {
-  customer_tier: order.customer.tier,  // Bounded
-  order_type: order.type               // Bounded
-});
-```
-
-### Anti-Pattern 3: "Span Per Iteration"
-
-```javascript
-// BAD: Span explosion in loops
-for (const item of items) {  // 10,000 items = 10,000 spans
-  tracer.startActiveSpan('process.item', (span) => {
+// BAD - 10,000 items = 10,000 spans
+for (const item of items) {
+  tracer.startActiveSpan("process.item", span => {
     processItem(item);
     span.end();
   });
 }
 
-// GOOD: Single span with events or metrics
-tracer.startActiveSpan('process.batch', (span) => {
-  span.setAttribute('batch.size', items.length);
-
-  for (const item of items) {
-    processItem(item);
-    // Use event for sampling, not span
-    if (shouldSample()) {
-      span.addEvent('item.processed', { item_id: item.id });
-    }
-  }
-
-  span.setAttribute('batch.processed', items.length);
+// GOOD - single span with batch size
+tracer.startActiveSpan("process.batch", span => {
+  span.setAttribute("batch.size", items.length);
+  items.forEach(processItem);
   span.end();
 });
 ```
 
-### Anti-Pattern 4: "Timestamp Attributes"
+### Don't: Timestamps as Attributes
 
 ```javascript
-// BAD: Timestamps as attributes
-span.setAttribute('started_at', Date.now());
-span.setAttribute('finished_at', Date.now());
-metric.record(value, { timestamp: Date.now() });  // Infinite cardinality!
+// BAD - infinite cardinality
+span.setAttribute("started_at", Date.now());
 
-// GOOD: Use built-in timing
+// GOOD - use built-in timing
 // Spans have automatic start/end times
-// Metrics have automatic timestamps
-// Events have automatic timestamps
-span.addEvent('checkpoint');  // Timestamp is automatic
 ```
 
-### Anti-Pattern 5: "Full Request/Response Logging"
+### Don't: Full Request/Response Bodies
 
 ```javascript
-// BAD: Logging entire payloads
-logger.info('Request received', { body: req.body });  // Could be huge, PII risk
-span.setAttribute('response.body', JSON.stringify(response));  // Size limit issues
+// BAD - size issues, PII risk
+span.setAttribute("request.body", JSON.stringify(req.body));
 
-// GOOD: Log structure, not content
-logger.info('Request received', {
-  content_type: req.headers['content-type'],
-  body_size: JSON.stringify(req.body).length,
-  has_file: !!req.file
-});
+// GOOD - structure, not content
+span.setAttribute("request.content_type", req.contentType);
+span.setAttribute("request.body_size", JSON.stringify(req.body).length);
 ```
 
 ---
 
-## Quality Metrics
+## Semantic Conventions
 
-### Track Your Telemetry Health
+Use standard attribute names:
 
-```javascript
-// Metrics about your metrics
-const telemetryHealth = {
-  // Cardinality tracking
-  'telemetry.metrics.cardinality': new Gauge(),
-  'telemetry.metrics.cardinality.growth_rate': new Gauge(),
+```yaml
+# HTTP
+http.request.method: GET          # Not: method, http_method
+http.response.status_code: 200    # Not: status, statusCode
+url.path: /api/users              # Not: path, http.path
 
-  // Cost tracking
-  'telemetry.spans.exported': new Counter(),
-  'telemetry.spans.dropped': new Counter(),
-  'telemetry.metrics.exported': new Counter(),
+# Database
+db.system: postgresql             # Not: database, db_type
+db.operation.name: SELECT         # Not: query_type
 
-  // Quality tracking
-  'telemetry.spans.with_errors': new Counter(),
-  'telemetry.spans.duration_exceeded': new Counter(),
-};
-
-// Alert on cardinality growth
-alert:
-  name: cardinality_explosion
-  expr: rate(telemetry.metrics.cardinality[1h]) > 1000
-  for: 5m
-  labels:
-    severity: warning
-  annotations:
-    summary: "Metric cardinality growing rapidly"
+# Errors
+error.type: ValidationError       # Not: error_class
+exception.message: "Invalid..."   # Not: error_message
 ```
 
-### Quality Checklist
+---
+
+## Quality Checklist
 
 Before deploying new telemetry:
 
-```
-[ ] Cardinality calculated and within budget
-[ ] All attributes are bounded or normalized
-[ ] Semantic conventions used where applicable
-[ ] No PII in attributes or logs
-[ ] Sampling strategy defined
-[ ] Cost impact estimated
-[ ] Dashboard/alert exists that uses this data
-[ ] Retention requirements considered
-```
-
----
-
-## Summary: The Quality Hierarchy
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  TELEMETRY QUALITY HIERARCHY                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Level 1: CORRECTNESS                                           │
-│  └─ Data is accurate and complete                               │
-│  └─ Timestamps are correct                                      │
-│  └─ Context propagation works                                   │
-│                                                                 │
-│  Level 2: ACTIONABILITY                                         │
-│  └─ Every signal helps detect, localize, or explain             │
-│  └─ Dashboards and alerts are built on this data                │
-│  └─ Incidents are diagnosed faster with this data               │
-│                                                                 │
-│  Level 3: EFFICIENCY                                            │
-│  └─ Cardinality is bounded and budgeted                         │
-│  └─ Attributes are normalized                                   │
-│  └─ Sampling is appropriate for signal type                     │
-│                                                                 │
-│  Level 4: SUSTAINABILITY                                        │
-│  └─ Costs scale linearly (not exponentially) with growth        │
-│  └─ Team understands what telemetry exists and why              │
-│  └─ Regular reviews prune unused telemetry                      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+- [ ] Cardinality calculated and < 100K series
+- [ ] All attributes bounded or normalized
+- [ ] Semantic conventions used
+- [ ] No PII in attributes
+- [ ] Sampling strategy defined
+- [ ] Dashboard or alert will use this data

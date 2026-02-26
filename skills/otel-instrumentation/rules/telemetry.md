@@ -1,14 +1,16 @@
 ---
-title: "Signals: Spans, Metrics, Logs"
+title: "Telemetry: Spans, Metrics, Logs"
 impact: CRITICAL
 tags:
+  - telemetry
   - spans
   - metrics
   - logs
   - traces
+  - cardinality
 ---
 
-# Signals Reference
+# Telemetry Reference
 
 ## Spans
 
@@ -95,14 +97,40 @@ http.server.duration      # Histogram
 db.connections.active     # UpDownCounter
 ```
 
-### Cardinality Rules
+### Cardinality
+
+**The #1 cost driver.** Before adding attributes, calculate:
+
+```
+method:    5 values
+route:     50 values (normalized)
+status:    5 values (bucketed)
+instances: 10
+
+Total: 5 × 50 × 5 × 10 = 12,500 series ✓
+```
+
+| Series | Zone | Action |
+|--------|------|--------|
+| < 10K | Ideal | Proceed |
+| 10K-100K | Caution | Review attributes |
+| > 100K | Danger | Remove unbounded attributes |
+
+**Never use on metrics:**
+- `user.id`, `request.id`, `order.id`
+- `url.full` (has query params)
+- `timestamp`, `ip.address`
+
+### Normalization
 
 ```javascript
-// GOOD: bounded labels
-counter.add(1, { method: "GET", route: "/users/{id}", status: "2xx" });
+// URLs: /users/123 → /users/{id}
+path.replace(/\/\d+/g, "/{id}")
 
-// BAD: unbounded labels
-counter.add(1, { user_id: userId });  // Millions of values!
+// Status codes: 200 → "2xx"
+if (code >= 200 && code < 300) return "2xx";
+if (code >= 400 && code < 500) return "4xx";
+if (code >= 500) return "5xx";
 ```
 
 ---
@@ -147,28 +175,29 @@ function getTraceContext() {
 logger.info("order.placed", { ...getTraceContext(), order_id: orderId });
 ```
 
-### Severity Mapping
+---
 
-| Logger | OTel |
-|--------|------|
-| debug | DEBUG (5) |
-| info | INFO (9) |
-| warn | WARN (13) |
-| error | ERROR (17) |
+## Attribute Placement
+
+| Signal | Cardinality Tolerance | OK | Avoid |
+|--------|----------------------|----|----|
+| Metrics | Very low | method, route, status_bucket | user.id |
+| Spans | Medium | + user.id, order.id | request.body |
+| Logs | Higher | + request.id | secrets |
 
 ---
 
-## Common Anti-Patterns
+## Anti-Patterns
 
 ### Spans in Loops
 
 ```javascript
-// BAD
+// BAD: 10,000 items = 10,000 spans
 items.forEach(item => {
   tracer.startActiveSpan("process.item", span => { process(item); span.end(); });
 });
 
-// GOOD
+// GOOD: single span
 tracer.startActiveSpan("process.batch", span => {
   span.setAttribute("batch.size", items.length);
   items.forEach(process);
@@ -179,10 +208,10 @@ tracer.startActiveSpan("process.batch", span => {
 ### Unbounded Metric Labels
 
 ```javascript
-// BAD
-counter.add(1, { user_id: userId, timestamp: Date.now() });
+// BAD: millions of series
+counter.add(1, { user_id: userId });
 
-// GOOD
+// GOOD: bounded
 counter.add(1, { user_tier: "premium" });
 ```
 
@@ -207,3 +236,4 @@ logger.error("order.failed", {
 - [Traces](https://opentelemetry.io/docs/concepts/signals/traces/)
 - [Metrics](https://opentelemetry.io/docs/concepts/signals/metrics/)
 - [Logs](https://opentelemetry.io/docs/concepts/signals/logs/)
+- [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)

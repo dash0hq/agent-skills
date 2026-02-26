@@ -2,61 +2,58 @@
 
 Expert guidance for implementing high-quality, cost-efficient OpenTelemetry telemetry across Node.js and browser applications.
 
+## Rules
+
+| Rule | Description |
+|------|-------------|
+| [telemetry](./rules/telemetry.md) | Spans, metrics, logs, cardinality, anti-patterns |
+| [nodejs](./rules/nodejs.md) | Node.js instrumentation with auto-instrumentation |
+| [browser](./rules/browser.md) | Browser instrumentation with Dash0 SDK or OTel |
+
 ## Quick Start
 
-If you're new to OpenTelemetry, start with these rules:
+**Node.js:**
+```bash
+npm install @opentelemetry/auto-instrumentations-node
 
-1. `core-setup` - Basic SDK configuration
-2. `signal-spans` - Understanding traces
-3. Your platform: `nodejs-sdk-setup` or `browser-sdk-setup`
+export OTEL_SERVICE_NAME="my-service"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_TOKEN"
+export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
 
-## Rule Categories
+node app.js
+```
 
-| Section | Rules | Use When |
-|---------|-------|----------|
-| **Signal Types** | `signal-spans`, `signal-metrics`, `signal-logs` | Understanding telemetry signals |
-| **Core Concepts** | `core-setup`, `core-telemetry-quality` | Production setup, cost control |
-| **Dash0** | `dash0-overview`, `dash0-mcp-server`, `dash0-agent0` | Using Dash0 platform |
-| **Node.js** | `nodejs-sdk-setup`, `nodejs-auto-instrumentation`, `nodejs-manual-instrumentation` | Backend instrumentation |
-| **Browser** | `browser-sdk-setup`, `browser-auto-instrumentation`, `browser-manual-instrumentation`, `browser-server-correlation` | Frontend instrumentation |
+**Browser:**
+```bash
+npm install @dash0/sdk-web
+```
+
+```javascript
+import { init } from "@dash0/sdk-web";
+
+init({
+  serviceName: "my-frontend",
+  endpoint: { url: "https://ingress.eu-west-1.dash0.com:4318", authToken: "YOUR_TOKEN" }
+});
+```
 
 ## Key Principles
 
-### Signal Density Over Volume
-
-Every telemetry item should serve one of three purposes:
-- **Detect** - Help identify that something is wrong
-- **Localize** - Help pinpoint where the problem is
-- **Explain** - Help understand why it happened
-
-If it doesn't serve one of these purposes, don't emit it.
-
-### Push Reduction Early
-
-```
-SDK (sampling)  →  Collector (filtering)  →  Backend (retention)
-     ↓                    ↓                       ↓
-  Cheapest           Centralized              Most flexible
-```
-
-### SLO-Aware Policies
-
-- **Never sample** metrics used in SLO calculations
-- **Always capture** error traces for SLO violations
-- **Prioritize** data needed for incident response
+- **Signal density over volume** - Every telemetry item should help detect, localize, or explain issues
+- **Push reduction early** - SDK sampling → Collector filtering → Backend retention
+- **SLO-aware policies** - Never sample data feeding your SLOs
 
 ## Installation
 
 ```bash
-npx skills add dash0/skills/otel-instrumentation
+npx skills add dash0/otel-instrumentation
 ```
 
 ## Official Documentation
 
 - [OpenTelemetry Docs](https://opentelemetry.io/docs/)
-- [Signals Overview](https://opentelemetry.io/docs/concepts/signals/)
-- [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/)
-- [Collector](https://opentelemetry.io/docs/collector/)
+- [Dash0 Integration Hub](https://www.dash0.com/hub/integrations)
 
 ## License
 

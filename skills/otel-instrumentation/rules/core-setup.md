@@ -1,5 +1,5 @@
 ---
-title: "SDK Setup and Backend Integration"
+title: 'SDK Setup and Backend Integration'
 impact: CRITICAL
 tags:
   - setup
@@ -53,7 +53,7 @@ resource.attributes:
 ```yaml
 # Environment variables
 OTEL_EXPORTER_OTLP_ENDPOINT: https://collector.example.com:4317
-OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer token123"
+OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Bearer token123'
 
 # Or protocol-specific
 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: https://traces.example.com:4317
@@ -82,7 +82,7 @@ endpoint: https://collector:4318/v1/traces
 ```yaml
 # Trace sampling
 OTEL_TRACES_SAMPLER: parentbased_traceidratio
-OTEL_TRACES_SAMPLER_ARG: 0.1  # 10% sampling
+OTEL_TRACES_SAMPLER_ARG: 0.1 # 10% sampling
 
 # Available samplers
 samplers:
@@ -98,14 +98,14 @@ samplers:
 
 ```yaml
 # Traces
-OTEL_BSP_SCHEDULE_DELAY: 5000        # Export interval (ms)
-OTEL_BSP_MAX_QUEUE_SIZE: 2048        # Max queued spans
-OTEL_BSP_MAX_EXPORT_BATCH_SIZE: 512  # Spans per batch
-OTEL_BSP_EXPORT_TIMEOUT: 30000       # Export timeout (ms)
+OTEL_BSP_SCHEDULE_DELAY: 5000 # Export interval (ms)
+OTEL_BSP_MAX_QUEUE_SIZE: 2048 # Max queued spans
+OTEL_BSP_MAX_EXPORT_BATCH_SIZE: 512 # Spans per batch
+OTEL_BSP_EXPORT_TIMEOUT: 30000 # Export timeout (ms)
 
 # Metrics
-OTEL_METRIC_EXPORT_INTERVAL: 60000   # Collection interval (ms)
-OTEL_METRIC_EXPORT_TIMEOUT: 30000    # Export timeout (ms)
+OTEL_METRIC_EXPORT_INTERVAL: 60000 # Collection interval (ms)
+OTEL_METRIC_EXPORT_TIMEOUT: 30000 # Export timeout (ms)
 ```
 
 ## Authentication Patterns
@@ -114,12 +114,12 @@ OTEL_METRIC_EXPORT_TIMEOUT: 30000    # Export timeout (ms)
 
 ```yaml
 # Environment variable
-OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer your-token-here"
+OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Bearer your-token-here'
 
 # Or in code
 exporterOptions:
   headers:
-    authorization: "Bearer ${API_TOKEN}"
+    authorization: 'Bearer ${API_TOKEN}'
 ```
 
 ### API Key
@@ -269,10 +269,10 @@ regions:
 ```yaml
 # Dash0 uses Bearer token authentication
 headers:
-  authorization: "Bearer ${DASH0_AUTH_TOKEN}"
+  authorization: 'Bearer ${DASH0_AUTH_TOKEN}'
 
 # Environment variable
-OTEL_EXPORTER_OTLP_HEADERS: "authorization=Bearer ${DASH0_AUTH_TOKEN}"
+OTEL_EXPORTER_OTLP_HEADERS: 'authorization=Bearer ${DASH0_AUTH_TOKEN}'
 ```
 
 ### Quick Setup
@@ -291,7 +291,7 @@ exporters:
   otlp/dash0:
     endpoint: ingress.eu-west-1.dash0.com:4317
     headers:
-      authorization: "Bearer ${DASH0_AUTH_TOKEN}"
+      authorization: 'Bearer ${DASH0_AUTH_TOKEN}'
     tls:
       insecure: false
 
@@ -317,56 +317,8 @@ service:
 
 ## Other Backend Integrations
 
-### Grafana Cloud
-
-```yaml
-# Tempo (traces)
-OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: https://tempo-prod-XX.grafana.net:443
-
-# Mimir (metrics)
-OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: https://mimir-prod-XX.grafana.net:443
-
-# Loki (logs)
-OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: https://logs-prod-XX.grafana.net:443
-
-# Authentication
-OTEL_EXPORTER_OTLP_HEADERS: "authorization=Basic $(echo -n 'user:api-key' | base64)"
-```
-
-### Datadog
-
-```yaml
-# Use Datadog Agent as collector
-OTEL_EXPORTER_OTLP_ENDPOINT: http://datadog-agent:4317
-
-# Or direct to Datadog
-DD_API_KEY: your-datadog-api-key
-DD_SITE: datadoghq.com
-```
-
-### Honeycomb
-
-```yaml
-OTEL_EXPORTER_OTLP_ENDPOINT: https://api.honeycomb.io:443
-OTEL_EXPORTER_OTLP_HEADERS: "x-honeycomb-team=your-api-key"
-```
-
-### New Relic
-
-```yaml
-OTEL_EXPORTER_OTLP_ENDPOINT: https://otlp.nr-data.net:4317
-OTEL_EXPORTER_OTLP_HEADERS: "api-key=your-new-relic-key"
-```
-
-### Self-Hosted (Tempo + Prometheus)
-
-```yaml
-# Traces to Grafana Tempo
-traces:
-  endpoint: http://tempo:4317
-
-# Metrics to Prometheus
-metrics:
-  endpoint: http://prometheus:9090/api/v1/otlp
-  # Or use prometheus exporter
-```
+- Grafana Cloud
+- Datadog
+- Honeycomb
+- New Relic
+- Self-Hosted (Tempo + Prometheus)

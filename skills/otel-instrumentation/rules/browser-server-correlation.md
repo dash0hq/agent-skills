@@ -1,3 +1,14 @@
+---
+title: "Server-to-Browser Correlation"
+impact: HIGH
+tags:
+  - browser
+  - server
+  - correlation
+  - full-stack
+  - distributed-tracing
+---
+
 # Server-to-Browser Correlation Reference
 
 Guide to connecting frontend traces with backend traces for full-stack observability.

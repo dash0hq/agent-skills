@@ -1,3 +1,14 @@
+---
+title: "Dash0 Agent0 AI Platform"
+impact: HIGH
+tags:
+  - dash0
+  - agent0
+  - ai
+  - incident-investigation
+  - promql
+---
+
 # Dash0 Agent0
 
 ## What is Agent0?

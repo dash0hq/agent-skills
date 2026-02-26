@@ -1,5 +1,5 @@
 ---
-name: '@otel-telemetry'
+name: 'otel-instrumentation'
 description: Expert guidance for emitting high-quality, cost-efficient OpenTelemetry telemetry. Use when instrumenting applications with traces, metrics, or logs. Triggers on requests for observability, telemetry, tracing, metrics collection, logging integration, or OTel setup. Critical skill that asks clarifying questions to understand exact tracking requirements.
 license: MIT
 metadata:
@@ -334,17 +334,65 @@ Checklist:
 [ ] Resource attributes set (service.name required)
 ```
 
-## Reference Documents
+## Rule Categories
 
-For detailed guidance on each signal type:
+This skill contains 16 rules organized into 5 sections:
 
-- [Telemetry Quality](./references/telemetry-quality.md) - Cardinality, attribute hygiene, signal density
-- [Spans Reference](./references/signals/spans.md) - Traces and spans best practices
-- [Metrics Reference](./references/signals/metrics.md) - Metrics instrumentation guide
-- [Logs Reference](./references/signals/logs.md) - Structured logging with OTel
-- [Collector Reference](./references/collector.md) - Collector configuration
-- [Setup Reference](./references/setup.md) - SDK setup and backend integration
+### Signal Types (CRITICAL)
 
-## Examples
+| Rule | Description |
+|------|-------------|
+| [signal-spans](./rules/signal-spans.md) | Traces, spans, context propagation, sampling |
+| [signal-metrics](./rules/signal-metrics.md) | Counters, histograms, gauges, cardinality |
+| [signal-logs](./rules/signal-logs.md) | Structured logging, trace correlation, severity |
 
-- [Cost Optimization Scenarios](./examples/cost-optimization.md) - Real-world cost reduction strategies
+### Core Concepts (CRITICAL)
+
+| Rule | Description |
+|------|-------------|
+| [core-setup](./rules/core-setup.md) | SDK setup, OTLP, backend configuration |
+| [core-telemetry-quality](./rules/core-telemetry-quality.md) | Cardinality management, attribute hygiene |
+
+### Dash0 Integration (HIGH)
+
+| Rule | Description |
+|------|-------------|
+| [dash0-overview](./rules/dash0-overview.md) | Platform features, AI capabilities |
+| [dash0-mcp-server](./rules/dash0-mcp-server.md) | MCP Server setup for Claude Code, Cursor |
+| [dash0-agent0](./rules/dash0-agent0.md) | AI agents: Seeker, Oracle, Pathfinder |
+
+### Node.js Implementation (HIGH)
+
+| Rule | Description |
+|------|-------------|
+| [nodejs-sdk-setup](./rules/nodejs-sdk-setup.md) | instrumentation.ts, --import flag, exporters |
+| [nodejs-auto-instrumentation](./rules/nodejs-auto-instrumentation.md) | Auto-instrumentation packages, configuration |
+| [nodejs-manual-instrumentation](./rules/nodejs-manual-instrumentation.md) | Custom spans, metrics, context propagation |
+
+### Browser Implementation (HIGH)
+
+| Rule | Description |
+|------|-------------|
+| [browser-sdk-setup](./rules/browser-sdk-setup.md) | WebTracerProvider, context managers |
+| [browser-auto-instrumentation](./rules/browser-auto-instrumentation.md) | Document load, fetch, user interaction |
+| [browser-manual-instrumentation](./rules/browser-manual-instrumentation.md) | Route tracking, React Profiler, Web Vitals |
+| [browser-server-correlation](./rules/browser-server-correlation.md) | Full-stack trace correlation methods |
+
+## Quick Reference
+
+### By Platform
+
+- **Node.js**: `nodejs-sdk-setup` → `nodejs-auto-instrumentation` → `nodejs-manual-instrumentation`
+- **Browser**: `browser-sdk-setup` → `browser-auto-instrumentation` → `browser-manual-instrumentation`
+- **Full-Stack**: Add `browser-server-correlation` for end-to-end tracing
+
+### By Use Case
+
+| Use Case | Rules to Consult |
+|----------|------------------|
+| New project setup | `core-setup`, platform SDK setup |
+| Adding custom spans | `signal-spans`, platform manual instrumentation |
+| Reducing costs | `core-telemetry-quality` |
+| Using Dash0 | `dash0-overview`, `dash0-mcp-server` |
+| Debugging with AI | `dash0-agent0` |
+| Full-stack tracing | `browser-server-correlation` |

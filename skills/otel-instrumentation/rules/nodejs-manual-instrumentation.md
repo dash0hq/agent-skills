@@ -1,3 +1,14 @@
+---
+title: "Node.js Manual Instrumentation"
+impact: HIGH
+tags:
+  - nodejs
+  - manual-instrumentation
+  - spans
+  - metrics
+  - context
+---
+
 # Manual Instrumentation Reference
 
 Guide to creating custom spans, metrics, and logs with OpenTelemetry in Node.js.

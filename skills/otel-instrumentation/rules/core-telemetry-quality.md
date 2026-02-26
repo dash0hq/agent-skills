@@ -1,3 +1,14 @@
+---
+title: "Telemetry Quality and Cardinality"
+impact: CRITICAL
+tags:
+  - cardinality
+  - attributes
+  - quality
+  - cost
+  - optimization
+---
+
 # Telemetry Quality Reference
 
 Comprehensive guide to emitting high-quality, actionable telemetry that serves your observability goals without breaking the bank.

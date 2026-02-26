@@ -1,3 +1,14 @@
+---
+title: "Browser SDK Setup"
+impact: HIGH
+tags:
+  - browser
+  - sdk
+  - web
+  - frontend
+  - react
+---
+
 # Browser SDK Setup Reference
 
 Detailed guide to configuring the OpenTelemetry Web SDK.

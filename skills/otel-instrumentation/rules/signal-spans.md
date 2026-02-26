@@ -1,3 +1,13 @@
+---
+title: "Spans and Traces"
+impact: CRITICAL
+tags:
+  - traces
+  - spans
+  - distributed-tracing
+  - context-propagation
+---
+
 # Spans Reference
 
 Comprehensive guide to traces and spans in OpenTelemetry.

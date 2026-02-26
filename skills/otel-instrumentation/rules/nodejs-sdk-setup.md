@@ -1,3 +1,14 @@
+---
+title: "Node.js SDK Setup"
+impact: HIGH
+tags:
+  - nodejs
+  - sdk
+  - setup
+  - configuration
+  - typescript
+---
+
 # SDK Setup Reference
 
 Detailed guide to OpenTelemetry SDK initialization for Node.js.
@@ -423,17 +434,6 @@ const exporter = new OTLPTraceExporter({
   headers: {
     'Authorization': 'Bearer token'
   }
-});
-```
-
-### HTTP/JSON (Debugging)
-
-```typescript
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-
-const exporter = new OTLPTraceExporter({
-  url: 'https://collector:4318/v1/traces',
-  headers: {}
 });
 ```
 

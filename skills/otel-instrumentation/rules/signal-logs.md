@@ -1,3 +1,13 @@
+---
+title: "Structured Logging"
+impact: CRITICAL
+tags:
+  - logs
+  - structured-logging
+  - trace-correlation
+  - severity
+---
+
 # Logs Reference
 
 Comprehensive guide to structured logging with OpenTelemetry.

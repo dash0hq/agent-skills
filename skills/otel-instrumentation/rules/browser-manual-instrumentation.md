@@ -1,3 +1,14 @@
+---
+title: "Browser Manual Instrumentation"
+impact: HIGH
+tags:
+  - browser
+  - manual-instrumentation
+  - react
+  - web-vitals
+  - spa
+---
+
 # Browser Manual Instrumentation Reference
 
 Guide to creating custom spans, tracking events, and recording metrics in browser applications.
@@ -285,70 +296,6 @@ await tracker.track('checkout.complete', async () => {
 });
 ```
 
-### Track API Calls with Business Context
-
-```typescript
-import { trace, SpanStatusCode, context } from '@opentelemetry/api';
-
-const tracer = trace.getTracer('api-client');
-
-interface ApiCallOptions {
-  method: string;
-  path: string;
-  body?: unknown;
-  spanName?: string;
-  attributes?: Record<string, string | number>;
-}
-
-async function apiCall<T>({ method, path, body, spanName, attributes }: ApiCallOptions): Promise<T> {
-  const name = spanName || `api.${method.toLowerCase()}.${path.replace(/\//g, '.')}`;
-
-  return tracer.startActiveSpan(name, async (span) => {
-    try {
-      span.setAttribute('http.method', method);
-      span.setAttribute('http.url', path);
-
-      if (attributes) {
-        Object.entries(attributes).forEach(([k, v]) => span.setAttribute(k, v));
-      }
-
-      const response = await fetch(`/api${path}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-      });
-
-      span.setAttribute('http.status_code', response.status);
-
-      if (!response.ok) {
-        span.setStatus({ code: SpanStatusCode.ERROR, message: `HTTP ${response.status}` });
-      }
-
-      const data = await response.json();
-      return data as T;
-    } catch (error) {
-      span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR });
-      throw error;
-    } finally {
-      span.end();
-    }
-  });
-}
-
-// Usage
-const order = await apiCall<Order>({
-  method: 'POST',
-  path: '/orders',
-  body: { items: cart.items },
-  spanName: 'order.create',
-  attributes: {
-    'order.items_count': cart.items.length,
-    'order.total': cart.total
-  }
-});
-```
-
 ## Recording Metrics
 
 ### Counter (Events)
@@ -600,36 +547,6 @@ function manualContextPropagation() {
 
     parentSpan.end();
   });
-}
-```
-
-### Linking to Server Context
-
-```typescript
-import { context, trace, propagation } from '@opentelemetry/api';
-import { W3CTraceContextPropagator } from '@opentelemetry/core';
-
-// If server provides trace context in initial HTML
-function continueServerTrace() {
-  const traceparent = document.querySelector('meta[name="traceparent"]')?.getAttribute('content');
-
-  if (traceparent) {
-    const propagator = new W3CTraceContextPropagator();
-    const carrier = { traceparent };
-
-    const serverContext = propagator.extract(context.active(), carrier, {
-      get: (carrier, key) => carrier[key as keyof typeof carrier],
-      keys: () => ['traceparent']
-    });
-
-    // All browser operations now continue the server trace
-    context.with(serverContext, () => {
-      tracer.startActiveSpan('browser.hydration', (span) => {
-        // This span is a child of the server's trace
-        span.end();
-      });
-    });
-  }
 }
 ```
 

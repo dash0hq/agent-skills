@@ -1,3 +1,14 @@
+---
+title: "Dash0 MCP Server Setup"
+impact: HIGH
+tags:
+  - dash0
+  - mcp
+  - ai-assistant
+  - claude-code
+  - cursor
+---
+
 # Dash0 MCP Server
 
 ## What is MCP?

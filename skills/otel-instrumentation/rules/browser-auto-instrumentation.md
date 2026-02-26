@@ -1,3 +1,14 @@
+---
+title: "Browser Auto-Instrumentation"
+impact: HIGH
+tags:
+  - browser
+  - auto-instrumentation
+  - fetch
+  - document-load
+  - user-interaction
+---
+
 # Browser Auto-Instrumentation Reference
 
 Guide to automatic instrumentation available for browser applications.
@@ -57,11 +68,11 @@ Captures the full page load lifecycle using the Navigation Timing API.
 ### Spans Created
 
 ```
-documentLoad ─────────────────────────────────────── total page load
-  └─ documentFetch ───────────────────────────────── HTML fetch
-  └─ resourceFetch (script.js) ───────────────────── each resource
-  └─ resourceFetch (styles.css) ──────────────────── each resource
-  └─ resourceFetch (image.png) ───────────────────── each resource
+documentLoad ─────────────────────────────────── total page load
+  └─ documentFetch ───────────────────────────── HTML fetch
+  └─ resourceFetch (script.js) ───────────────── each resource
+  └─ resourceFetch (styles.css) ──────────────── each resource
+  └─ resourceFetch (image.png) ───────────────── each resource
 ```
 
 ### Configuration
@@ -424,4 +435,4 @@ You'll need manual instrumentation for:
 | Animation performance | Use Performance API |
 | Web Vitals (LCP, CLS, INP) | Use web-vitals library |
 
-See [manual-instrumentation.md](./manual-instrumentation.md) for these patterns.
+See [browser-manual-instrumentation](./browser-manual-instrumentation.md) for these patterns.

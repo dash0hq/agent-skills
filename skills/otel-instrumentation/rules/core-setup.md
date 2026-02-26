@@ -1,3 +1,14 @@
+---
+title: "SDK Setup and Backend Integration"
+impact: CRITICAL
+tags:
+  - setup
+  - sdk
+  - configuration
+  - otlp
+  - backend
+---
+
 # Setup Reference
 
 General setup guide for OpenTelemetry SDK and backend integration.
@@ -301,50 +312,6 @@ service:
       processors: [batch]
       exporters: [otlp/dash0]
 ```
-
-### Dash0 Dashboard Recommendations
-
-```yaml
-# Key dashboards to create
-dashboards:
-  - name: Service Overview
-    panels:
-      - Request rate (from traces)
-      - Error rate (from traces)
-      - Latency percentiles (from traces)
-      - Active instances (from metrics)
-
-  - name: Error Analysis
-    panels:
-      - Error traces by service
-      - Error distribution by type
-      - Error trends over time
-
-  - name: Performance
-    panels:
-      - Latency by endpoint
-      - Slow trace analysis
-      - Database query performance
-```
-
-### Dash0 Resources
-
-- [Dash0 Documentation](https://www.dash0.com/documentation)
-- [OTLP Integration Guide](https://www.dash0.com/documentation/opentelemetry)
-- [Dash0 Support](https://www.dash0.com/support)
-
-### Dash0 AI-Powered Features
-
-Dash0 provides AI-powered tools to help you understand and query your telemetry data:
-
-- **Agent0**: Built-in AI assistant with 5 specialized agents for incident investigation,
-  query optimization, and dashboard creation. Access with `Cmd+Shift+0` (macOS) or
-  `Ctrl+Shift+0` (Windows/Linux) in the Dash0 UI.
-
-- **MCP Server**: Connect your AI coding assistants (Claude Code, Cursor, Windsurf, etc.)
-  directly to your observability data for natural language queries.
-
-See the [Dash0 Platform Guide](./dash0/README.md) for detailed documentation.
 
 ---
 

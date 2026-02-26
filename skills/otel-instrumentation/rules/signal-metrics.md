@@ -1,3 +1,14 @@
+---
+title: "Metrics Instrumentation"
+impact: CRITICAL
+tags:
+  - metrics
+  - counters
+  - histograms
+  - gauges
+  - cardinality
+---
+
 # Metrics Reference
 
 Comprehensive guide to metrics instrumentation with OpenTelemetry.
@@ -380,38 +391,6 @@ new View({
   instrumentName: 'legacy.metric.name',
   name: 'new.metric.name'
 })
-```
-
-## Pre-Aggregation Strategies
-
-### At SDK Level
-
-```javascript
-// Instead of high-cardinality labels
-requestCounter.add(1, {
-  'user.id': userId,      // Bad: unbounded
-  'user.tier': userTier   // Good: bounded (free, pro, enterprise)
-});
-
-// Aggregate before recording
-const stats = aggregateByTier(requests);
-for (const [tier, count] of Object.entries(stats)) {
-  requestCounter.add(count, { 'user.tier': tier });
-}
-```
-
-### At Collector Level
-
-```yaml
-processors:
-  metricstransform:
-    transforms:
-      - include: http.server.duration
-        action: update
-        operations:
-          - action: aggregate_labels
-            label_set: [http.method, http.route]  # Drop others
-            aggregation_type: sum
 ```
 
 ## Environment-Specific Configuration

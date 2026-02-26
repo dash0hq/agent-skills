@@ -1,3 +1,14 @@
+---
+title: "Node.js Auto-Instrumentation"
+impact: HIGH
+tags:
+  - nodejs
+  - auto-instrumentation
+  - http
+  - express
+  - database
+---
+
 # Auto-Instrumentation Reference
 
 Guide to automatic instrumentation with OpenTelemetry for Node.js.

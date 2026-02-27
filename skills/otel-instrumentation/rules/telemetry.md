@@ -1,5 +1,5 @@
 ---
-title: "Telemetry: Spans, Metrics, Logs"
+title: 'Telemetry: Spans, Metrics, Logs'
 impact: CRITICAL
 tags:
   - telemetry
@@ -16,11 +16,11 @@ tags:
 
 Telemetry consists of three pillars: **Metrics**, **Traces**, and **Logs**. Each serves a distinct purpose in understanding system behavior.
 
-| Signal | What It Tells You | When to Use |
-|--------|-------------------|-------------|
-| Metrics | _What_ is happening (aggregated) | Alerting, dashboards, trends |
-| Traces | _Where_ it's happening (request flow) | Latency analysis, distributed debugging |
-| Logs | _Why_ it happened (details) | Root cause analysis, audit trails |
+| Signal  | What It Tells You                     | When to Use                             |
+| ------- | ------------------------------------- | --------------------------------------- |
+| Metrics | _What_ is happening (aggregated)      | Alerting, dashboards, trends            |
+| Traces  | _Where_ it's happening (request flow) | Latency analysis, distributed debugging |
+| Logs    | _Why_ it happened (details)           | Root cause analysis, audit trails       |
 
 **Symptom-to-cause workflow:** Metrics surface problems → Traces pinpoint location → Logs explain causation.
 
@@ -36,27 +36,27 @@ Metrics are time-stamped numerical measurements, aggregated over time.
 
 #### Instrument Types
 
-| Type | Use For | Example |
-|------|---------|---------|
-| Counter | Monotonic increase | Requests, errors |
-| UpDownCounter | Can decrease | Active connections |
-| Histogram | Distributions | Latency, sizes |
-| Gauge | Point-in-time | Memory, CPU |
+| Type          | Use For            | Example            |
+| ------------- | ------------------ | ------------------ |
+| Counter       | Monotonic increase | Requests, errors   |
+| UpDownCounter | Can decrease       | Active connections |
+| Histogram     | Distributions      | Latency, sizes     |
+| Gauge         | Point-in-time      | Memory, CPU        |
 
 #### Golden Signals
 
 ```javascript
 // Latency
-const duration = meter.createHistogram("http.server.duration", { unit: "ms" });
+const duration = meter.createHistogram('http.server.duration', { unit: 'ms' });
 
 // Traffic
-const requests = meter.createCounter("http.server.requests");
+const requests = meter.createCounter('http.server.requests');
 
 // Errors
-const errors = meter.createCounter("http.server.errors");
+const errors = meter.createCounter('http.server.errors');
 
 // Saturation
-meter.createObservableGauge("system.cpu.utilization", (result) => {
+meter.createObservableGauge('system.cpu.utilization', (result) => {
   result.observe(getCpuUtilization());
 });
 ```
@@ -90,9 +90,9 @@ Bad:  handleRequest, doStuff, /api/users/123
 #### Basic Pattern
 
 ```javascript
-tracer.startActiveSpan("order.process", async (span) => {
+tracer.startActiveSpan('order.process', async (span) => {
   try {
-    span.setAttribute("order.id", order.id);
+    span.setAttribute('order.id', order.id);
     const result = await processOrder(order);
     return result;
   } catch (error) {
@@ -107,16 +107,16 @@ tracer.startActiveSpan("order.process", async (span) => {
 
 #### Status Codes
 
-| Code | When |
-|------|------|
+| Code  | When                         |
+| ----- | ---------------------------- |
 | UNSET | Default, operation completed |
-| ERROR | Operation failed |
+| ERROR | Operation failed             |
 
 #### Events vs Logs
 
-| Use Events | Use Logs |
-|------------|----------|
-| Tied to span operation | Independent events |
+| Use Events              | Use Logs                 |
+| ----------------------- | ------------------------ |
+| Tied to span operation  | Independent events       |
 | Cache hit/miss, retries | Audit logs, debug output |
 
 ---
@@ -132,28 +132,28 @@ Logs are textual records of discrete events with local context.
 logger.info(`User ${userId} placed order ${orderId}`);
 
 // GOOD: structured
-logger.info("order.placed", {
+logger.info('order.placed', {
   user_id: userId,
   order_id: orderId,
-  amount: amount
+  amount: amount,
 });
 ```
 
 #### Levels by Environment
 
 | Level | Production | Development |
-|-------|------------|-------------|
-| ERROR | Always | Always |
-| WARN | Always | Always |
-| INFO | Sample 10% | Always |
-| DEBUG | Never | Always |
+| ----- | ---------- | ----------- |
+| ERROR | Always     | Always      |
+| WARN  | Always     | Always      |
+| INFO  | Sample 10% | Always      |
+| DEBUG | Never      | Always      |
 
 #### Trace Correlation
 
 Inject trace context into logs to navigate from traces to related log entries:
 
 ```javascript
-import { trace, context } from "@opentelemetry/api";
+import { trace, context } from '@opentelemetry/api';
 
 function getTraceContext() {
   const span = trace.getSpan(context.active());
@@ -162,7 +162,7 @@ function getTraceContext() {
   return { trace_id: ctx.traceId, span_id: ctx.spanId };
 }
 
-logger.info("order.placed", { ...getTraceContext(), order_id: orderId });
+logger.info('order.placed', { ...getTraceContext(), order_id: orderId });
 ```
 
 ---
@@ -171,27 +171,35 @@ logger.info("order.placed", { ...getTraceContext(), order_id: orderId });
 
 ### Cardinality Management
 
-**The #1 cost driver.** Cardinality is the number of unique time series created by your metrics. Before adding attributes, calculate:
+**The #1 cost driver.** Cardinality is the number of unique time series created by your metrics. Each new attribute multiplies your current total series count by its number of unique values. E.g. an additional attribute with 10 values turns 12,500 series into 125,000 instantly. Before adding attributes, calculate:
+
+An example of a metric with 4 attributes:
 
 ```
 method:    5 values
 route:     50 values (normalized)
 status:    5 values (bucketed)
 instances: 10
-
-Total: 5 × 50 × 5 × 10 = 12,500 series ✓
 ```
 
-| Series | Zone | Action |
-|--------|------|--------|
-| < 10K | Ideal | Proceed |
-| 10K-100K | Caution | Review attributes |
-| > 100K | Danger | Remove unbounded attributes |
+Total: 5 × 50 × 5 × 10 = <ins>**12,500 series**</ins> ✓
+
+| Series Count     | Zone       | Action                                  |
+| ---------------- | ---------- | --------------------------------------- |
+| < 1,000          | Minimal    | Room to add more dimensions             |
+| 1,000 - 10,000   | ✓ Ideal    | Good balance of detail vs cost          |
+| 10,000 - 50,000  | Acceptable | Monitor growth, review monthly          |
+| 50,000 - 100,000 | Caution    | Review attributes, consider sampling    |
+| > 100,000        | Danger     | Remove unbounded attributes immediately |
+| > 1,000,000      | Critical   | Backend instability, massive costs      |
 
 **Never use on metrics:**
+
 - `user.id`, `request.id`, `order.id`
 - `url.full` (has query params)
 - `timestamp`, `ip.address`
+
+Why? Each unique value creates a new time series, which can quickly lead to millions of series and skyrocketing costs.
 
 ### Normalization
 
@@ -199,23 +207,23 @@ Normalize high-cardinality values before using them as attributes:
 
 ```javascript
 // URLs: /users/123 → /users/{id}
-path.replace(/\/\d+/g, "/{id}")
+path.replace(/\/\d+/g, '/{id}');
 
 // Status codes: 200 → "2xx"
-if (code >= 200 && code < 300) return "2xx";
-if (code >= 400 && code < 500) return "4xx";
-if (code >= 500) return "5xx";
+if (code >= 200 && code < 300) return '2xx';
+if (code >= 400 && code < 500) return '4xx';
+if (code >= 500) return '5xx';
 ```
 
 ### Attribute Placement
 
 Different signals tolerate different cardinality levels:
 
-| Signal | Cardinality Tolerance | OK | Avoid |
-|--------|----------------------|----|----|
-| Metrics | Very low | method, route, status_bucket | user.id |
-| Spans | Medium | + user.id, order.id | request.body |
-| Logs | Higher | + request.id | secrets |
+| Signal  | Cardinality Tolerance | OK                           | Avoid        |
+| ------- | --------------------- | ---------------------------- | ------------ |
+| Metrics | Very low              | method, route, status_bucket | user.id      |
+| Spans   | Medium                | + user.id, order.id          | request.body |
+| Logs    | Higher                | + request.id                 | secrets      |
 
 ---
 
@@ -225,13 +233,16 @@ Different signals tolerate different cardinality levels:
 
 ```javascript
 // BAD: 10,000 items = 10,000 spans
-items.forEach(item => {
-  tracer.startActiveSpan("process.item", span => { process(item); span.end(); });
+items.forEach((item) => {
+  tracer.startActiveSpan('process.item', (span) => {
+    process(item);
+    span.end();
+  });
 });
 
 // GOOD: single span
-tracer.startActiveSpan("process.batch", span => {
-  span.setAttribute("batch.size", items.length);
+tracer.startActiveSpan('process.batch', (span) => {
+  span.setAttribute('batch.size', items.length);
   items.forEach(process);
   span.end();
 });
@@ -244,7 +255,7 @@ tracer.startActiveSpan("process.batch", span => {
 counter.add(1, { user_id: userId });
 
 // GOOD: bounded
-counter.add(1, { user_tier: "premium" });
+counter.add(1, { user_tier: 'premium' });
 ```
 
 ### Unstructured Logs
@@ -254,10 +265,10 @@ counter.add(1, { user_tier: "premium" });
 logger.error(`Failed: ${error.message}`);
 
 // GOOD
-logger.error("order.failed", {
+logger.error('order.failed', {
   error_type: error.name,
   error_message: error.message,
-  order_id: orderId
+  order_id: orderId,
 });
 ```
 
@@ -265,12 +276,12 @@ logger.error("order.failed", {
 
 ```javascript
 // BAD: logs without context
-logger.info("Payment processed");
+logger.info('Payment processed');
 
 // GOOD: logs with trace context
-logger.info("payment.processed", {
+logger.info('payment.processed', {
   ...getTraceContext(),
-  payment_id: paymentId
+  payment_id: paymentId,
 });
 ```
 

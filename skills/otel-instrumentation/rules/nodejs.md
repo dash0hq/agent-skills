@@ -145,6 +145,39 @@ node --env-file=.env.local app.js
 
 **Note**: The `--env-file` flag requires Node.js 20.6 or later.
 
+### Using package.json Scripts
+
+Add instrumented scripts to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "start": "node app.js",
+    "start:otel": "node --env-file=.env.local app.js",
+    "start:otel:console": "OTEL_SERVICE_NAME=my-service OTEL_TRACES_EXPORTER=console node --import @opentelemetry/auto-instrumentations-node/register app.js",
+    "dev": "node --env-file=.env.local --watch app.js"
+  }
+}
+```
+
+**.env.local** (create this file):
+```bash
+OTEL_SERVICE_NAME=my-service
+OTEL_TRACES_EXPORTER=otlp
+OTEL_METRICS_EXPORTER=otlp
+OTEL_LOGS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com:4317
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
+NODE_OPTIONS=--import @opentelemetry/auto-instrumentations-node/register
+```
+
+**Usage:**
+```bash
+npm run start:otel          # Run with OTLP export to backend
+npm run start:otel:console  # Run with console output (no collector needed)
+npm run dev                 # Development with watch mode + telemetry
+```
+
 ---
 
 ## Local Development

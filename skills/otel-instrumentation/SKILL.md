@@ -23,6 +23,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 | [telemetry](./rules/telemetry.md) | Spans, metrics, logs - how to write good telemetry |
 | [nodejs](./rules/nodejs.md) | Node.js instrumentation setup |
 | [browser](./rules/browser.md) | Browser instrumentation setup |
+| [nextjs](./rules/nextjs.md) | Next.js full-stack instrumentation (App Router) |
 
 ## Official Documentation
 
@@ -61,5 +62,6 @@ SDK (sampling)  →  Collector (filtering)  →  Backend (retention)
 |----------|------|
 | Node.js backend | [nodejs](./rules/nodejs.md) |
 | Browser frontend | [browser](./rules/browser.md) |
+| Next.js (App Router) | [nextjs](./rules/nextjs.md) |
 | Writing spans/metrics/logs | [telemetry](./rules/telemetry.md) |
 | Cardinality management | [telemetry](./rules/telemetry.md) |

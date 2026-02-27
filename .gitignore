@@ -1,2 +1,7 @@
 .claude
 
+node_modules
+dist
+
+.env*
+.next

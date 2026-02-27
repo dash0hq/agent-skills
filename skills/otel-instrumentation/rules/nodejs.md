@@ -25,7 +25,26 @@ Instrument Node.js applications to generate traces, logs, and metrics for deep i
 npm install @opentelemetry/auto-instrumentations-node
 ```
 
-**Note**: Installing the package alone is insufficient—you must activate the SDK.
+**Note**: Installing the package alone is insufficient—you must activate the SDK AND enable exporters.
+
+---
+
+## Environment Variables
+
+All environment variables that control the SDK behavior:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OTEL_SERVICE_NAME` | Yes | `unknown_service` | Identifies your service in telemetry data |
+| `OTEL_TRACES_EXPORTER` | Yes | `none` | **Must set to `otlp`** to export traces |
+| `OTEL_METRICS_EXPORTER` | No | `none` | Set to `otlp` to export metrics |
+| `OTEL_LOGS_EXPORTER` | No | `none` | Set to `otlp` to export logs |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4317` | OTLP collector endpoint |
+| `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `grpc` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
+| `OTEL_RESOURCE_ATTRIBUTES` | No | - | Additional resource attributes (e.g., `deployment.environment=production`) |
+
+**Critical**: Without `OTEL_TRACES_EXPORTER=otlp`, the SDK defaults to `none` and no telemetry is exported.
 
 ---
 
@@ -33,13 +52,19 @@ npm install @opentelemetry/auto-instrumentations-node
 
 ### 1. Activate the SDK
 
-Use `NODE_OPTIONS` to load dependencies at startup:
+The SDK must be loaded before your application code. The method depends on your module system:
 
+**ESM Projects** (package.json has `"type": "module"` or using `.mjs` files):
+```bash
+export NODE_OPTIONS="--import @opentelemetry/auto-instrumentations-node/register"
+```
+
+**CommonJS Projects** (default, or using `.cjs` files):
 ```bash
 export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
 ```
 
-**Note**: Tools like npm, pnpm, and yarn are Node.js applications, so you may observe instrumentation data from package managers.
+**Note**: Tools like npm, pnpm, and yarn are Node.js applications, so you may observe instrumentation data from package managers when running commands.
 
 ### 2. Set Service Name
 
@@ -47,14 +72,27 @@ export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/registe
 export OTEL_SERVICE_NAME="my-service"
 ```
 
-### 3. Configure Export
+### 3. Enable Exporters
+
+**This step is required** - without it, no telemetry is sent:
+
+```bash
+# Required for traces
+export OTEL_TRACES_EXPORTER="otlp"
+
+# Optional: also export metrics and logs
+export OTEL_METRICS_EXPORTER="otlp"
+export OTEL_LOGS_EXPORTER="otlp"
+```
+
+### 4. Configure Endpoint
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 ```
 
-### 4. Optional: Target Specific Dataset
+### 5. Optional: Target Specific Dataset
 
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
@@ -64,14 +102,114 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Da
 
 ## Complete Setup
 
+### Using Environment Variables
+
 ```bash
+# Service identification
 export OTEL_SERVICE_NAME="my-service"
+
+# Enable exporters (required!)
+export OTEL_TRACES_EXPORTER="otlp"
+export OTEL_METRICS_EXPORTER="otlp"
+export OTEL_LOGS_EXPORTER="otlp"
+
+# Configure endpoint
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
-export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
+
+# Activate SDK (use --import for ESM, --require for CommonJS)
+export NODE_OPTIONS="--import @opentelemetry/auto-instrumentations-node/register"
 
 node app.js
 ```
+
+### Using .env.local File
+
+Node.js does not automatically load `.env` files. Use the `--env-file` flag (Node.js 20.6+):
+
+**.env.local:**
+```bash
+OTEL_SERVICE_NAME=my-service
+OTEL_TRACES_EXPORTER=otlp
+OTEL_METRICS_EXPORTER=otlp
+OTEL_LOGS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com:4317
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
+NODE_OPTIONS=--import @opentelemetry/auto-instrumentations-node/register
+```
+
+**Run with:**
+```bash
+node --env-file=.env.local app.js
+```
+
+**Note**: The `--env-file` flag requires Node.js 20.6 or later.
+
+### Using package.json Scripts
+
+Add instrumented scripts to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "start": "node app.js",
+    "start:otel": "node --env-file=.env.local app.js",
+    "start:otel:console": "OTEL_SERVICE_NAME=my-service OTEL_TRACES_EXPORTER=console node --import @opentelemetry/auto-instrumentations-node/register app.js",
+    "dev": "node --env-file=.env.local --watch app.js"
+  }
+}
+```
+
+**.env.local** (create this file):
+```bash
+OTEL_SERVICE_NAME=my-service
+OTEL_TRACES_EXPORTER=otlp
+OTEL_METRICS_EXPORTER=otlp
+OTEL_LOGS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com:4317
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
+NODE_OPTIONS=--import @opentelemetry/auto-instrumentations-node/register
+```
+
+**Usage:**
+```bash
+npm run start:otel          # Run with OTLP export to backend
+npm run start:otel:console  # Run with console output (no collector needed)
+npm run dev                 # Development with watch mode + telemetry
+```
+
+---
+
+## Local Development
+
+### Console Exporter
+
+For development without a collector, use the console exporter to see telemetry in your terminal:
+
+```bash
+export OTEL_SERVICE_NAME="my-service"
+export OTEL_TRACES_EXPORTER="console"
+export OTEL_METRICS_EXPORTER="console"
+export OTEL_LOGS_EXPORTER="console"
+export NODE_OPTIONS="--import @opentelemetry/auto-instrumentations-node/register"
+
+node app.js
+```
+
+This prints spans, metrics, and logs directly to stdout—useful for verifying instrumentation works before configuring a remote backend.
+
+### Without a Collector
+
+If you set `OTEL_TRACES_EXPORTER=otlp` but have no collector running, you'll see connection errors. This is expected behavior:
+
+```
+Error: 14 UNAVAILABLE: No connection established. Last error: connect ECONNREFUSED 127.0.0.1:4317
+```
+
+**Options:**
+1. Use `console` exporter during development (recommended for quick testing)
+2. Run a local OpenTelemetry Collector
+3. Point directly to your observability backend
 
 ---
 
@@ -134,8 +272,60 @@ async function processOrder(order) {
 
 ---
 
+## Troubleshooting
+
+### No Telemetry Appearing
+
+**Check exporters are enabled:**
+```bash
+echo $OTEL_TRACES_EXPORTER  # Should be "otlp" or "console", not empty
+```
+
+The SDK defaults `OTEL_TRACES_EXPORTER` to `none`, which silently discards all telemetry.
+
+**Verify SDK is loaded:**
+```bash
+echo $NODE_OPTIONS  # Should contain --import or --require
+```
+
+### ECONNREFUSED Errors
+
+```
+Error: 14 UNAVAILABLE: connect ECONNREFUSED 127.0.0.1:4317
+```
+
+This means the SDK is working but cannot reach the collector:
+- **No collector running**: Start a local collector or use `OTEL_TRACES_EXPORTER=console`
+- **Wrong endpoint**: Check `OTEL_EXPORTER_OTLP_ENDPOINT` is correct
+- **Port mismatch**: gRPC uses 4317, HTTP uses 4318
+
+### Environment Variables Not Loading
+
+If using `.env.local`:
+- Ensure you're using `--env-file=.env.local` flag
+- Requires Node.js 20.6+
+- Check file path is correct relative to where you run the command
+
+### ESM/CommonJS Mismatch
+
+**Symptom**: SDK loads but no instrumentation happens
+
+**Fix**: Match the flag to your module system:
+- ESM (`"type": "module"` in package.json): Use `--import`
+- CommonJS (default): Use `--require`
+
+### "Exporter is Empty" or Similar Warnings
+
+Usually means `OTEL_TRACES_EXPORTER` (or metrics/logs) is not set. Set it explicitly:
+```bash
+export OTEL_TRACES_EXPORTER="otlp"
+```
+
+---
+
 ## Resources
 
 - [OpenTelemetry Node.js Documentation](https://opentelemetry.io/docs/languages/js/getting-started/nodejs/)
 - [Auto-Instrumentation Package](https://www.npmjs.com/package/@opentelemetry/auto-instrumentations-node)
+- [Environment Variable Specification](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/)
 - [Dash0 Kubernetes Operator](https://github.com/dash0hq/dash0-operator)

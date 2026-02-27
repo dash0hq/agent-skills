@@ -11,7 +11,8 @@ otel-instrumentation/
 └── rules/
     ├── telemetry.md      # Spans, metrics, logs, cardinality
     ├── nodejs.md         # Node.js instrumentation
-    └── browser.md        # Browser instrumentation
+    ├── browser.md        # Browser instrumentation
+    └── nextjs.md         # Next.js full-stack instrumentation
 ```
 
 ## Getting Started
@@ -31,6 +32,7 @@ The skill activates automatically when working on observability tasks.
 | [telemetry](./rules/telemetry.md) | CRITICAL | Spans, metrics, logs, cardinality management |
 | [nodejs](./rules/nodejs.md) | HIGH | Node.js auto-instrumentation setup |
 | [browser](./rules/browser.md) | HIGH | Browser instrumentation with Dash0 SDK |
+| [nextjs](./rules/nextjs.md) | HIGH | Next.js full-stack instrumentation (App Router) |
 
 ## Rule File Structure
 

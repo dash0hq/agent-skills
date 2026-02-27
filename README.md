@@ -21,6 +21,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 - Telemetry (spans, metrics, logs, cardinality, anti-patterns)
 - Node.js (auto-instrumentation, environment variables, Kubernetes)
 - Browser (Dash0 SDK, OpenTelemetry JS, server correlation)
+- Next.js (App Router, full-stack instrumentation, common gotchas)
 
 **Platforms:**
 - Node.js (Express, Fastify, NestJS, etc.)

@@ -1,5 +1,5 @@
 ---
-title: "Next.js Instrumentation"
+title: 'Next.js Instrumentation'
 impact: HIGH
 tags:
   - nextjs
@@ -51,8 +51,6 @@ NEXT_PUBLIC_OTEL_ENDPOINT=https://ingress.eu-west-1.dash0.com
 NEXT_PUBLIC_OTEL_AUTH_TOKEN=your-auth-token-here
 ```
 
-**No port numbers** on Dash0 endpoints. Use `https://ingress.eu-west-1.dash0.com` not `:4318`.
-
 ### 3. Create `src/instrumentation.ts` (Server)
 
 ```typescript
@@ -62,15 +60,22 @@ import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
+import {
+  BatchLogRecordProcessor,
+  LoggerProvider,
+} from '@opentelemetry/sdk-logs';
 import { logs } from '@opentelemetry/api-logs';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+import {
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+} from '@opentelemetry/semantic-conventions';
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     // CRITICAL: Read env vars inside register() to ensure .env.local is loaded
-    const OTEL_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
+    const OTEL_ENDPOINT =
+      process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
     const OTEL_AUTH_TOKEN = process.env.NEXT_PUBLIC_OTEL_AUTH_TOKEN;
 
     console.log('[OTel] Endpoint:', OTEL_ENDPOINT);
@@ -125,7 +130,8 @@ export async function register() {
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
-      sdk.shutdown()
+      sdk
+        .shutdown()
         .then(() => loggerProvider.shutdown())
         .then(() => console.log('Telemetry shut down'))
         .catch((err) => console.error('Shutdown error', err))
@@ -161,21 +167,21 @@ export { addSignalAttribute, sendEvent };
 ### 5. Add CORS Headers to `next.config.ts`
 
 ```typescript
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/api/:path*",
+        source: '/api/:path*',
         headers: [
           {
-            key: "Access-Control-Allow-Headers",
-            value: "Content-Type, Authorization, traceparent, tracestate",
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization, traceparent, tracestate',
           },
           {
-            key: "Access-Control-Expose-Headers",
-            value: "X-Trace-Id",
+            key: 'Access-Control-Expose-Headers',
+            value: 'X-Trace-Id',
           },
         ],
       },
@@ -215,16 +221,6 @@ rm -rf .next && npm run dev
 
 Client-side env vars are inlined at build time. Changes won't take effect without clearing the cache.
 
-### No Port Numbers on Dash0 Endpoints
-
-```bash
-# WRONG
-OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com:4318
-
-# CORRECT
-OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com
-```
-
 ### Package API Notes
 
 - Use `resourceFromAttributes` (not `new Resource()`)
@@ -237,18 +233,18 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com
 Create `src/lib/telemetry.ts` for custom spans, metrics, and logs:
 
 ```typescript
-import { trace, context, SpanStatusCode, metrics } from "@opentelemetry/api";
-import { logs, SeverityNumber } from "@opentelemetry/api-logs";
+import { trace, context, SpanStatusCode, metrics } from '@opentelemetry/api';
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 
-export function getTracer(name = "my-app") {
+export function getTracer(name = 'my-app') {
   return trace.getTracer(name);
 }
 
-export function getMeter(name = "my-app") {
+export function getMeter(name = 'my-app') {
   return metrics.getMeter(name);
 }
 
-export function getLogger(name = "my-app") {
+export function getLogger(name = 'my-app') {
   return logs.getLogger(name);
 }
 
@@ -264,7 +260,7 @@ export const logger = {
   info(message: string, attributes: Record<string, unknown> = {}) {
     getLogger().emit({
       severityNumber: SeverityNumber.INFO,
-      severityText: "INFO",
+      severityText: 'INFO',
       body: message,
       attributes: { ...getTraceContext(), ...attributes },
     });
@@ -272,7 +268,7 @@ export const logger = {
   warn(message: string, attributes: Record<string, unknown> = {}) {
     getLogger().emit({
       severityNumber: SeverityNumber.WARN,
-      severityText: "WARN",
+      severityText: 'WARN',
       body: message,
       attributes: { ...getTraceContext(), ...attributes },
     });
@@ -280,7 +276,7 @@ export const logger = {
   error(message: string, attributes: Record<string, unknown> = {}) {
     getLogger().emit({
       severityNumber: SeverityNumber.ERROR,
-      severityText: "ERROR",
+      severityText: 'ERROR',
       body: message,
       attributes: { ...getTraceContext(), ...attributes },
     });
@@ -291,7 +287,7 @@ export const logger = {
 export async function withSpan<T>(
   name: string,
   attributes: Record<string, string | number | boolean>,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   return getTracer().startActiveSpan(name, async (span) => {
     try {
@@ -317,56 +313,77 @@ export async function withSpan<T>(
 Create `src/app/api/demo/route.ts`:
 
 ```typescript
-import { NextRequest, NextResponse } from "next/server";
-import { getTracer, getMeter, logger, withSpan, getTraceContext } from "@/lib/telemetry";
-import { SpanStatusCode } from "@opentelemetry/api";
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getTracer,
+  getMeter,
+  logger,
+  withSpan,
+  getTraceContext,
+} from '@/lib/telemetry';
+import { SpanStatusCode } from '@opentelemetry/api';
 
 // Create metrics (do once at module level)
 const meter = getMeter();
-const requestCounter = meter.createCounter("demo.requests");
-const requestDuration = meter.createHistogram("demo.request.duration", { unit: "ms" });
+const requestCounter = meter.createCounter('demo.requests');
+const requestDuration = meter.createHistogram('demo.request.duration', {
+  unit: 'ms',
+});
 
 export async function GET(request: NextRequest) {
   const tracer = getTracer();
   const startTime = Date.now();
 
-  return tracer.startActiveSpan("demo.api.get", async (span) => {
+  return tracer.startActiveSpan('demo.api.get', async (span) => {
     try {
-      const itemId = request.nextUrl.searchParams.get("id") || "default";
+      const itemId = request.nextUrl.searchParams.get('id') || 'default';
 
-      span.setAttribute("http.route", "/api/demo");
-      span.setAttribute("item.id", itemId);
+      // SPANS: Add context for distributed tracing - helps locate WHERE in the request flow
+      span.setAttribute('http.route', '/api/demo');
+      span.setAttribute('item.id', itemId);
 
-      logger.info("api.request.received", {
-        route: "/api/demo",
+      // LOGS: Record discrete events with details - helps understand WHY something happened
+      // Note: logger auto-injects traceId/spanId via getTraceContext() for span↔log correlation
+      logger.info('api.request.received', {
+        route: '/api/demo',
         item_id: itemId,
       });
 
-      requestCounter.add(1, { method: "GET", route: "/api/demo" });
+      // METRICS: Aggregate counts for dashboards/alerts - helps detect WHAT is happening
+      requestCounter.add(1, { method: 'GET', route: '/api/demo' });
 
       // Simulate work with custom span
-      const result = await withSpan("demo.process", { item_id: itemId }, async () => {
-        await new Promise((r) => setTimeout(r, 50));
-        return { id: itemId, processed: true };
-      });
+      const result = await withSpan(
+        'demo.process',
+        { item_id: itemId },
+        async () => {
+          await new Promise((r) => setTimeout(r, 50));
+          return { id: itemId, processed: true };
+        },
+      );
 
       requestDuration.record(Date.now() - startTime, {
-        method: "GET",
-        status_code: "200",
+        method: 'GET',
+        status_code: '200',w
       });
 
       const traceContext = getTraceContext();
-      return NextResponse.json({
-        success: true,
-        data: result,
-        _trace: traceContext,
-      }, {
-        headers: { "X-Trace-Id": traceContext.traceId || "" },
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          data: result,
+          _trace: traceContext,
+        },
+        {
+          headers: { 'X-Trace-Id': traceContext.traceId || '' },
+        },
+      );
     } catch (error) {
       span.recordException(error as Error);
       span.setStatus({ code: SpanStatusCode.ERROR });
-      logger.error("api.request.failed", { error_message: (error as Error).message });
+      logger.error('api.request.failed', {
+        error_message: (error as Error).message,
+      });
       return NextResponse.json({ success: false }, { status: 500 });
     } finally {
       span.end();

@@ -12,57 +12,29 @@ tags:
 
 # Telemetry Reference
 
-## Spans
+## Overview
 
-### When to Create Custom Spans
+Telemetry consists of three pillars: **Metrics**, **Traces**, and **Logs**. Each serves a distinct purpose in understanding system behavior.
 
-- **Use auto-instrumentation** for HTTP, databases, frameworks
-- **Create custom spans** for business logic, custom protocols
+| Signal | What It Tells You | When to Use |
+|--------|-------------------|-------------|
+| Metrics | _What_ is happening (aggregated) | Alerting, dashboards, trends |
+| Traces | _Where_ it's happening (request flow) | Latency analysis, distributed debugging |
+| Logs | _Why_ it happened (details) | Root cause analysis, audit trails |
 
-### Naming
+**Symptom-to-cause workflow:** Metrics surface problems → Traces pinpoint location → Logs explain causation.
 
-```
-Good: order.process, payment.authorize, cache.get
-Bad:  handleRequest, doStuff, /api/users/123
-```
-
-### Basic Pattern
-
-```javascript
-tracer.startActiveSpan("order.process", async (span) => {
-  try {
-    span.setAttribute("order.id", order.id);
-    const result = await processOrder(order);
-    return result;
-  } catch (error) {
-    span.recordException(error);
-    span.setStatus({ code: SpanStatusCode.ERROR });
-    throw error;
-  } finally {
-    span.end();
-  }
-});
-```
-
-### Status Codes
-
-| Code | When |
-|------|------|
-| UNSET | Default, operation completed |
-| ERROR | Operation failed |
-
-### Events vs Logs
-
-| Use Events | Use Logs |
-|------------|----------|
-| Tied to span operation | Independent events |
-| Cache hit/miss, retries | Audit logs, debug output |
+**Correlation is essential.** Link signals through shared context (trace IDs, span IDs) so you can navigate from an alert to the exact log line that explains the failure.
 
 ---
 
-## Metrics
+## Signals
 
-### Instrument Types
+### Metrics
+
+Metrics are time-stamped numerical measurements, aggregated over time.
+
+#### Instrument Types
 
 | Type | Use For | Example |
 |------|---------|---------|
@@ -71,7 +43,7 @@ tracer.startActiveSpan("order.process", async (span) => {
 | Histogram | Distributions | Latency, sizes |
 | Gauge | Point-in-time | Memory, CPU |
 
-### Golden Signals
+#### Golden Signals
 
 ```javascript
 // Latency
@@ -89,7 +61,7 @@ meter.createObservableGauge("system.cpu.utilization", (result) => {
 });
 ```
 
-### Naming
+#### Naming
 
 ```
 http.server.requests      # Counter
@@ -97,9 +69,109 @@ http.server.duration      # Histogram
 db.connections.active     # UpDownCounter
 ```
 
-### Cardinality
+---
 
-**The #1 cost driver.** Before adding attributes, calculate:
+### Spans/Traces
+
+Traces are hierarchical records of a request's journey across services. Each span represents a unit of work.
+
+#### When to Create Custom Spans
+
+- **Use auto-instrumentation** for HTTP, databases, frameworks
+- **Create custom spans** for business logic, custom protocols
+
+#### Naming
+
+```
+Good: order.process, payment.authorize, cache.get
+Bad:  handleRequest, doStuff, /api/users/123
+```
+
+#### Basic Pattern
+
+```javascript
+tracer.startActiveSpan("order.process", async (span) => {
+  try {
+    span.setAttribute("order.id", order.id);
+    const result = await processOrder(order);
+    return result;
+  } catch (error) {
+    span.recordException(error);
+    span.setStatus({ code: SpanStatusCode.ERROR });
+    throw error;
+  } finally {
+    span.end();
+  }
+});
+```
+
+#### Status Codes
+
+| Code | When |
+|------|------|
+| UNSET | Default, operation completed |
+| ERROR | Operation failed |
+
+#### Events vs Logs
+
+| Use Events | Use Logs |
+|------------|----------|
+| Tied to span operation | Independent events |
+| Cache hit/miss, retries | Audit logs, debug output |
+
+---
+
+### Logs
+
+Logs are textual records of discrete events with local context.
+
+#### Structured Logging
+
+```javascript
+// BAD: unstructured
+logger.info(`User ${userId} placed order ${orderId}`);
+
+// GOOD: structured
+logger.info("order.placed", {
+  user_id: userId,
+  order_id: orderId,
+  amount: amount
+});
+```
+
+#### Levels by Environment
+
+| Level | Production | Development |
+|-------|------------|-------------|
+| ERROR | Always | Always |
+| WARN | Always | Always |
+| INFO | Sample 10% | Always |
+| DEBUG | Never | Always |
+
+#### Trace Correlation
+
+Inject trace context into logs to navigate from traces to related log entries:
+
+```javascript
+import { trace, context } from "@opentelemetry/api";
+
+function getTraceContext() {
+  const span = trace.getSpan(context.active());
+  if (!span) return {};
+  const ctx = span.spanContext();
+  return { trace_id: ctx.traceId, span_id: ctx.spanId };
+}
+
+logger.info("order.placed", { ...getTraceContext(), order_id: orderId });
+```
+
+---
+
+## Telemetry Quality
+
+### Cardinality Management
+
+**The #1 cost driver.** Cardinality is the number of unique time series created by your metrics. Before adding attributes, calculate:
 
 ```
 method:    5 values
@@ -123,6 +195,8 @@ Total: 5 × 50 × 5 × 10 = 12,500 series ✓
 
 ### Normalization
 
+Normalize high-cardinality values before using them as attributes:
+
 ```javascript
 // URLs: /users/123 → /users/{id}
 path.replace(/\/\d+/g, "/{id}")
@@ -133,51 +207,9 @@ if (code >= 400 && code < 500) return "4xx";
 if (code >= 500) return "5xx";
 ```
 
----
+### Attribute Placement
 
-## Logs
-
-### Structure
-
-```javascript
-// BAD: unstructured
-logger.info(`User ${userId} placed order ${orderId}`);
-
-// GOOD: structured
-logger.info("order.placed", {
-  user_id: userId,
-  order_id: orderId,
-  amount: amount
-});
-```
-
-### Levels by Environment
-
-| Level | Production | Development |
-|-------|------------|-------------|
-| ERROR | Always | Always |
-| WARN | Always | Always |
-| INFO | Sample 10% | Always |
-| DEBUG | Never | Always |
-
-### Trace Correlation
-
-```javascript
-import { trace, context } from "@opentelemetry/api";
-
-function getTraceContext() {
-  const span = trace.getSpan(context.active());
-  if (!span) return {};
-  const ctx = span.spanContext();
-  return { trace_id: ctx.traceId, span_id: ctx.spanId };
-}
-
-logger.info("order.placed", { ...getTraceContext(), order_id: orderId });
-```
-
----
-
-## Attribute Placement
+Different signals tolerate different cardinality levels:
 
 | Signal | Cardinality Tolerance | OK | Avoid |
 |--------|----------------------|----|----|
@@ -226,6 +258,19 @@ logger.error("order.failed", {
   error_type: error.name,
   error_message: error.message,
   order_id: orderId
+});
+```
+
+### Missing Trace Correlation
+
+```javascript
+// BAD: logs without context
+logger.info("Payment processed");
+
+// GOOD: logs with trace context
+logger.info("payment.processed", {
+  ...getTraceContext(),
+  payment_id: paymentId
 });
 ```
 

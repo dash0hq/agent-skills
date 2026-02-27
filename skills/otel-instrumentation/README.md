@@ -70,9 +70,11 @@ tags:
 npm install @opentelemetry/auto-instrumentations-node
 
 export OTEL_SERVICE_NAME="my-service"
+export OTEL_TRACES_EXPORTER="otlp"  # Required! Defaults to "none"
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_TOKEN"
-export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
+# Use --import for ESM projects, --require for CommonJS
+export NODE_OPTIONS="--import @opentelemetry/auto-instrumentations-node/register"
 
 node app.js
 ```

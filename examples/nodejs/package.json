@@ -1,0 +1,23 @@
+{
+  "name": "otel-nodejs-example",
+  "version": "1.0.0",
+  "description": "OpenTelemetry Node.js instrumentation example demonstrating traces, metrics, and logs",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js",
+    "start:otel": "node --env-file=.env.local --import @opentelemetry/auto-instrumentations-node/register src/app.js",
+    "start:otel:console": "OTEL_TRACES_EXPORTER=console OTEL_METRICS_EXPORTER=console OTEL_LOGS_EXPORTER=console node --env-file=.env.local --import @opentelemetry/auto-instrumentations-node/register src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.50.0",
+    "express": "^4.21.0",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

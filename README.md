@@ -27,6 +27,12 @@ Help me reduce my telemetry costs
 ```
 Write an OTTL expression to redact sensitive headers
 ```
+```
+Which attributes should I use for my database spans?
+```
+```
+Help me fix my span naming to follow semantic conventions
+```
 
 ## Available Skills
 
@@ -51,6 +57,24 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 - Node.js (Express, Fastify, NestJS, etc.)
 - Browser (React, Vue, Next.js, etc.)
 - Dash0 or any OTLP-compatible backend
+
+### otel-semantic-conventions
+
+Expert guidance for selecting, applying, and reviewing OpenTelemetry semantic conventions — the standardized names, types, and semantics for telemetry attributes, span names, and status codes.
+
+**Use when:**
+- Choosing attributes for spans, metrics, or logs
+- Naming spans or selecting span kinds
+- Mapping HTTP status codes to span status
+- Reviewing telemetry for semantic convention compliance
+- Migrating from old to new attribute names
+- Understanding Dash0 derived attributes
+
+**Rules covered:**
+- Attributes (registry, selection, placement, common attributes by domain, namespaces)
+- Spans (naming patterns, span kind, status code mapping)
+- Versioning (stability levels, migration, Dash0 auto-upgrades)
+- Dash0 (derived attributes, feature dependencies)
 
 ### otel-ottl
 

@@ -14,13 +14,13 @@ tags:
 
 ## Overview
 
-Telemetry consists of three pillars: **Metrics**, **Traces**, and **Logs**. Each serves a distinct purpose in understanding system behavior.
+Telemetry consists of three core signal types: **Metrics**, **Traces**, and **Logs**. Each serves a distinct purpose in understanding system behavior.
 
-| Signal  | What It Tells You                     | When to Use                             |
-| ------- | ------------------------------------- | --------------------------------------- |
-| Metrics | _What_ is happening (aggregated)      | Alerting, dashboards, trends            |
-| Traces  | _Where_ it's happening (request flow) | Latency analysis, distributed debugging |
-| Logs    | _Why_ it happened (details)           | Root cause analysis, audit trails       |
+| Signal  | When to Use                             |
+| ------- |-----------------------------------------|
+| Metrics | Alerting, dashboards, trends            |
+| Traces  | Latency analysis, distributed debugging |
+| Logs    | Audit trails                            |
 
 **Symptom-to-cause workflow:** Metrics surface problems → Traces pinpoint location → Logs explain causation.
 

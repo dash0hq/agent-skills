@@ -4,6 +4,30 @@ A collection of skills for AI coding agents. Skills are packaged instructions an
 
 Skills follow the [Agent Skills](https://agentskills.io/) format.
 
+## Installation
+
+```bash
+npx skills add dash0hq/agent-skills
+```
+
+## Usage
+
+Skills are automatically available once installed. The agent will use them when relevant tasks are detected.
+
+**Examples:**
+```
+Add OpenTelemetry to my Node.js app
+```
+```
+Set up browser tracing with Dash0
+```
+```
+Help me reduce my telemetry costs
+```
+```
+Write an OTTL expression to redact sensitive headers
+```
+
 ## Available Skills
 
 ### otel-instrumentation
@@ -28,26 +52,25 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 - Browser (React, Vue, Next.js, etc.)
 - Dash0 or any OTLP-compatible backend
 
-## Installation
+### otel-ottl
 
-```bash
-npx skills add dash0/otel-instrumentation
-```
+Expert guidance for writing and debugging OpenTelemetry Transformation Language (OTTL) expressions for the OpenTelemetry Collector's transform and filter processors.
 
-## Usage
+**Use when:**
+- Writing OTTL expressions to transform, filter, or enrich telemetry
+- Redacting sensitive data from spans, metrics, or logs
+- Configuring transform or filter processors in the Collector
+- Debugging OTTL syntax or runtime errors
+- Optimizing Collector pipeline performance
 
-Skills are automatically available once installed. The agent will use them when relevant tasks are detected.
+**Capabilities:**
+- Transform (modify attributes and values)
+- Filter (drop unwanted telemetry)
+- Redact (hide sensitive information)
+- Enrich (add contextual metadata)
+- Convert (change data types and formats)
 
-**Examples:**
-```
-Add OpenTelemetry to my Node.js app
-```
-```
-Set up browser tracing with Dash0
-```
-```
-Help me reduce my telemetry costs
-```
+**Contexts:** resource, scope, span, spanevent, metric, datapoint, log
 
 ## Skill Structure
 
@@ -55,13 +78,3 @@ Each skill contains:
 - `SKILL.md` - Instructions for the agent
 - `rules/` - Focused guidance documents
 - `README.md` - Human-readable documentation
-
-## Key Principles
-
-- **Signal density over volume** - Every telemetry item should help detect, localize, or explain issues
-- **Push reduction early** - SDK sampling → Collector filtering → Backend retention
-- **SLO-aware policies** - Never sample data feeding your SLOs
-
-## License
-
-MIT

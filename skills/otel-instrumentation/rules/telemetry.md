@@ -17,7 +17,7 @@ tags:
 Telemetry consists of three core signal types: **Metrics**, **Traces**, and **Logs**. Each serves a distinct purpose in understanding system behavior.
 
 | Signal  | When to Use                             |
-| ------- |-----------------------------------------|
+| ------- | --------------------------------------- |
 | Metrics | Alerting, dashboards, trends            |
 | Traces  | Latency analysis, distributed debugging |
 | Logs    | Audit trails                            |
@@ -224,59 +224,6 @@ Different signals tolerate different cardinality levels:
 | Metrics | Very low              | method, route, status_bucket | user.id      |
 | Spans   | Medium                | + user.id, order.id          | request.body |
 | Logs    | Higher                | + request.id                 | secrets      |
-
-### Semantic Conventions
-
-Semantic conventions are standardized attribute names that ensure consistency across services, teams, and tools. Using them enables:
-
-- **Interoperability** - Dashboards and queries work across services
-- **Correlation** - Backends can link related signals automatically
-- **Tooling** - Observability platforms recognize standard attributes
-
-#### Common Namespaces
-
-| Namespace     | Use For                        | Example Attributes                                                           |
-| ------------- | ------------------------------ | ---------------------------------------------------------------------------- |
-| `http.*`      | HTTP requests/responses        | `http.request.method`, `http.response.status_code`, `http.route`             |
-| `db.*`        | Database operations            | `db.system`, `db.operation.name`, `db.collection.name`                       |
-| `messaging.*` | Message queues                 | `messaging.system`, `messaging.operation.type`, `messaging.destination.name` |
-| `rpc.*`       | Remote procedure calls         | `rpc.system`, `rpc.method`, `rpc.service`                                    |
-| `error.*`     | Error details                  | `error.type`, `error.message`                                                |
-| `user.*`      | User context (spans/logs only) | `user.id`, `user.email`                                                      |
-
-#### Usage
-
-```javascript
-// HTTP span attributes (auto-instrumented, but useful to know)
-span.setAttributes({
-  'http.request.method': 'POST',
-  'http.route': '/api/orders/{id}',
-  'http.response.status_code': 201,
-});
-
-// Database span attributes
-span.setAttributes({
-  'db.system': 'postgresql',
-  'db.operation.name': 'SELECT',
-  'db.collection.name': 'orders',
-});
-
-// Custom business attributes (use your own namespace)
-span.setAttributes({
-  'order.id': orderId,
-  'order.total': total,
-  'order.item_count': items.length,
-});
-```
-
-#### Rules
-
-1. **Prefer standard conventions** over custom names when they exist
-2. **Use namespaces** for custom attributes (`app.feature.*`, `order.*`)
-3. **Check the spec** before inventing new attributes—it's likely already defined
-4. **Don't mix conventions** (e.g., `httpMethod` vs `http.request.method`)
-
-Read more at [OpenTelemetry Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) for a comprehensive list of standard attributes and best practices.
 
 ---
 

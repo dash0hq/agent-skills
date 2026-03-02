@@ -1,5 +1,5 @@
 ---
-title: "Browser Instrumentation"
+title: 'Browser Instrumentation'
 impact: HIGH
 tags:
   - browser
@@ -28,12 +28,18 @@ Instrument web applications to monitor performance, user sessions, requests, and
 
 ### Prerequisites
 
-1. **Auth Token**: Obtain from Settings → Auth Tokens
-2. **Endpoint URL**: Find the `OTLP via HTTP` endpoint in Settings → Endpoints
+1. **OTLP Endpoint**: Your observability platform's HTTP endpoint
+   - In Dash0: [Settings → Organization → Endpoints → "OTLP via HTTP"](https://app.dash0.com/settings/endpoints?s=eJwtyzEOgCAQRNG7TG1Cb29h5REMcVclIUDYsSLcXUxsZ95vcJgbxNObEjNET_9Eok9wY2FIlzlNUnJItM_GYAM2WK7cqmgdlbcDE0yjHlRZfr7KuDJj2W-yoPf-AmNVJ2I%3D)
+   - Format: `https://<region>.your-platform.com`
+2. **Auth Token**: API token for telemetry ingestion
+   - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 
-**Security**: Use a separate token exclusively for web monitoring with:
+
+**Security**: Browser tokens are exposed in client code. Use a dedicated token with:
+
 - Limited dataset access
 - `Ingesting` permissions only
+- No access to sensitive data or admin functions
 
 ### Installation
 
@@ -46,14 +52,14 @@ npm install @dash0/sdk-web
 Initialize as early as possible in your application:
 
 ```javascript
-import { init } from "@dash0/sdk-web";
+import { init } from '@dash0/sdk-web';
 
 init({
-  serviceName: "my-frontend",
+  serviceName: 'my-frontend',
   endpoint: {
-    url: "https://ingress.eu-west-1.dash0.com:4318",
-    authToken: "YOUR_AUTH_TOKEN"
-  }
+    url: 'https://<OTLP_ENDPOINT>',
+    authToken: 'YOUR_AUTH_TOKEN',
+  },
 });
 ```
 
@@ -62,6 +68,7 @@ For Next.js, use the `instrumentation-client.js` file.
 ### Features
 
 Auto-instrumentation captures without code modifications:
+
 - Page loads and navigation timing
 - Fetch/XHR requests with trace propagation
 - User sessions
@@ -71,20 +78,20 @@ Auto-instrumentation captures without code modifications:
 
 ```javascript
 // Add custom attributes
-import { addAttributes } from "@dash0/sdk-web";
-addAttributes({ "user.tier": "premium" });
+import { addAttributes } from '@dash0/sdk-web';
+addAttributes({ 'user.tier': 'premium' });
 
 // Identify users
-import { setUser } from "@dash0/sdk-web";
-setUser({ id: "user-123" });
+import { setUser } from '@dash0/sdk-web';
+setUser({ id: 'user-123' });
 
 // Report custom errors
-import { reportError } from "@dash0/sdk-web";
-reportError(new Error("Custom error"));
+import { reportError } from '@dash0/sdk-web';
+reportError(new Error('Custom error'));
 
 // Send custom events
-import { sendEvent } from "@dash0/sdk-web";
-sendEvent("checkout.completed", { order_id: "123" });
+import { sendEvent } from '@dash0/sdk-web';
+sendEvent('checkout.completed', { order_id: '123' });
 ```
 
 ### Resources
@@ -125,24 +132,29 @@ Add to `package.json`:
 Create `instrumentation.js`:
 
 ```javascript
-import { WebTracerProvider, BatchSpanProcessor } from "@opentelemetry/sdk-trace-web";
-import { getWebAutoInstrumentations } from "@opentelemetry/auto-instrumentations-web";
-import { registerInstrumentations } from "@opentelemetry/instrumentation";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import {
+  WebTracerProvider,
+  BatchSpanProcessor,
+} from '@opentelemetry/sdk-trace-web';
+import { getWebAutoInstrumentations } from '@opentelemetry/auto-instrumentations-web';
+import { registerInstrumentations } from '@opentelemetry/instrumentation';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
 const provider = new WebTracerProvider();
 
-provider.addSpanProcessor(new BatchSpanProcessor(
-  new OTLPTraceExporter({
-    url: "https://ingress.eu-west-1.dash0.com:4318/v1/traces",
-    headers: { "Authorization": "Bearer YOUR_AUTH_TOKEN" }
-  })
-));
+provider.addSpanProcessor(
+  new BatchSpanProcessor(
+    new OTLPTraceExporter({
+      url: 'https://<OTLP_ENDPOINT>/v1/traces',
+      headers: { Authorization: 'Bearer YOUR_AUTH_TOKEN' },
+    }),
+  ),
+);
 
 provider.register();
 
 registerInstrumentations({
-  instrumentations: [getWebAutoInstrumentations()]
+  instrumentations: [getWebAutoInstrumentations()],
 });
 ```
 
@@ -151,13 +163,13 @@ registerInstrumentations({
 Create `rollup.config.js`:
 
 ```javascript
-import resolve from "@rollup/plugin-node-resolve";
-import commonjs from "rollup-plugin-commonjs";
+import resolve from '@rollup/plugin-node-resolve';
+import commonjs from 'rollup-plugin-commonjs';
 
 export default {
-  input: "src/instrumentation.js",
-  output: { file: "dist/index.js", format: "iife" },
-  plugins: [resolve(), commonjs()]
+  input: 'src/instrumentation.js',
+  output: { file: 'dist/index.js', format: 'iife' },
+  plugins: [resolve(), commonjs()],
 };
 ```
 
@@ -190,17 +202,24 @@ To connect frontend traces with backend traces:
 ### 1. Configure Trace Propagation
 
 ```javascript
-import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
+import { FetchInstrumentation } from '@opentelemetry/instrumentation-fetch';
 
 new FetchInstrumentation({
-  propagateTraceHeaderCorsUrls: [/api\.yoursite\.com/]
+  propagateTraceHeaderCorsUrls: [/api\.yoursite\.com/],
 });
 ```
 
 ### 2. Backend CORS Configuration
 
 ```javascript
-app.use(cors({
-  allowedHeaders: ["Content-Type", "Authorization", "traceparent", "tracestate"]
-}));
+app.use(
+  cors({
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'traceparent',
+      'tracestate',
+    ],
+  }),
+);
 ```

@@ -65,14 +65,18 @@ tags:
 
 ## Quick Start
 
+**Get your credentials:**
+- **OTLP Endpoint**: In Dash0: [Settings → Organization → Endpoints](https://app.dash0.com/settings/endpoints?s=eJwtyzEOgCAQRNG7TG1Cb29h5REMcVclIUDYsSLcXUxsZ95vcJgbxNObEjNET_9Eok9wY2FIlzlNUnJItM_GYAM2WK7cqmgdlbcDE0yjHlRZfr7KuDJj2W-yoPf-AmNVJ2I%3D)
+- **Auth Token**: In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
+
 **Node.js:**
 ```bash
 npm install @opentelemetry/auto-instrumentations-node
 
 export OTEL_SERVICE_NAME="my-service"
 export OTEL_TRACES_EXPORTER="otlp"  # Required! Defaults to "none"
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_TOKEN"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <AUTH_TOKEN>"
 # Use --import for ESM projects, --require for CommonJS
 export NODE_OPTIONS="--import @opentelemetry/auto-instrumentations-node/register"
 
@@ -89,7 +93,7 @@ import { init } from "@dash0/sdk-web";
 
 init({
   serviceName: "my-frontend",
-  endpoint: { url: "https://ingress.eu-west-1.dash0.com:4318", authToken: "YOUR_TOKEN" }
+  endpoint: { url: "https://<OTLP_ENDPOINT>", authToken: "<AUTH_TOKEN>" }
 });
 ```
 

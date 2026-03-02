@@ -46,6 +46,15 @@ All environment variables that control the SDK behavior:
 
 **Critical**: Without `OTEL_TRACES_EXPORTER=otlp`, the SDK defaults to `none` and no telemetry is exported.
 
+### Where to Get Configuration Values
+
+1. **OTLP Endpoint**: Your observability platform's OTLP endpoint
+   - In Dash0: [Settings → Organization → Endpoints](https://app.dash0.com/settings/endpoints?s=eJwtyzEOgCAQRNG7TG1Cb29h5REMcVclIUDYsSLcXUxsZ95vcJgbxNObEjNET_9Eok9wY2FIlzlNUnJItM_GYAM2WK7cqmgdlbcDE0yjHlRZfr7KuDJj2W-yoPf-AmNVJ2I%3D)
+   - Format: `https://<region>.your-platform.com`
+2. **Auth Token**: API token for telemetry ingestion
+   - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
+3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
+
 ---
 
 ## Configuration
@@ -88,7 +97,7 @@ export OTEL_LOGS_EXPORTER="otlp"
 ### 4. Configure Endpoint
 
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 ```
 
@@ -114,7 +123,7 @@ export OTEL_METRICS_EXPORTER="otlp"
 export OTEL_LOGS_EXPORTER="otlp"
 
 # Configure endpoint
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://ingress.eu-west-1.dash0.com:4317"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 
 # Activate SDK (use --import for ESM, --require for CommonJS)
@@ -133,7 +142,7 @@ OTEL_SERVICE_NAME=my-service
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
 OTEL_LOGS_EXPORTER=otlp
-OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com:4317
+OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 NODE_OPTIONS=--import @opentelemetry/auto-instrumentations-node/register
 ```
@@ -166,7 +175,7 @@ OTEL_SERVICE_NAME=my-service
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
 OTEL_LOGS_EXPORTER=otlp
-OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com:4317
+OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 NODE_OPTIONS=--import @opentelemetry/auto-instrumentations-node/register
 ```

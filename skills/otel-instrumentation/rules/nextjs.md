@@ -15,8 +15,12 @@ Full-stack OpenTelemetry setup for Next.js 13+ with App Router. Server-side uses
 ## Prerequisites
 
 - Next.js 13+ with App Router
-- Dash0 auth token (Settings → Auth Tokens)
-- OTLP endpoint (Settings → Endpoints → "OTLP via HTTP")
+- **OTLP Endpoint**: Your observability platform's HTTP endpoint
+  - In Dash0: [Settings → Organization → Endpoints → "OTLP via HTTP"](https://app.dash0.com/settings/endpoints?s=eJwtyzEOgCAQRNG7TG1Cb29h5REMcVclIUDYsSLcXUxsZ95vcJgbxNObEjNET_9Eok9wY2FIlzlNUnJItM_GYAM2WK7cqmgdlbcDE0yjHlRZfr7KuDJj2W-yoPf-AmNVJ2I%3D)
+  - Format: `https://<region>.your-platform.com`
+- **Auth Token**: API token for telemetry ingestion
+  - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
+  - For browser telemetry, use a token with limited permissions (Ingesting only)
 
 ---
 
@@ -43,11 +47,11 @@ npm install @opentelemetry/api \
 
 ```bash
 # Server-side (standard OTEL env vars)
-OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.eu-west-1.dash0.com
+OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_SERVICE_NAME=my-nextjs-app
 
 # Client-side (NEXT_PUBLIC_ prefix required)
-NEXT_PUBLIC_OTEL_ENDPOINT=https://ingress.eu-west-1.dash0.com
+NEXT_PUBLIC_OTEL_ENDPOINT=https://<OTLP_ENDPOINT>
 NEXT_PUBLIC_OTEL_AUTH_TOKEN=your-auth-token-here
 ```
 
@@ -401,7 +405,7 @@ export async function GET(request: NextRequest) {
 On startup, you should see:
 
 ```
-[OTel] Endpoint: https://ingress.eu-west-1.dash0.com
+[OTel] Endpoint: https://<OTLP_ENDPOINT>
 [OTel] Auth: configured
 ```
 

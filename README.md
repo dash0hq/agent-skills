@@ -53,7 +53,7 @@ Following the guidance in these skills helps your services score higher, which d
 
 ## Available skills
 
-### otel-instrumentation
+### [otel-instrumentation](./skills/otel-instrumentation/SKILL.md)
 
 Expert guidance for implementing high-quality, cost-efficient OpenTelemetry telemetry.
 Covers backend and browser instrumentation across multiple languages.
@@ -91,7 +91,7 @@ Covers backend and browser instrumentation across multiple languages.
 - Browser (React, Vue, Next.js, etc.)
 - Dash0 or any OTLP-compatible backend
 
-### otel-semantic-conventions
+### [otel-semantic-conventions](./skills/otel-semantic-conventions/SKILL.md)
 
 Expert guidance for selecting, applying, and reviewing OpenTelemetry semantic conventions — the standardized names, types, and semantics for telemetry attributes, span names, and status codes.
 
@@ -109,7 +109,7 @@ Expert guidance for selecting, applying, and reviewing OpenTelemetry semantic co
 - Versioning (stability levels, migration, Dash0 auto-upgrades)
 - Dash0 (derived attributes, feature dependencies)
 
-### otel-ottl
+### [otel-ottl](./skills/otel-ottl/SKILL.md)
 
 Expert guidance for writing and debugging OpenTelemetry Transformation Language (OTTL) expressions for the OpenTelemetry Collector's transform and filter processors.
 

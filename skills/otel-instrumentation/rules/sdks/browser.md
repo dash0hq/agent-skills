@@ -24,7 +24,7 @@ Instrument web applications to monitor performance, user sessions, requests, and
 
 ## Option 1: Dash0 SDK Web (Recommended)
 
-100% open source. Simplest setup with sensible defaults.
+100% open source. Designed to work with Dash0. Simplest setup with sensible defaults.
 
 ### Prerequisites
 
@@ -35,7 +35,7 @@ Instrument web applications to monitor performance, user sessions, requests, and
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 
 
-**Security**: Browser tokens are exposed in client code. Use a dedicated token with:
+**Security**: Browser auth tokens are exposed in client code. Use a dedicated auth token with:
 
 - Limited dataset access
 - `Ingesting` permissions only

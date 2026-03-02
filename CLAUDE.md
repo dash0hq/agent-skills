@@ -1,5 +1,26 @@
 # Agent rules
 
+## Audience
+
+The skills in this repository are consumed operationally by agentic frameworks (AI coding agents, copilots, and autonomous developer tools).
+Every piece of guidance must be written so that an agent can act on it without human interpretation.
+
+When writing or editing skill content, follow these principles:
+- **Be prescriptive, not descriptive.**
+  Tell the agent what to do (`Use a Histogram`) rather than explaining concepts (`Histograms capture distributions`).
+  Explanations are acceptable only when they inform the decision.
+- **Make decisions enumerable.**
+  When multiple options exist, provide a numbered decision process, a lookup table, or explicit criteria — not open-ended advice.
+- **Include code examples for every actionable rule.**
+  An agent generating code needs a template to follow.
+  Show both the correct pattern and, where useful, the incorrect one labelled `// BAD`.
+- **Avoid subjective conditions.**
+  Do not write "if the user wants" or "it is likely that."
+  State concrete, testable criteria the agent can evaluate from the code or configuration it has access to.
+- **Keep rules self-contained.**
+  An agent may load a single rule file without reading the rest of the skill.
+  Each file must make sense on its own; use cross-references for detail, not for essential context.
+
 ## Prose rules
 
 Follow these rules when writing or editing prose in this project.

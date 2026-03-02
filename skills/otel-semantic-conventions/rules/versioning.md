@@ -10,9 +10,11 @@ tags:
 
 # Versioning
 
-Semantic conventions evolve. Attributes get renamed, restructured, or deprecated across versions. Understanding the stability model and migration tooling prevents broken queries and silent data loss.
+Use the rename table below when writing or reviewing attribute names.
+Always use the current (new) name — not the deprecated one.
+If you encounter a deprecated name in existing code, replace it with the current name.
 
-## Stability Levels
+## Stability levels
 
 | Level | Meaning |
 |---|---|
@@ -20,9 +22,10 @@ Semantic conventions evolve. Attributes get renamed, restructured, or deprecated
 | **Experimental** | May change or be removed. Use with caution. |
 | **Deprecated** | Replaced by a newer attribute. Migrate away. |
 
-Always prefer stable attributes. When using experimental attributes, be prepared to update them when they stabilize (names often change during stabilization).
+Always use stable attributes.
+Only use experimental attributes when no stable alternative exists, and add a code comment noting the attribute is experimental so it can be updated when it stabilizes.
 
-## Key Renames to Know
+## Key renames to know
 
 | Old Name | New Name |
 |---|---|
@@ -48,7 +51,7 @@ Always prefer stable attributes. When using experimental attributes, be prepared
 
 For the full list of attribute changes, see the [common attributes reference](./attributes.md#most-common-span-attributes).
 
-## Dash0 Semantic Convention Upgrades
+## Dash0 semantic convention upgrades
 
 Dash0 automatically normalizes incoming telemetry to a configured semantic convention version at ingestion time. This means:
 

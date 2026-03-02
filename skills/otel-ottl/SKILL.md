@@ -8,19 +8,15 @@ metadata:
 
 # OpenTelemetry Transformation Language (OTTL)
 
-OTTL is a domain-specific language for transforming, filtering, and manipulating telemetry data within the OpenTelemetry Collector. It enables modification of traces, metrics, and logs during collection before export, without altering application code.
+Use OTTL to transform, filter, and manipulate telemetry data inside the OpenTelemetry Collector — without changing application code.
 
-## Core Capabilities
+Choose the right processor:
+- **Transform processor** — use when you need to modify, enrich, or redact telemetry (set attributes, rename fields, truncate values).
+- **Filter processor** — use when you need to drop telemetry entirely (discard metrics by name, drop spans by status, remove noisy logs).
 
-- Transform attribute names and values
-- Filter unwanted telemetry data
-- Redact sensitive information
-- Add contextual information to telemetry signals
-- Convert between different format types
+## OTTL syntax
 
-## OTTL Syntax
-
-### Path Expressions
+### Path expressions
 
 Navigate telemetry data using dot notation:
 
@@ -75,7 +71,7 @@ delete_key(resource.attributes, "internal.key")
 limit(log.attributes, 10, [])
 ```
 
-### Conditional Statements
+### Conditional statements
 
 The `where` clause applies transformations conditionally:
 
@@ -83,7 +79,7 @@ The `where` clause applies transformations conditionally:
 span.attributes["db.statement"] = "REDACTED" where resource.attributes["service.name"] == "accounting"
 ```
 
-### Nil Checks
+### Nil checks
 
 OTTL uses `nil` for absence checking (not `null`):
 
@@ -91,21 +87,21 @@ OTTL uses `nil` for absence checking (not `null`):
 resource.attributes["service.name"] != nil
 ```
 
-## Common Patterns
+## Common patterns
 
-### Set Attributes
+### Set attributes
 
 ```
 set(resource.attributes["k8s.cluster.name"], "prod-aws-us-west-2")
 ```
 
-### Redact Sensitive Data
+### Redact sensitive data
 
 ```
 set(span.attributes["http.request.header.authorization"], "REDACTED") where span.attributes["http.request.header.authorization"] != nil
 ```
 
-### Drop Telemetry by Pattern
+### Drop telemetry by pattern
 
 In a filter processor, matching expressions cause data to be dropped:
 
@@ -113,13 +109,13 @@ In a filter processor, matching expressions cause data to be dropped:
 IsMatch(metric.name, "^k8s\\.replicaset\\..*$")
 ```
 
-### Drop Stale Data
+### Drop stale data
 
 ```
 time_unix_nano < UnixNano(Now()) - 21600000000000
 ```
 
-### Backfill Missing Timestamps
+### Backfill missing timestamps
 
 ```yaml
 processors:
@@ -131,7 +127,7 @@ processors:
           - set(log.time, log.observed_time) where log.time_unix_nano == 0
 ```
 
-### Filter Processor Example
+### Filter processor example
 
 ```yaml
 processors:
@@ -148,7 +144,7 @@ service:
       exporters: [debug]
 ```
 
-### Transform Processor Example
+### Transform processor example
 
 ```yaml
 processors:
@@ -167,7 +163,7 @@ service:
       exporters: [debug]
 ```
 
-### Defensive Nil Checks
+### Defensive nil checks
 
 Always check for `nil` before operating on optional attributes:
 
@@ -177,9 +173,9 @@ and
 IsMatch(ConvertCase(String(resource.attributes["service.namespace"]), "lower"), "^platform.*$")
 ```
 
-## Error Handling
+## Error handling
 
-### Compilation Errors
+### Compilation errors
 
 Occur during processor initialization and prevent Collector startup:
 - Invalid syntax (missing quotes)
@@ -187,22 +183,23 @@ Occur during processor initialization and prevent Collector startup:
 - Invalid path expressions
 - Type mismatches
 
-### Runtime Errors
+### Runtime errors
 
 Occur during telemetry processing:
 - Accessing non-existent attributes
 - Type conversion failures
 - Function execution errors
 
-### Error Mode Configuration
+### Error mode configuration
 
-The `error_mode` setting controls runtime error handling:
+Always set `error_mode` explicitly.
+The default (`propagate`) stops processing the current item on any error, which can silently drop telemetry in production.
 
-| Mode | Behavior | Use Case |
-|------|----------|----------|
-| `propagate` (default) | Stops processing current item | Development, strict environments |
-| `ignore` | Logs error, continues processing | **Recommended for production** |
-| `silent` | Ignores errors without logging | High-volume, known-safe transforms |
+| Mode | Behavior | When to use |
+|------|----------|-------------|
+| `propagate` (default) | Stops processing current item | Development and strict environments where you want to catch every error |
+| `ignore` | Logs error, continues processing | **Production** — set this unless you have a specific reason not to |
+| `silent` | Ignores errors without logging | High-volume pipelines with known-safe transforms where error logs are noise |
 
 ```yaml
 processors:
@@ -216,9 +213,11 @@ processors:
 
 ## Performance
 
-OTTL statements compile once at startup (similar to regular expressions). At runtime, compiled expressions execute as optimized function chains. For example, `IsMatch()` compiles the regex pattern during statement compilation and reuses it for all evaluations.
+OTTL statements compile once at startup and execute as optimized function chains at runtime.
+There is no need to optimize for compilation speed — focus on reducing the number of statements that evaluate per telemetry item.
+Use `where` clauses to skip items early rather than applying unconditional transforms.
 
-## Function Reference
+## Function reference
 
 ### Editors
 
@@ -241,7 +240,7 @@ Editors modify telemetry data in-place. They are lowercase.
 | `set` | `set(target, value)` | Sets a telemetry field to a value |
 | `truncate_all` | `truncate_all(target, limit)` | Truncates all string values in a map to a max length |
 
-### Converters: Type Checking
+### Converters: type checking
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
@@ -254,7 +253,7 @@ Editors modify telemetry data in-place. They are lowercase.
 | `IsRootSpan` | `IsRootSpan()` | Returns true if span has no parent |
 | `IsString` | `IsString(value)` | Returns true if value is a string |
 
-### Converters: Type Conversion
+### Converters: type conversion
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
@@ -263,7 +262,7 @@ Editors modify telemetry data in-place. They are lowercase.
 | `Int` | `Int(value)` | Converts value to int64 |
 | `String` | `String(value)` | Converts value to string |
 
-### Converters: String Manipulation
+### Converters: string manipulation
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
@@ -294,7 +293,7 @@ Editors modify telemetry data in-place. They are lowercase.
 | `SHA256` | `SHA256(value)` | Returns SHA256 hash as hex string |
 | `SHA512` | `SHA512(value)` | Returns SHA512 hash as hex string |
 
-### Converters: Encoding/Decoding
+### Converters: encoding and decoding
 
 | Function | Signature | Description |
 |----------|-----------|-------------|

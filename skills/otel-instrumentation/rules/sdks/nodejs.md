@@ -11,7 +11,7 @@ tags:
 
 Instrument Node.js applications to generate traces, logs, and metrics for deep insights into behavior and performance.
 
-## Use Cases
+## Use cases
 
 - **HTTP Request Monitoring**: Understand outgoing and incoming HTTP requests through traces and metrics, with drill-downs to database level
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
@@ -29,7 +29,7 @@ npm install @opentelemetry/auto-instrumentations-node
 
 ---
 
-## Environment Variables
+## Environment variables
 
 All environment variables that control the SDK behavior:
 
@@ -46,7 +46,7 @@ All environment variables that control the SDK behavior:
 
 **Critical**: Without `OTEL_TRACES_EXPORTER=otlp`, the SDK defaults to `none` and no telemetry is exported.
 
-### Where to Get Configuration Values
+### Where to get configuration values
 
 1. **OTLP Endpoint**: Your observability platform's OTLP endpoint
    - In Dash0: [Settings → Organization → Endpoints](https://app.dash0.com/settings/endpoints?s=eJwtyzEOgCAQRNG7TG1Cb29h5REMcVclIUDYsSLcXUxsZ95vcJgbxNObEjNET_9Eok9wY2FIlzlNUnJItM_GYAM2WK7cqmgdlbcDE0yjHlRZfr7KuDJj2W-yoPf-AmNVJ2I%3D)
@@ -75,13 +75,13 @@ export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/registe
 
 **Note**: Tools like npm, pnpm, and yarn are Node.js applications, so you may observe instrumentation data from package managers when running commands.
 
-### 2. Set Service Name
+### 2. Set service name
 
 ```bash
 export OTEL_SERVICE_NAME="my-service"
 ```
 
-### 3. Enable Exporters
+### 3. Enable exporters
 
 **This step is required** - without it, no telemetry is sent:
 
@@ -94,14 +94,14 @@ export OTEL_METRICS_EXPORTER="otlp"
 export OTEL_LOGS_EXPORTER="otlp"
 ```
 
-### 4. Configure Endpoint
+### 4. Configure endpoint
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 ```
 
-### 5. Optional: Target Specific Dataset
+### 5. Optional: target specific dataset
 
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
@@ -109,9 +109,9 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Da
 
 ---
 
-## Complete Setup
+## Complete setup
 
-### Using Environment Variables
+### Using environment variables
 
 ```bash
 # Service identification
@@ -132,7 +132,7 @@ export NODE_OPTIONS="--import @opentelemetry/auto-instrumentations-node/register
 node app.js
 ```
 
-### Using .env.local File
+### Using .env.local file
 
 Node.js does not automatically load `.env` files. Use the `--env-file` flag (Node.js 20.6+):
 
@@ -154,7 +154,7 @@ node --env-file=.env.local app.js
 
 **Note**: The `--env-file` flag requires Node.js 20.6 or later.
 
-### Using package.json Scripts
+### Using package.json scripts
 
 Add instrumented scripts to your `package.json`:
 
@@ -189,9 +189,9 @@ npm run dev                 # Development with watch mode + telemetry
 
 ---
 
-## Local Development
+## Local development
 
-### Console Exporter
+### Console exporter
 
 For development without a collector, use the console exporter to see telemetry in your terminal:
 
@@ -207,7 +207,7 @@ node app.js
 
 This prints spans, metrics, and logs directly to stdout—useful for verifying instrumentation works before configuring a remote backend.
 
-### Without a Collector
+### Without a collector
 
 If you set `OTEL_TRACES_EXPORTER=otlp` but have no collector running, you'll see connection errors. This is expected behavior:
 
@@ -222,19 +222,20 @@ Error: 14 UNAVAILABLE: No connection established. Last error: connect ECONNREFUS
 
 ---
 
-## Kubernetes Setup
+## Resource configuration
 
-When not using the Dash0 Kubernetes Operator, extend resource attributes with Pod information for proper log, trace, and metrics correlation:
-
-```bash
-export OTEL_RESOURCE_ATTRIBUTES="k8s.pod.name=$(hostname),k8s.pod.uid=$(POD_UID)"
-```
-
-**Recommended**: Use the [Dash0 Kubernetes Operator](https://github.com/dash0hq/dash0-operator) for automatic instrumentation of Node.js workloads.
+Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
+See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
 ---
 
-## Supported Libraries
+## Kubernetes setup
+
+See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
+
+---
+
+## Supported libraries
 
 The auto-instrumentation package automatically instruments:
 
@@ -253,7 +254,7 @@ Refer to [OpenTelemetry documentation](https://opentelemetry.io/ecosystem/regist
 
 ---
 
-## Custom Spans
+## Custom spans
 
 Add business context to auto-instrumented traces:
 
@@ -281,9 +282,61 @@ async function processOrder(order) {
 
 ---
 
+## Structured logging
+
+Configure your logging framework to serialize exceptions into a single structured field so that stack traces do not break the one-line-per-record contract.
+See [logs](../logs.md) for general guidance on structured logging and exception stack traces.
+
+### pino
+
+pino serializes errors into structured JSON by default when passed as the first argument.
+The `err` serializer extracts `message`, `type`, and `stack` as separate fields, keeping each log record on a single line.
+
+```javascript
+import pino from 'pino';
+
+const logger = pino();
+
+try {
+  processOrder(order);
+} catch (err) {
+  logger.error({ err, order_id: order.id }, 'order.failed');
+}
+```
+
+Pass the error as `{ err }` in the first argument, not as the message string.
+If you log `error.stack` directly as the message, pino prints it as multi-line text.
+
+### winston
+
+winston does not serialize errors by default.
+Enable the `errors` format with `{ stack: true }` to capture the stack trace as a structured field.
+
+```javascript
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  format: winston.format.combine(
+    winston.format.errors({ stack: true }),
+    winston.format.json(),
+  ),
+  transports: [new winston.transports.Console()],
+});
+
+try {
+  processOrder(order);
+} catch (err) {
+  logger.error('order.failed', { error: err, order_id: order.id });
+}
+```
+
+Without `winston.format.errors({ stack: true })`, the stack trace is silently dropped from JSON output.
+
+---
+
 ## Troubleshooting
 
-### No Telemetry Appearing
+### No telemetry appearing
 
 **Check exporters are enabled:**
 ```bash
@@ -297,7 +350,7 @@ The SDK defaults `OTEL_TRACES_EXPORTER` to `none`, which silently discards all t
 echo $NODE_OPTIONS  # Should contain --import or --require
 ```
 
-### ECONNREFUSED Errors
+### ECONNREFUSED errors
 
 ```
 Error: 14 UNAVAILABLE: connect ECONNREFUSED 127.0.0.1:4317
@@ -308,14 +361,14 @@ This means the SDK is working but cannot reach the collector:
 - **Wrong endpoint**: Check `OTEL_EXPORTER_OTLP_ENDPOINT` is correct
 - **Port mismatch**: gRPC uses 4317, HTTP uses 4318
 
-### Environment Variables Not Loading
+### Environment variables not loading
 
 If using `.env.local`:
 - Ensure you're using `--env-file=.env.local` flag
 - Requires Node.js 20.6+
 - Check file path is correct relative to where you run the command
 
-### ESM/CommonJS Mismatch
+### ESM/CommonJS mismatch
 
 **Symptom**: SDK loads but no instrumentation happens
 
@@ -323,7 +376,7 @@ If using `.env.local`:
 - ESM (`"type": "module"` in package.json): Use `--import`
 - CommonJS (default): Use `--require`
 
-### "Exporter is Empty" or Similar Warnings
+### "Exporter is empty" or similar warnings
 
 Usually means `OTEL_TRACES_EXPORTER` (or metrics/logs) is not set. Set it explicitly:
 ```bash

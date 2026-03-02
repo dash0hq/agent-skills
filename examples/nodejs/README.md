@@ -18,10 +18,8 @@ A comprehensive example demonstrating proper OpenTelemetry instrumentation in No
 ### 3. Golden Signal Metrics
 | Metric | Type | Purpose |
 |--------|------|---------|
-| `http.server.duration` | Histogram | Latency tracking |
-| `http.server.requests` | Counter | Traffic monitoring |
-| `http.server.errors` | Counter | Error rate SLOs |
-| `http.server.active_connections` | UpDownCounter | Saturation |
+| `http.server.request.duration` | Histogram | Latency tracking (traffic count and error rate derived from it) |
+| `http.server.active_requests` | UpDownCounter | Saturation |
 
 ### 4. Structured Logging
 - Trace correlation (`trace_id`, `span_id`)
@@ -170,15 +168,15 @@ logger.info("order.completed", {
 ### Cardinality-Safe Metrics
 
 ```javascript
-// GOOD: Bounded attributes only
-httpDuration.record(duration, {
-  method: "POST",
-  route: "/users/{id}",  // Normalized
-  status: "2xx",         // Bucketed
+// GOOD: Bounded semconv attributes only
+httpDuration.record(durationS, {
+  "http.request.method": "POST",
+  "http.route": "/users/{id}",      // Normalized
+  "http.response.status_code": 200,
 });
 
 // BAD: Unbounded attributes (DON'T DO THIS)
-httpDuration.record(duration, {
+httpDuration.record(durationS, {
   user_id: userId,       // Millions of unique values!
   request_id: requestId, // Unbounded
 });

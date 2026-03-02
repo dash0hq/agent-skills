@@ -1,6 +1,6 @@
 # otel-instrumentation
 
-Expert guidance for implementing high-quality, cost-efficient OpenTelemetry telemetry across Node.js and browser applications.
+Expert guidance for implementing high-quality, cost-efficient OpenTelemetry telemetry across multiple languages and platforms.
 
 ## Structure
 
@@ -9,10 +9,20 @@ otel-instrumentation/
 ├── SKILL.md              # Skill manifest and entry point
 ├── README.md             # This file
 └── rules/
-    ├── telemetry.md      # Spans, metrics, logs, cardinality
-    ├── nodejs.md         # Node.js instrumentation
-    ├── browser.md        # Browser instrumentation
-    └── nextjs.md         # Next.js full-stack instrumentation
+    ├── telemetry.md      # Signal overview and correlation
+    ├── resources.md      # Resource attributes
+    ├── metrics.md        # Instrument types, naming, cardinality
+    ├── logs.md           # Structured logging, severity, trace correlation
+    └── sdks/
+        ├── nodejs.md     # Node.js instrumentation
+        ├── go.md         # Go instrumentation
+        ├── python.md     # Python instrumentation
+        ├── java.md       # Java instrumentation
+        ├── dotnet.md     # .NET instrumentation
+        ├── ruby.md       # Ruby instrumentation
+        ├── php.md        # PHP instrumentation
+        ├── browser.md    # Browser instrumentation
+        └── nextjs.md     # Next.js full-stack instrumentation
 ```
 
 ## Getting Started
@@ -29,10 +39,19 @@ The skill activates automatically when working on observability tasks.
 
 | Rule | Impact | Description |
 |------|--------|-------------|
-| [telemetry](./rules/telemetry.md) | CRITICAL | Spans, metrics, logs, cardinality management |
-| [nodejs](./rules/nodejs.md) | HIGH | Node.js auto-instrumentation setup |
-| [browser](./rules/browser.md) | HIGH | Browser instrumentation with Dash0 SDK |
-| [nextjs](./rules/nextjs.md) | HIGH | Next.js full-stack instrumentation (App Router) |
+| [telemetry](./rules/telemetry.md) | CRITICAL | Signal overview and correlation |
+| [resources](./rules/resources.md) | CRITICAL | Resource attributes - service identity, environment, Kubernetes |
+| [metrics](./rules/metrics.md) | CRITICAL | Instrument types, naming, units, cardinality |
+| [logs](./rules/logs.md) | CRITICAL | Structured logging, severity, trace correlation |
+| [nodejs](./rules/sdks/nodejs.md) | HIGH | Node.js auto-instrumentation setup |
+| [go](./rules/sdks/go.md) | HIGH | Go instrumentation setup |
+| [python](./rules/sdks/python.md) | HIGH | Python auto-instrumentation setup |
+| [java](./rules/sdks/java.md) | HIGH | Java auto-instrumentation setup |
+| [dotnet](./rules/sdks/dotnet.md) | HIGH | .NET auto-instrumentation setup |
+| [ruby](./rules/sdks/ruby.md) | HIGH | Ruby instrumentation setup |
+| [php](./rules/sdks/php.md) | HIGH | PHP auto-instrumentation setup |
+| [browser](./rules/sdks/browser.md) | HIGH | Browser instrumentation with Dash0 SDK |
+| [nextjs](./rules/sdks/nextjs.md) | HIGH | Next.js full-stack instrumentation (App Router) |
 
 ## Rule File Structure
 

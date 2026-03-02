@@ -1,8 +1,7 @@
 # Dash0 Agent Skills
 
-A collection of skills for AI coding agents. Skills are packaged instructions and scripts that extend agent capabilities.
-
-Skills follow the [Agent Skills](https://agentskills.io/) format.
+A collection of skills for AI coding agents to make applications observable with OpenTelemetry and [Dash0](https://www.dash0.com).
+Skills are packaged instructions and scripts that extend agent capabilities, following the [Agent Skills](https://agentskills.io/) format.
 
 ## Installation
 
@@ -34,11 +33,30 @@ Which attributes should I use for my database spans?
 Help me fix my span naming to follow semantic conventions
 ```
 
-## Available Skills
+## Why semantic conventions matter
+
+[OpenTelemetry Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) define standardized names, types, and semantics for telemetry attributes, metric names, span names, and status codes.
+Following them is the single highest-leverage thing you can do for observability quality.
+
+When instrumentation follows semantic conventions:
+- Auto-instrumentation libraries, dashboards, and alerting rules work out of the box.
+- Service maps, operation grouping, and error tracking derive correct results without manual configuration.
+- Cross-service queries return consistent results because every service speaks the same attribute language.
+
+When conventions are missing or inconsistent, these capabilities degrade silently — no errors, just incomplete data, broken topology views, and fragmented queries.
+
+## Instrumentation score
+
+Some of the guidance in these skills is aligned with the [Instrumentation Score](https://github.com/instrumentation-score/spec) specification — a vendor-neutral corpus of guidance that quantifies how well a service follows OpenTelemetry best practices.
+The spec defines impact-weighted rules across resources, spans, metrics, and logs.
+Following the guidance in these skills helps your services score higher, which directly translates to better observability outcomes.
+
+## Available skills
 
 ### otel-instrumentation
 
-Expert guidance for implementing high-quality, cost-efficient OpenTelemetry telemetry. Covers Node.js and browser instrumentation.
+Expert guidance for implementing high-quality, cost-efficient OpenTelemetry telemetry.
+Covers backend and browser instrumentation across multiple languages.
 
 **Use when:**
 - Setting up observability for a new service
@@ -48,13 +66,28 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 - Connecting browser traces to backend traces
 
 **Rules covered:**
-- Telemetry (spans, metrics, logs, cardinality, anti-patterns)
+- Telemetry (signal overview and correlation)
+- Resources (service identity, environment, Kubernetes attributes)
+- Metrics (instrument types, naming, units, cardinality)
+- Logs (structured logging, severity, trace correlation)
 - Node.js (auto-instrumentation, environment variables, Kubernetes)
+- Go (SDK setup, instrumentation libraries, context propagation)
+- Python (auto-instrumentation, Flask, Django, FastAPI)
+- Java (javaagent, Spring Boot, JVM system properties)
+- .NET (auto-instrumentation, ASP.NET Core, ActivitySource)
+- Ruby (SDK setup, Rails, Sinatra)
+- PHP (auto-instrumentation, Laravel, Symfony)
 - Browser (Dash0 SDK, OpenTelemetry JS, server correlation)
 - Next.js (App Router, full-stack instrumentation, common gotchas)
 
 **Platforms:**
 - Node.js (Express, Fastify, NestJS, etc.)
+- Go (net/http, gin, echo, fiber, etc.)
+- Python (Flask, Django, FastAPI, etc.)
+- Java (Spring Boot, Servlet, JAX-RS, etc.)
+- .NET (ASP.NET Core, Entity Framework, etc.)
+- Ruby (Rails, Sinatra, etc.)
+- PHP (Laravel, Symfony, etc.)
 - Browser (React, Vue, Next.js, etc.)
 - Dash0 or any OTLP-compatible backend
 
@@ -96,7 +129,7 @@ Expert guidance for writing and debugging OpenTelemetry Transformation Language 
 
 **Contexts:** resource, scope, span, spanevent, metric, datapoint, log
 
-## Skill Structure
+## Skill structure
 
 Each skill contains:
 - `SKILL.md` - Instructions for the agent

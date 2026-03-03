@@ -198,6 +198,13 @@ export default nextConfig;
 
 ---
 
+## Resource configuration
+
+Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
+See [resource attributes](../resources.md) for the full list of required and recommended attributes.
+
+---
+
 ## Common Gotchas
 
 ### ENV Vars Must Be Read Inside `register()`

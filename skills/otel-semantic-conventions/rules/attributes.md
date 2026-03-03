@@ -13,17 +13,29 @@ tags:
 
 # Attributes
 
-Attributes are the key-value pairs attached to telemetry signals. Choosing the right attributes — and placing them at the right level — determines whether your telemetry is queryable, correlatable, and useful. The [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/) is the single source of truth for all defined attributes.
+When adding attributes to telemetry, always search the [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/) first and place each attribute at the correct telemetry level.
+Wrong attributes — or attributes at the wrong level — make telemetry unqueryable and break cross-service correlation.
 
-## Core Principles
+## Core principles
 
-1. **Registry first.** Before creating a custom attribute, search the [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/). If a registered attribute exists for your concept, use it — even if the name isn't exactly what you'd choose.
-2. **No custom attributes unless necessary.** Custom attributes fragment querying and break tooling. Only create them for truly domain-specific concepts that have no registry equivalent. When you must, use a namespaced prefix (e.g., `com.acme.order.priority`).
-3. **Low cardinality in names, high cardinality in attributes.** Span names and metric attribute values must be bounded. Put variable data (IDs, paths, user inputs) into span attributes instead.
-4. **Right level, every time.** Place attributes at the correct telemetry level (resource, scope, span, log, metric data point). Never duplicate resource-level data on every span.
-5. **Consistent placement.** Once you decide an attribute belongs at a certain level, keep it there everywhere. Inconsistency (sometimes resource, sometimes span) makes querying unreliable.
+1. **Registry first.**
+   Before creating a custom attribute, search the [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/).
+   If a registered attribute exists for your concept, use it — even if the name is not exactly what you would choose.
+2. **No custom attributes unless necessary.**
+   Custom attributes fragment querying and break tooling.
+   Only create them for truly domain-specific concepts that have no registry equivalent.
+   When you must, use a namespaced prefix (e.g., `com.acme.order.priority`).
+3. **Low cardinality in names, high cardinality in attributes.**
+   Span names and metric attribute values must be bounded.
+   Put variable data (IDs, paths, user inputs) into span attributes instead.
+4. **Right level, every time.**
+   Place attributes at the correct telemetry level (resource, scope, span, log, metric data point).
+   Never duplicate resource-level data on every span.
+5. **Consistent placement.**
+   Once you decide an attribute belongs at a certain level, keep it there everywhere.
+   Inconsistency (sometimes resource, sometimes span) makes querying unreliable.
 
-## Attribute Placement
+## Attribute placement
 
 ### Levels
 
@@ -36,7 +48,7 @@ Attributes are the key-value pairs attached to telemetry signals. Choosing the r
 | **Log Record** | Structured log entry attributes. | `log.file.path`, severity fields, body fields |
 | **Metric Data Point** | Low-cardinality dimensions for aggregation. | `http.request.method`, `http.response.status_code`, `http.route` |
 
-### Common Mistakes
+### Common mistakes
 
 - **Putting `service.name` on spans.** It is a resource attribute. Putting it on spans duplicates data and wastes storage.
 - **Putting `k8s.pod.name` on every span.** Kubernetes metadata belongs on the resource. The Collector's `k8sattributes` processor handles this.
@@ -45,17 +57,19 @@ Attributes are the key-value pairs attached to telemetry signals. Choosing the r
 - **Putting `enduser.*` or `user.*` on resources.** User identity changes per request — these are span or log attributes, never resource attributes. A resource describes the process, not who is calling it.
 - **Putting `browser.*` on resources.** Browser attributes like `browser.language` or `browser.brands` vary per request in server-side telemetry. They belong on spans, not on the resource.
 
-## Required and Important Attributes
+## Required and important attributes
 
-### Must-Have Resource Attributes
+### Must-have resource attributes
 
 | Attribute | Type | Why |
 |---|---|---|
 | `service.name` | string | **Required.** Identifies the service. Without it, telemetry is unattributable. Falls back to `unknown_service` if not set. |
 | `service.version` | string | Enables version-aware analysis, deployment tracking, and regression detection. |
+| `service.instance.id` | string | Uniquely identifies the service instance (e.g., pod). Must be unique across all instances sharing the same `service.name`. |
 | `deployment.environment.name` | string | Distinguishes production from staging/dev. Previously `deployment.environment`. |
+| `k8s.pod.uid` | string | **Required for Kubernetes workloads.** Enables telemetry correlation via the `k8sattributes` processor. Prefer over `k8s.pod.ip`, which breaks with service meshes (Istio, and Linkerd). |
 
-### Most Common Span Attributes
+### Most common span attributes
 
 #### HTTP
 
@@ -114,20 +128,20 @@ Attributes are the key-value pairs attached to telemetry signals. Choosing the r
 
 | Attribute | Type | Notes |
 |---|---|---|
-| `error.type` | string | The error class, status code, or stable identifier. Set whenever span status is `Error`. See [span status code rules](./spans.md#span-status-code). |
+| `error.type` | string | The error class, status code, or stable identifier. Set whenever span status is `ERROR`. See [span status code rules](../../otel-instrumentation/rules/spans.md#span-status-code). |
 | `exception.type` | string | On span events of type `exception`. |
 | `exception.message` | string | Human-readable error message. |
 | `exception.stacktrace` | string | Full stacktrace as a string. |
 
-### The `_OTHER` Pattern
+### The `_OTHER` pattern
 
 Attributes like `http.request.method` only accept a fixed set of known values. Unknown values are normalized to `_OTHER` and the original is preserved in a companion attribute (e.g., `http.request.method_original`). This bounds cardinality while retaining detail.
 
-## Attribute Registry Namespaces
+## Attribute registry namespaces
 
 Before creating a custom attribute, check if it belongs to an existing namespace. The registry contains 80+ namespaces.
 
-### Infrastructure & Compute
+### Infrastructure and compute
 
 | Namespace | Covers |
 |---|---|
@@ -142,7 +156,7 @@ Before creating a custom attribute, check if it belongs to an existing namespace
 | `faas` | Serverless function: name, version, trigger, invocation ID |
 | `device` | Physical device: ID, manufacturer, model |
 
-### Cloud Providers
+### Cloud providers
 
 | Namespace | Covers |
 |---|---|
@@ -151,7 +165,7 @@ Before creating a custom attribute, check if it belongs to an existing namespace
 | `azure` | Azure services: Cosmos DB, client libraries |
 | `heroku` | Heroku app, release, dyno metadata |
 
-### Protocols & Communication
+### Protocols and communication
 
 | Namespace | Covers |
 |---|---|
@@ -164,14 +178,14 @@ Before creating a custom attribute, check if it belongs to an existing namespace
 | `client` | Client side of connection: address, port |
 | `server` | Server side of connection: address, port |
 
-### Data Systems
+### Data systems
 
 | Namespace | Covers |
 |---|---|
 | `db` | Database operations: system, operation, collection, namespace, query |
 | `messaging` | Messaging systems: Kafka, RabbitMQ, SQS, destination, operation |
 
-### URLs & Identity
+### URLs and identity
 
 | Namespace | Covers |
 |---|---|
@@ -182,7 +196,7 @@ Before creating a custom attribute, check if it belongs to an existing namespace
 | `session` | Session: ID, previous session ID |
 | `peer` | Remote service: `peer.service` for uninstrumented peers |
 
-### Errors & Diagnostics
+### Errors and diagnostics
 
 | Namespace | Covers |
 |---|---|
@@ -193,7 +207,7 @@ Before creating a custom attribute, check if it belongs to an existing namespace
 | `log` | Log record metadata: file path, iostream, record UID |
 | `event` | Event identification: `event.name` |
 
-### Application Runtimes
+### Application runtimes
 
 | Namespace | Covers |
 |---|---|
@@ -204,7 +218,7 @@ Before creating a custom attribute, check if it belongs to an existing namespace
 | `v8js` | V8 engine: GC type, heap spaces |
 | `cpython` | CPython: GC generation |
 
-### AI & ML
+### AI and ML
 
 | Namespace | Covers |
 |---|---|
@@ -212,14 +226,14 @@ Before creating a custom attribute, check if it belongs to an existing namespace
 | `openai` | OpenAI-specific: API type, service tier |
 | `mcp` | Model Context Protocol: tool interactions |
 
-### CI/CD & Source Control
+### CI/CD and source control
 
 | Namespace | Covers |
 |---|---|
 | `cicd` | CI/CD pipelines: pipeline name, run ID, task |
 | `vcs` | Version control: repository, branch, commit, change (PR) |
 
-### Mobile & Browser
+### Mobile and browser
 
 | Namespace | Covers |
 |---|---|

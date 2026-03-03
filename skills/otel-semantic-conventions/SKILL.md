@@ -17,11 +17,10 @@ The [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/at
 | Rule                                | Description                                                           |
 |-------------------------------------|-----------------------------------------------------------------------|
 | [attributes](./rules/attributes.md) | Attribute registry, selection, placement, common attributes by domain |
-| [spans](./rules/spans.md)           | Span naming, span kind, span status code mapping                      |
 | [versioning](./rules/versioning.md) | Semconv versioning, stability, migration                              |
 | [dash0](./rules/dash0.md)           | Dash0 derived attributes and feature dependencies                     |
 
-## Official Documentation
+## Official documentation
 
 - [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/)
 - [Semantic Conventions Specification](https://opentelemetry.io/docs/specs/semconv/)
@@ -29,7 +28,7 @@ The [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/at
 - [Dash0 Semantic Conventions](https://www.dash0.com/documentation/dash0/semantic-conventions)
 - [Dash0 Semantic Conventions Explainer](https://www.dash0.com/knowledge/otel-semantic-conventions-explainer)
 
-## Key Principles
+## Key principles
 
 - **Registry first** — Search the [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/) before creating any custom attribute
 - **No custom attributes unless necessary** — Custom names fragment querying and break tooling
@@ -37,14 +36,14 @@ The [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/at
 - **Right level, every time** — Place attributes at the correct telemetry level (resource, scope, span, log, metric)
 - **Consistent placement** — Once an attribute is at a level, keep it there across all services
 
-## Quick Reference
+## Quick reference
 
 | Use Case                               | Rule                                |
 |----------------------------------------|-------------------------------------|
 | Choosing or reviewing attributes       | [attributes](./rules/attributes.md) |
 | HTTP/DB/messaging/RPC attributes       | [attributes](./rules/attributes.md) |
 | Attribute placement (resource vs span) | [attributes](./rules/attributes.md) |
-| Naming a span or choosing span kind    | [spans](./rules/spans.md)           |
-| Span status code mapping               | [spans](./rules/spans.md)           |
+| Naming a span or choosing span kind    | [spans](../otel-instrumentation/rules/spans.md) |
+| Span status code mapping               | [spans](../otel-instrumentation/rules/spans.md) |
 | Semconv version migration              | [versioning](./rules/versioning.md) |
 | Dash0 derived attributes               | [dash0](./rules/dash0.md)           |

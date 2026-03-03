@@ -85,7 +85,7 @@ Content-Type: application/json
 ### ===========================================
 
 # @name slowOperation
-# Simulates a 500ms slow operation - check http.server.duration metric
+# Simulates a 500ms slow operation - check http.server.request.duration metric
 GET {{baseUrl}}/slow
 
 ### ===========================================
@@ -99,7 +99,7 @@ GET {{baseUrl}}/error
 ###
 
 # @name notFound
-# 404 error - check http.server.errors metric with status=4xx
+# 404 error - check http.server.request.duration metric filtered by status code
 GET {{baseUrl}}/orders/nonexistent_order_id
 
 ### ===========================================

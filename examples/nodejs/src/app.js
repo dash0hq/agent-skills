@@ -13,10 +13,10 @@
  *    - Meaningful span names (noun.verb format)
  *
  * 3. GOLDEN SIGNAL METRICS
- *    - Latency: http.server.duration histogram
- *    - Traffic: http.server.requests counter
- *    - Errors: http.server.errors counter
- *    - Saturation: http.server.active_connections gauge
+ *    - Latency: http.server.request.duration histogram
+ *    - Traffic: derived from the duration histogram count
+ *    - Errors: derived from the duration histogram filtered by status code
+ *    - Saturation: http.server.active_requests gauge
  *
  * 4. STRUCTURED LOGGING
  *    - Trace correlation (trace_id, span_id)
@@ -32,11 +32,11 @@
 import express from "express";
 import { metricsMiddleware } from "./middleware/metrics.js";
 import { processOrder, getOrder, processBatch } from "./services/order-service.js";
-import { tracer, withSpan } from "./telemetry.js";
+import { withSpan } from "./telemetry.js";
 import logger from "./logger.js";
 
 const app = express();
-app.use(express.json());
+app.use(express.json());  
 
 // Apply metrics middleware to all routes
 app.use(metricsMiddleware);

@@ -25,36 +25,25 @@ export const meter = metrics.getMeter(SERVICE_NAME);
 /**
  * Latency histogram - measures request duration
  * Use for: SLO tracking, performance monitoring
+ * Traffic (request count) is derived from this histogram.
+ * Error rate is derived by filtering on http.response.status_code.
  */
-export const httpDuration = meter.createHistogram("http.server.duration", {
-  description: "HTTP request duration in milliseconds",
-  unit: "ms",
-});
+export const httpDuration = meter.createHistogram(
+  "http.server.request.duration",
+  {
+    description: "Duration of HTTP server requests",
+    unit: "s",
+  }
+);
 
 /**
- * Traffic counter - counts total requests
- * Use for: Traffic monitoring, rate calculations
- */
-export const httpRequests = meter.createCounter("http.server.requests", {
-  description: "Total number of HTTP requests",
-});
-
-/**
- * Error counter - counts failed requests
- * Use for: Error rate SLOs, alerting
- */
-export const httpErrors = meter.createCounter("http.server.errors", {
-  description: "Total number of HTTP errors",
-});
-
-/**
- * Saturation gauge - tracks active connections
+ * Saturation gauge - tracks active requests
  * Use for: Capacity planning, load monitoring
  */
-export const activeConnections = meter.createUpDownCounter(
-  "http.server.active_connections",
+export const activeRequests = meter.createUpDownCounter(
+  "http.server.active_requests",
   {
-    description: "Number of active HTTP connections",
+    description: "Number of active HTTP server requests",
   }
 );
 

@@ -10,9 +10,10 @@ tags:
 
 # Dash0
 
-Dash0 automatically derives enriched attributes from incoming telemetry to power filtering, grouping, AI-powered insights, and visualization. These derived attributes depend on correct semantic conventions in your telemetry.
+To get full value from Dash0, ensure your telemetry sets the attributes listed in the table below.
+Dash0 derives enriched attributes from incoming telemetry — if the source attributes are missing or incorrect, the features degrade silently without errors.
 
-## Derived Capabilities
+## Derived capabilities
 
 | Capability | Depends On | What Happens |
 |---|---|---|
@@ -22,24 +23,25 @@ Dash0 automatically derives enriched attributes from incoming telemetry to power
 | **Adaptive sampling** | Consistent attribute naming across services | Makes intelligent sampling decisions based on attribute patterns |
 | **AI-powered log analysis** | Structured severity, log body conventions | Generates log templates and groups similar log entries |
 
-## What Degrades Silently
+## Minimum attributes to set
 
-If conventions are missing or inconsistent, these features degrade without errors or warnings:
+At a minimum, ensure every service sets the following.
+Without them, Dash0 features degrade silently — no errors, just missing data.
 
-- **Missing `service.name`** — telemetry appears as `unknown_service`, cannot be attributed
-- **Wrong span kind** — service map edges are missing or incorrect. A database call with `INTERNAL` kind won't appear as an outbound dependency.
-- **Missing protocol attributes** — spans without `http.*` or `db.*` attributes are classified as generic, losing type-specific dashboards and filtering
-- **Inconsistent attribute names across services** — cross-service queries return partial results; topology views show fragmented services
+| What to set | Why | Consequence if missing |
+|---|---|---|
+| `service.name` | Service attribution | Telemetry appears as `unknown_service` |
+| Correct span kind (`SERVER`, `CLIENT`, etc.) | Service map edges | Database calls with `INTERNAL` kind do not appear as dependencies |
+| Protocol attributes (`http.*`, `db.*`, `messaging.*`, `rpc.*`) | Span type classification | Spans are classified as generic, losing type-specific dashboards |
+| Consistent attribute names across all services | Cross-service queries | Topology views show fragmented services; queries return partial results |
 
-Getting `service.name`, span kind, span naming, and the core protocol attributes right is the highest-leverage thing you can do for Dash0 feature quality.
-
-## Dash0 Derived Attributes
+## Dash0 derived attributes
 
 These attributes are automatically derived by Dash0 from incoming telemetry. They are not set by instrumentation — Dash0 computes them at ingestion time.
 
 The `otel.*` attributes below are Dash0's attribute representations of OpenTelemetry protocol fields that are not natively attributes (e.g., trace ID, span duration, severity number). Dash0 surfaces them as queryable attributes for filtering and analysis.
 
-### Resource Attributes
+### Resource attributes
 
 | Attribute | Type | Description |
 |---|---|---|
@@ -47,7 +49,7 @@ The `otel.*` attributes below are Dash0's attribute representations of OpenTelem
 | `dash0.resource.type` | string | Type classification (e.g., `k8s.pod`, `host`, `vercel.project`) |
 | `dash0.resource.name` | string | Human-readable name for the resource |
 
-### Span Attributes
+### Span attributes
 
 | Attribute | Type | Description |
 |---|---|---|
@@ -66,7 +68,7 @@ The `otel.*` attributes below are Dash0's attribute representations of OpenTelem
 | `otel.span.status.code` | string | Span status code: `OK`, `ERROR` (from OTel protocol status field) |
 | `otel.span.status.message` | string | Span status description (from OTel protocol status field) |
 
-### Log Attributes
+### Log attributes
 
 | Attribute | Type | Description |
 |---|---|---|
@@ -79,7 +81,7 @@ The `otel.*` attributes below are Dash0's attribute representations of OpenTelem
 | `otel.log.severity.text` | string | Severity as text, e.g., `ERROR` (from OTel protocol severity text field) |
 | `otel.log.severity.range` | string | Categorical severity range: `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE` |
 
-### Metric Attributes
+### Metric attributes
 
 | Attribute | Type | Description |
 |---|---|---|

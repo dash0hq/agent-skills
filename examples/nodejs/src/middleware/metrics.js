@@ -1,25 +1,22 @@
 /**
  * HTTP Metrics Middleware
  *
- * Records golden signal metrics for all HTTP requests:
- * - Latency (histogram)
- * - Traffic (counter)
- * - Errors (counter)
- * - Saturation (active connections)
+ * Records golden signal metrics for all HTTP requests using semconv names:
+ * - Latency: http.server.request.duration histogram (traffic count derived from it)
+ * - Errors: derived from the histogram filtered by http.response.status_code
+ * - Saturation: http.server.active_requests gauge
  *
  * Key principles:
+ * - Use semantic convention metric names and attribute keys whenever applicable
+ * - Use bounded attributes only on metrics (e.g. status_code, not user_id)
  * - Normalize paths to prevent cardinality explosion
- * - Bucket status codes for metrics (exact codes on spans)
  * - Never include unbounded attributes (user_id, request_id)
  */
 
 import {
   httpDuration,
-  httpRequests,
-  httpErrors,
-  activeConnections,
+  activeRequests,
   normalizePath,
-  bucketStatusCode,
 } from "../telemetry.js";
 import logger from "../logger.js";
 
@@ -27,37 +24,28 @@ import logger from "../logger.js";
  * Express middleware for HTTP metrics
  */
 export function metricsMiddleware(req, res, next) {
-  const startTime = Date.now();
+  const startTime = performance.now();
 
-  // Track active connections (saturation)
-  activeConnections.add(1);
+  // Track active requests (saturation)
+  activeRequests.add(1);
 
   // Capture response finish
   res.on("finish", () => {
-    const duration = Date.now() - startTime;
+    const durationS = (performance.now() - startTime) / 1000;
     const normalizedPath = normalizePath(req.path);
-    const statusBucket = bucketStatusCode(res.statusCode);
 
-    // Metric attributes - BOUNDED only!
+    // Metric attributes - use semconv attribute keys, BOUNDED only!
     const metricAttributes = {
-      method: req.method,
-      route: normalizedPath,
-      status: statusBucket,
+      "http.request.method": req.method,
+      "http.route": normalizedPath,
+      "http.response.status_code": res.statusCode,
     };
 
-    // Record latency
-    httpDuration.record(duration, metricAttributes);
+    // Record duration — traffic count and error rate are derived from this histogram
+    httpDuration.record(durationS, metricAttributes);
 
-    // Record request count
-    httpRequests.add(1, metricAttributes);
-
-    // Record errors (4xx and 5xx)
-    if (res.statusCode >= 400) {
-      httpErrors.add(1, metricAttributes);
-    }
-
-    // Release active connection
-    activeConnections.add(-1);
+    // Release active request
+    activeRequests.add(-1);
 
     // Structured log with request details
     // Logs can have higher cardinality than metrics
@@ -65,7 +53,7 @@ export function metricsMiddleware(req, res, next) {
       method: req.method,
       path: req.path, // Full path OK in logs
       status: res.statusCode, // Exact code OK in logs
-      duration_ms: duration,
+      duration_ms: Math.round(durationS * 1000),
       user_agent: req.get("user-agent"),
     });
   });

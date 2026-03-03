@@ -1,6 +1,6 @@
 ---
 name: otel-ottl
-description: OpenTelemetry Transformation Language (OTTL) expert. Use when writing or debugging OTTL expressions for the OpenTelemetry Collector's transform and filter processors. Triggers on tasks involving telemetry transformation, filtering, attribute manipulation, data redaction, or Collector processor configuration. Covers syntax, contexts, functions, error handling, and performance.
+description: OpenTelemetry Transformation Language (OTTL) expert. Use when writing or debugging OTTL expressions for any OpenTelemetry Collector component that supports OTTL (processors, connectors, receivers, exporters). Triggers on tasks involving telemetry transformation, filtering, attribute manipulation, data redaction, sampling policies, routing, or Collector configuration. Covers syntax, contexts, functions, error handling, and performance.
 metadata:
   author: dash0
   version: '1.0.0'
@@ -10,9 +10,37 @@ metadata:
 
 Use OTTL to transform, filter, and manipulate telemetry data inside the OpenTelemetry Collector — without changing application code.
 
-Choose the right processor:
-- **Transform processor** — use when you need to modify, enrich, or redact telemetry (set attributes, rename fields, truncate values).
-- **Filter processor** — use when you need to drop telemetry entirely (discard metrics by name, drop spans by status, remove noisy logs).
+## Components that use OTTL
+
+OTTL is not limited to the transform and filter processors.
+The following Collector components accept OTTL expressions in their configuration.
+
+### Processors
+
+| Component | Use case |
+|-----------|----------|
+| [transform](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor) | Modify, enrich, or redact telemetry (set attributes, rename fields, truncate values) |
+| [filter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/filterprocessor) | Drop telemetry entirely (discard metrics by name, drop spans by status, remove noisy logs) |
+| [attributes](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor) | Insert, update, delete, or hash resource and record attributes |
+| [span](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/spanprocessor) | Rename spans and set span status based on attribute values |
+| [tailsampling](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor) | Sample traces based on OTTL conditions (e.g., keep error traces, drop health checks) |
+| [cumulativetodelta](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/cumulativetodeltaprocessor) | Convert cumulative metrics to delta temporality with OTTL-based metric selection |
+| [logdedup](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/logdedupprocessor) | Deduplicate log records using OTTL conditions |
+| [lookup](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/lookupprocessor) | Enrich telemetry by looking up values from external tables using OTTL expressions |
+
+### Connectors
+
+| Component | Use case |
+|-----------|----------|
+| [routing](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/routingconnector) | Route telemetry to different pipelines based on OTTL conditions |
+| [count](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/countconnector) | Count spans, metrics, or logs matching OTTL conditions and emit as metrics |
+| [sum](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/sumconnector) | Sum numeric values from telemetry matching OTTL conditions and emit as metrics |
+| [signaltometrics](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/signaltometricsconnector) | Generate metrics from spans or logs using OTTL expressions for attribute extraction |
+### Receivers
+
+| Component | Use case |
+|-----------|----------|
+| [hostmetrics](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver) | Filter host metrics at collection time using OTTL conditions |
 
 ## OTTL syntax
 
@@ -388,7 +416,5 @@ Editors modify telemetry data in-place. They are lowercase.
 
 - [OTTL Guide](https://www.dash0.com/guides/opentelemetry-transformation-language-ottl)
 - [OTTL Specification](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/pkg/ottl)
-- [Transform Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor)
-- [Filter Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/filterprocessor)
 - [OTTL Functions Reference](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/pkg/ottl/ottlfuncs)
 - [OTTL Playground](https://ottl.run)

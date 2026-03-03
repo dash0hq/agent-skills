@@ -109,6 +109,25 @@ Expert guidance for selecting, applying, and reviewing OpenTelemetry semantic co
 - Versioning (stability levels, migration, Dash0 auto-upgrades)
 - Dash0 (derived attributes, feature dependencies)
 
+### [otel-collector](./skills/otel-collector/SKILL.md)
+
+Expert guidance for configuring and deploying the OpenTelemetry Collector to receive, process, and export telemetry.
+Covers pipeline configuration, deployment patterns, and forwarding to Dash0.
+
+**Use when:**
+- Setting up an OpenTelemetry Collector pipeline
+- Configuring receivers, processors, or exporters
+- Deploying the Collector to Kubernetes or Docker
+- Forwarding telemetry to Dash0 or another OTLP backend
+- Tuning Collector performance (memory, batching, queuing)
+
+**Rules covered:**
+- Receivers (OTLP, Prometheus, filelog, hostmetrics)
+- Exporters (OTLP/gRPC to Dash0, debug, authentication, retry, queuing)
+- Processors (memory limiter, batch, resource detection, Kubernetes attributes, ordering)
+- Pipelines (service section, per-signal configuration, connectors, fan-out)
+- Deployment (agent vs gateway, DaemonSet, Deployment, Docker Compose, health checks)
+
 ### [otel-ottl](./skills/otel-ottl/SKILL.md)
 
 Expert guidance for writing and debugging OpenTelemetry Transformation Language (OTTL) expressions for the OpenTelemetry Collector's transform and filter processors.

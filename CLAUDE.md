@@ -32,7 +32,7 @@ Follow these rules when writing or editing prose in this project.
 - Keep paragraphs between 2 and 5 lines (sentences).
 
 ### Section headers
-Seaction headers should be written in sentence case, e.g., "This is an example".
+Section headers should be written in sentence case, e.g., "This is an example".
 
 ### Links
 - Use inline Markdown links: `[visible text](url)`.

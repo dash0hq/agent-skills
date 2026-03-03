@@ -93,7 +93,7 @@ Attributes that cannot be set from inside the pod — workload names and UIDs (`
 
 For `k8sattributes` processor configuration (metadata extraction, pod association, passthrough mode, RBAC), see [processors](../../../otel-collector/rules/processors.md).
 For `resource` processor configuration (`k8s.cluster.name`, `k8s.cluster.uid`), see [processors](../../../otel-collector/rules/processors.md).
-For Collector deployment manifests (DaemonSet, Deployment, RBAC), see [deployment](../../../otel-collector/rules/deployment.md).
+For Collector deployment manifests (DaemonSet, Deployment, RBAC), see [raw manifests](../../../otel-collector/rules/deployment/raw-manifests.md).
 
 ## Dash0 Kubernetes Operator
 

@@ -41,7 +41,7 @@ Check which instrumentation libraries are already installed in the project:
 
 ### Common auto-instrumented metrics
 
-The table below lists semconv metrics that auto-instrumentation libraries typically emit.
+The table below lists the stable semconv metric names that auto-instrumentation libraries are expected to emit.
 If a library from the left column is installed, the metrics in the right column are already being produced — do not recreate them.
 
 | Domain | Instrumentation library (example) | Metrics emitted |
@@ -54,6 +54,9 @@ If a library from the left column is installed, the metrics in the right column 
 | Runtime | `runtime-node`, `opentelemetry-javaagent`, `Process` | `process.runtime.*.memory`, `process.runtime.*.gc.*` |
 
 Refer to the [semantic conventions metric reference](https://opentelemetry.io/docs/specs/semconv/general/metrics/) and the documentation of each instrumentation library for the full list.
+
+Note: a library may lag behind the specification and emit metrics under outdated names, units, or attributes.
+Always [write an integration test](#auto-instrumented-metrics-must-be-tested) for each auto-instrumented metric your service depends on to verify it matches the expected stable semconv shape.
 
 ### Decision process
 
@@ -381,6 +384,46 @@ When a test fails, review the change before updating the expectation:
 - **Unit changed** — ensure all consumers expect the new unit and that the change is not an accidental mixup between `s` and `ms`.
 - **Attribute key added** — calculate the cardinality impact (see [cardinality management](#cardinality-management)) before accepting the change.
 - **Attribute key removed** — confirm that no dashboard or alert groups or filters by the removed key.
+
+### Auto-instrumented metrics must be tested
+
+Auto-instrumentation libraries do not always emit metrics under the current stable semantic convention names.
+A library may lag behind the specification — for example, emitting `http.server.duration` (unit `ms`, old attribute names like `http.method`) instead of the stable `http.server.request.duration` (unit `s`, attributes `http.request.method`, `http.route`, `http.response.status_code`).
+Assuming the library is up to date without verifying leads to dashboards and alerts that silently query non-existent metric names.
+
+Write one integration test per auto-instrumented metric that the service depends on.
+Assert the expected stable semconv name, instrument type, unit, and attribute keys using the same `findMetric()` helper from [metric shape must not change unexpectedly](#metric-shape-must-not-change-unexpectedly).
+
+```typescript
+it('http.server.request.duration has the expected shape', async () => {
+  await sendRequest('GET', '/health');
+  await reader.forceFlush();
+
+  const metric = findMetric('http.server.request.duration');
+  expect(metric).toBeDefined();
+  expect(metric).toEqual({
+    name: 'http.server.request.duration',
+    type: 'HISTOGRAM',
+    unit: 's',
+    attributeKeys: ['http.request.method', 'http.response.status_code', 'http.route'],
+  });
+});
+```
+
+If the test fails because the library emits an outdated metric name, unit, or attributes:
+
+1. **Create the metric manually** in application code using the correct stable semconv name, unit, and attributes.
+   Record it from the same code path that the auto-instrumentation would cover (e.g., an HTTP middleware for `http.server.request.duration`).
+2. **Drop the outdated metric in the Collector** using a [`filter` processor](../../otel-collector/rules/processors.md#filter-processor) to prevent it from reaching the backend.
+   Do not drop it in the SDK — that requires a custom SDK setup file and couples application code to library internals.
+   If the library exposes a configuration option to switch to stable semconv (e.g., `semconvStabilityOptIn`), prefer that — it avoids both the manual metric and the Collector filter.
+3. **Document the workaround** — add a comment at the metric creation site explaining why the metric is created manually and which library version caused the mismatch.
+   Include a note to remove the manual metric and the Collector filter once the library migrates to stable semantic conventions.
+4. **Update the test** to verify the manually created metric instead.
+   The test still asserts the stable semconv shape, which is the contract downstream consumers depend on.
+
+When the library eventually upgrades to stable semantic conventions, the test will detect a duplicate metric (both the library and the manual code emit the same name).
+At that point, remove the manual metric and the Collector filter, and let auto-instrumentation take over.
 
 ### Running the assertions
 

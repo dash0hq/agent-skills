@@ -12,11 +12,17 @@
  *    - Proper error handling with recordException()
  *    - Meaningful span names (noun.verb format)
  *
- * 3. GOLDEN SIGNAL METRICS
- *    - Latency: http.server.request.duration histogram
+ * 3. GOLDEN SIGNAL METRICS (middleware/metrics.js)
+ *    - Latency: http.server.request.duration histogram (stable semconv)
  *    - Traffic: derived from the duration histogram count
  *    - Errors: derived from the duration histogram filtered by status code
- *    - Saturation: http.server.active_requests gauge
+ *    - Saturation: http.server.active_requests UpDownCounter (stable semconv)
+ *    These metrics are created manually because the installed
+ *    @opentelemetry/instrumentation-http (0.53.x) still emits metrics under
+ *    old semconv names (http.server.duration, unit ms). The outdated metrics
+ *    are dropped in the Collector with a filter processor. Once the library
+ *    migrates to stable HTTP semantic conventions, remove the manual metrics
+ *    from middleware/metrics.js and the Collector filter.
  *
  * 4. STRUCTURED LOGGING
  *    - Trace correlation (trace_id, span_id)
@@ -35,8 +41,8 @@ import { processOrder, getOrder, processBatch } from "./services/order-service.j
 import { withSpan } from "./telemetry.js";
 import logger from "./logger.js";
 
-const app = express();
-app.use(express.json());  
+export const app = express();
+app.use(express.json());
 
 // Apply metrics middleware to all routes
 app.use(metricsMiddleware);
@@ -199,7 +205,7 @@ app.get("/nested", async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => {
+if (process.env.NODE_ENV !== "test") app.listen(PORT, () => {
   logger.info("server.started", {
     port: PORT,
     node_env: process.env.NODE_ENV || "development",
@@ -232,6 +238,7 @@ Test with:
 ===========================================
   `);
 });
+
 
 // ============================================================================
 // HELPERS

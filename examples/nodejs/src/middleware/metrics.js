@@ -1,61 +1,56 @@
 /**
- * HTTP Metrics Middleware
+ * HTTP metrics middleware
  *
- * Records golden signal metrics for all HTTP requests using semconv names:
- * - Latency: http.server.request.duration histogram (traffic count derived from it)
- * - Errors: derived from the histogram filtered by http.response.status_code
- * - Saturation: http.server.active_requests gauge
+ * Creates http.server.request.duration and http.server.active_requests
+ * following stable HTTP semantic conventions.
  *
- * Key principles:
- * - Use semantic convention metric names and attribute keys whenever applicable
- * - Use bounded attributes only on metrics (e.g. status_code, not user_id)
- * - Normalize paths to prevent cardinality explosion
- * - Never include unbounded attributes (user_id, request_id)
+ * Why manual instead of auto-instrumented?
+ * The installed @opentelemetry/instrumentation-http (0.53.x) emits metrics
+ * under old semconv names (http.server.duration, unit ms) and does not
+ * support the semconvStabilityOptIn option. This middleware creates the
+ * correct stable semconv metrics (http.server.request.duration, unit s)
+ * so that dashboards and alerts use consistent, forward-compatible names.
+ * The outdated metrics from instrumentation-http are dropped in the
+ * Collector with a filter processor — see otel-collector configuration.
+ *
+ * When @opentelemetry/instrumentation-http ships stable HTTP semconv
+ * support, remove this middleware and the Collector filter, and rely on
+ * auto-instrumentation instead.
  */
 
-import {
-  httpDuration,
-  activeRequests,
-  normalizePath,
-} from "../telemetry.js";
-import logger from "../logger.js";
+import { meter } from "../telemetry.js";
+
+const requestDuration = meter.createHistogram("http.server.request.duration", {
+  description: "Duration of HTTP server requests",
+  unit: "s",
+});
+
+const activeRequests = meter.createUpDownCounter("http.server.active_requests", {
+  description: "Number of active HTTP server requests",
+  unit: "1",
+});
 
 /**
- * Express middleware for HTTP metrics
+ * Express middleware for HTTP server metrics
  */
 export function metricsMiddleware(req, res, next) {
   const startTime = performance.now();
 
-  // Track active requests (saturation)
-  activeRequests.add(1);
+  activeRequests.add(1, { "http.request.method": req.method });
 
-  // Capture response finish
   res.on("finish", () => {
     const durationS = (performance.now() - startTime) / 1000;
-    const normalizedPath = normalizePath(req.path);
+    const route = req.route?.path
+      ? req.baseUrl + req.route.path
+      : req.path;
 
-    // Metric attributes - use semconv attribute keys, BOUNDED only!
-    const metricAttributes = {
+    requestDuration.record(durationS, {
       "http.request.method": req.method,
-      "http.route": normalizedPath,
+      "http.route": route,
       "http.response.status_code": res.statusCode,
-    };
-
-    // Record duration — traffic count and error rate are derived from this histogram
-    httpDuration.record(durationS, metricAttributes);
-
-    // Release active request
-    activeRequests.add(-1);
-
-    // Structured log with request details
-    // Logs can have higher cardinality than metrics
-    logger.info("http.request", {
-      method: req.method,
-      path: req.path, // Full path OK in logs
-      status: res.statusCode, // Exact code OK in logs
-      duration_ms: Math.round(durationS * 1000),
-      user_agent: req.get("user-agent"),
     });
+
+    activeRequests.add(-1, { "http.request.method": req.method });
   });
 
   next();

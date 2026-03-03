@@ -8,11 +8,11 @@
  * - Business metrics with bounded attributes
  */
 
+import { SpanStatusCode } from "@opentelemetry/api";
 import {
   withSpan,
   ordersProcessed,
   orderValue,
-  SpanStatusCode,
 } from "../telemetry.js";
 import logger from "../logger.js";
 
@@ -155,11 +155,13 @@ async function processPayment(order) {
       // Simulate occasional payment failures (10% chance)
       if (Math.random() < 0.1) {
         const reason = "card_declined";
-        span.addEvent("payment.declined", { reason });
+        logger.info("payment.declined", {
+          order_id: order.id,
+          reason,
+        });
         return { success: false, reason };
       }
 
-      span.addEvent("payment.authorized");
       logger.info("payment.authorized", {
         order_id: order.id,
         amount: order.total,

@@ -8,6 +8,7 @@
  */
 
 import { trace, context, metrics, SpanStatusCode } from "@opentelemetry/api";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 
 // Service name should match OTEL_SERVICE_NAME
 const SERVICE_NAME = process.env.OTEL_SERVICE_NAME || "otel-nodejs-example";
@@ -19,37 +20,12 @@ export const tracer = trace.getTracer(SERVICE_NAME);
 export const meter = metrics.getMeter(SERVICE_NAME);
 
 // ============================================================================
-// GOLDEN SIGNAL METRICS
-// ============================================================================
-
-/**
- * Latency histogram - measures request duration
- * Use for: SLO tracking, performance monitoring
- * Traffic (request count) is derived from this histogram.
- * Error rate is derived by filtering on http.response.status_code.
- */
-export const httpDuration = meter.createHistogram(
-  "http.server.request.duration",
-  {
-    description: "Duration of HTTP server requests",
-    unit: "s",
-  }
-);
-
-/**
- * Saturation gauge - tracks active requests
- * Use for: Capacity planning, load monitoring
- */
-export const activeRequests = meter.createUpDownCounter(
-  "http.server.active_requests",
-  {
-    description: "Number of active HTTP server requests",
-  }
-);
-
-// ============================================================================
 // BUSINESS METRICS
 // ============================================================================
+// HTTP golden signal metrics (http.server.request.duration, http.server.active_requests)
+// are created in middleware/metrics.js using the stable HTTP semantic conventions.
+// The installed @opentelemetry/instrumentation-http (0.53.x) still uses old
+// semconv names, so the middleware creates the correct metrics manually.
 
 /**
  * Order counter - tracks orders by status
@@ -57,6 +33,7 @@ export const activeRequests = meter.createUpDownCounter(
  */
 export const ordersProcessed = meter.createCounter("orders.processed", {
   description: "Total orders processed",
+  unit: "1",
 });
 
 /**
@@ -64,7 +41,7 @@ export const ordersProcessed = meter.createCounter("orders.processed", {
  */
 export const orderValue = meter.createHistogram("orders.value", {
   description: "Order value distribution",
-  unit: "usd",
+  unit: "{USD}",
 });
 
 // ============================================================================
@@ -95,30 +72,6 @@ export function getTraceContext() {
 // ============================================================================
 
 /**
- * Normalize URL paths for use as metric attributes
- * Prevents cardinality explosion from dynamic path segments
- *
- * Example: /users/123/orders/456 -> /users/{id}/orders/{id}
- */
-export function normalizePath(path) {
-  return path
-    .replace(/\/\d+/g, "/{id}") // Replace numeric IDs
-    .replace(/\/[a-f0-9-]{36}/gi, "/{uuid}"); // Replace UUIDs
-}
-
-/**
- * Bucket HTTP status codes to reduce cardinality
- * Use for metric attributes, not span attributes
- */
-export function bucketStatusCode(code) {
-  if (code >= 200 && code < 300) return "2xx";
-  if (code >= 300 && code < 400) return "3xx";
-  if (code >= 400 && code < 500) return "4xx";
-  if (code >= 500) return "5xx";
-  return "unknown";
-}
-
-/**
  * Create a span with proper error handling
  * Ensures span.end() is always called and errors are recorded
  */
@@ -133,11 +86,24 @@ export async function withSpan(name, attributes, fn) {
       const result = await fn(span);
       return result;
     } catch (error) {
-      // Record exception and set error status
-      span.recordException(error);
+      // Record exception as a structured log record (not span.recordException,
+      // which uses the deprecated Span Event API)
+      const spanContext = span.spanContext();
+      logs.getLogger(SERVICE_NAME).emit({
+        severityNumber: SeverityNumber.ERROR,
+        severityText: "ERROR",
+        body: "exception",
+        attributes: {
+          trace_id: spanContext.traceId,
+          span_id: spanContext.spanId,
+          "exception.type": error.name,
+          "exception.message": error.message,
+          "exception.stacktrace": error.stack,
+        },
+      });
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error.message,
+        message: `${error.name}: ${error.message}`,
       });
       throw error;
     } finally {
@@ -145,6 +111,3 @@ export async function withSpan(name, attributes, fn) {
     }
   });
 }
-
-// Re-export SpanStatusCode for convenience
-export { SpanStatusCode };

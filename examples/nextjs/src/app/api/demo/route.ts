@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getTracer, getMeter, logger, withSpan, getTraceContext } from "@/lib/telemetry";
+import { getTracer, getMeter, getLogger, logger, withSpan, getTraceContext } from "@/lib/telemetry";
 import { SpanStatusCode } from "@opentelemetry/api";
+import { SeverityNumber } from "@opentelemetry/api-logs";
 
 // Create metrics instruments (do this once at module level)
 const meter = getMeter();
@@ -149,28 +150,46 @@ export async function GET(request: NextRequest) {
           data: result,
           // Include trace context in response for debugging
           _trace: {
-            traceId: traceContext.traceId,
-            spanId: traceContext.spanId,
+            traceId: traceContext.trace_id,
+            spanId: traceContext.span_id,
           },
         },
         {
           headers: {
             // Expose trace ID for client-side correlation
-            "X-Trace-Id": traceContext.traceId || "",
+            "X-Trace-Id": traceContext.trace_id || "",
           },
         }
       );
     } catch (error) {
-      // Record exception in span
-      span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR });
+      const err = error as Error;
+
+      // Record exception as a structured log record (not span.recordException,
+      // which uses the deprecated Span Event API)
+      const spanContext = span.spanContext();
+      getLogger().emit({
+        severityNumber: SeverityNumber.ERROR,
+        severityText: "ERROR",
+        body: "exception",
+        attributes: {
+          trace_id: spanContext.traceId,
+          span_id: spanContext.spanId,
+          "exception.type": err.name,
+          "exception.message": err.message,
+          "exception.stacktrace": err.stack,
+        },
+      });
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: `${err.name}: ${err.message}`,
+      });
 
       // Log error with context
       logger.error("api.request.failed", {
         route: "/api/demo",
         method: "GET",
-        error_type: (error as Error).name,
-        error_message: (error as Error).message,
+        error_type: err.name,
+        error_message: err.message,
         duration_ms: Date.now() - startTime,
       });
 
@@ -273,26 +292,44 @@ export async function POST(request: NextRequest) {
           success: true,
           data: { name, value, ...result },
           _trace: {
-            traceId: traceContext.traceId,
-            spanId: traceContext.spanId,
+            traceId: traceContext.trace_id,
+            spanId: traceContext.span_id,
           },
         },
         {
           status: 201,
           headers: {
-            "X-Trace-Id": traceContext.traceId || "",
+            "X-Trace-Id": traceContext.trace_id || "",
           },
         }
       );
     } catch (error) {
-      span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR });
+      const err = error as Error;
+
+      // Record exception as a structured log record
+      const spanContext = span.spanContext();
+      getLogger().emit({
+        severityNumber: SeverityNumber.ERROR,
+        severityText: "ERROR",
+        body: "exception",
+        attributes: {
+          trace_id: spanContext.traceId,
+          span_id: spanContext.spanId,
+          "exception.type": err.name,
+          "exception.message": err.message,
+          "exception.stacktrace": err.stack,
+        },
+      });
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: `${err.name}: ${err.message}`,
+      });
 
       logger.error("api.request.failed", {
         route: "/api/demo",
         method: "POST",
-        error_type: (error as Error).name,
-        error_message: (error as Error).message,
+        error_type: err.name,
+        error_message: err.message,
         duration_ms: Date.now() - startTime,
       });
 

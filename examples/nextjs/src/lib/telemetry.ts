@@ -22,8 +22,8 @@ export function getTraceContext() {
   if (!span) return {};
   const ctx = span.spanContext();
   return {
-    traceId: ctx.traceId,
-    spanId: ctx.spanId,
+    trace_id: ctx.traceId,
+    span_id: ctx.spanId,
   };
 }
 
@@ -84,8 +84,26 @@ export async function withSpan<T>(
       const result = await fn();
       return result;
     } catch (error) {
-      span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR });
+      const err = error as Error;
+      // Record exception as a structured log record (not span.recordException,
+      // which uses the deprecated Span Event API)
+      const spanContext = span.spanContext();
+      getLogger().emit({
+        severityNumber: SeverityNumber.ERROR,
+        severityText: "ERROR",
+        body: "exception",
+        attributes: {
+          trace_id: spanContext.traceId,
+          span_id: spanContext.spanId,
+          "exception.type": err.name,
+          "exception.message": err.message,
+          "exception.stacktrace": err.stack,
+        },
+      });
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: `${err.name}: ${err.message}`,
+      });
       throw error;
     } finally {
       span.end();

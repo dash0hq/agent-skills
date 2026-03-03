@@ -33,7 +33,7 @@ export async function register() {
     const resource = resourceFromAttributes({
       [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'nextjs-demo',
       [ATTR_SERVICE_VERSION]: '1.0.0',
-      'deployment.environment': process.env.NODE_ENV || 'development',
+      'deployment.environment.name': process.env.NODE_ENV || 'development',
     });
 
     // Initialize LoggerProvider for structured logging

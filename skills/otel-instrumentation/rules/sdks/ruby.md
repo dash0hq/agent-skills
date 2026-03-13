@@ -240,6 +240,55 @@ def process_order(order)
 end
 ```
 
+### Span status rules
+
+See [span status code](../spans.md#span-status-code) for the full rules.
+This section shows how to apply them in Ruby.
+
+#### Always include a status message with `ERROR`
+
+The argument to `Status.error` is the status message.
+It must contain the error class and a short explanation — enough to understand the failure without opening the full trace.
+
+```ruby
+# BAD: no status message
+span.status = OpenTelemetry::Trace::Status.error
+
+# BAD: generic message with no diagnostic value
+span.status = OpenTelemetry::Trace::Status.error('something went wrong')
+
+# GOOD: specific message with error class and context
+span.status = OpenTelemetry::Trace::Status.error("#{e.class}: #{e.message}")
+```
+
+Do not include backtraces in the status message.
+Record those in a log record with `exception.stacktrace` instead.
+
+```ruby
+# BAD: backtrace in the status message
+span.status = OpenTelemetry::Trace::Status.error(e.full_message)
+
+# GOOD: short message only
+span.status = OpenTelemetry::Trace::Status.error(e.message)
+```
+
+#### Use `OK` only for confirmed success
+
+Set status to `OK` when application logic has explicitly verified the operation succeeded.
+Leave status `UNSET` if the code simply did not encounter an error.
+
+```ruby
+# GOOD: explicit confirmation from downstream
+response = Net::HTTP.get_response(uri)
+if response.is_a?(Net::HTTPSuccess)
+  span.status = OpenTelemetry::Trace::Status.ok
+end
+
+# BAD: setting OK speculatively
+span.status = OpenTelemetry::Trace::Status.ok
+some_method # might still fail after this point
+```
+
 ---
 
 ## Structured logging

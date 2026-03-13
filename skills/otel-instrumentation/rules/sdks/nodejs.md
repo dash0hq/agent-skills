@@ -259,7 +259,7 @@ Refer to [OpenTelemetry documentation](https://opentelemetry.io/ecosystem/regist
 Add business context to auto-instrumented traces:
 
 ```javascript
-import { trace } from "@opentelemetry/api";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 
 const tracer = trace.getTracer("my-service");
 
@@ -272,12 +272,64 @@ async function processOrder(order) {
       return result;
     } catch (error) {
       span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
       throw error;
     } finally {
       span.end();
     }
   });
 }
+```
+
+### Span status rules
+
+See [span status code](../spans.md#span-status-code) for the full rules.
+This section shows how to apply them in Node.js.
+
+#### Always include a status message with `ERROR`
+
+The `message` field on the status object must contain the error class and a short explanation — enough to understand the failure without opening the full trace.
+
+```javascript
+// BAD: no status message
+span.setStatus({ code: SpanStatusCode.ERROR });
+
+// BAD: generic message with no diagnostic value
+span.setStatus({ code: SpanStatusCode.ERROR, message: 'something went wrong' });
+
+// GOOD: specific message with error class and context
+span.setStatus({
+  code: SpanStatusCode.ERROR,
+  message: `TimeoutError: upstream payment service did not respond within 5s`,
+});
+```
+
+Do not include stack traces in the status message.
+Record those in a log record with `exception.stacktrace` instead.
+
+```javascript
+// BAD: stack trace in the status message
+span.setStatus({ code: SpanStatusCode.ERROR, message: error.stack });
+
+// GOOD: short message only
+span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+```
+
+#### Use `OK` only for confirmed success
+
+Set status to `OK` when application logic has explicitly verified the operation succeeded.
+Leave status `UNSET` if the code simply did not encounter an error.
+
+```javascript
+// GOOD: explicit confirmation from downstream
+const response = await fetch(url);
+if (response.ok) {
+  span.setStatus({ code: SpanStatusCode.OK });
+}
+
+// BAD: setting OK speculatively
+span.setStatus({ code: SpanStatusCode.OK });
+return await someFunction(); // might still fail after this point
 ```
 
 ---

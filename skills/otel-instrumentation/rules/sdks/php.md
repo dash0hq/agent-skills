@@ -270,12 +270,64 @@ function processOrder(array $order): mixed
         return $result;
     } catch (\Throwable $e) {
         $span->recordException($e);
+        $span->setStatus(\OpenTelemetry\API\Trace\StatusCode::STATUS_ERROR, $e->getMessage());
         throw $e;
     } finally {
         $scope->detach();
         $span->end();
     }
 }
+```
+
+### Span status rules
+
+See [span status code](../spans.md#span-status-code) for the full rules.
+This section shows how to apply them in PHP.
+
+#### Always include a status message with `ERROR`
+
+The second argument to `setStatus` is the status message.
+It must contain the error type and a short explanation — enough to understand the failure without opening the full trace.
+
+```php
+use OpenTelemetry\API\Trace\StatusCode;
+
+// BAD: no status message
+$span->setStatus(StatusCode::STATUS_ERROR);
+
+// BAD: generic message with no diagnostic value
+$span->setStatus(StatusCode::STATUS_ERROR, 'something went wrong');
+
+// GOOD: specific message with error type and context
+$span->setStatus(StatusCode::STATUS_ERROR, get_class($e) . ': ' . $e->getMessage());
+```
+
+Do not include stack traces in the status message.
+Record those in a log record with `exception.stacktrace` instead.
+
+```php
+// BAD: stack trace in the status message
+$span->setStatus(StatusCode::STATUS_ERROR, $e->getTraceAsString());
+
+// GOOD: short message only
+$span->setStatus(StatusCode::STATUS_ERROR, $e->getMessage());
+```
+
+#### Use `OK` only for confirmed success
+
+Set status to `OK` when application logic has explicitly verified the operation succeeded.
+Leave status `UNSET` if the code simply did not encounter an error.
+
+```php
+// GOOD: explicit confirmation from downstream
+$response = $client->request('GET', $url);
+if ($response->getStatusCode() === 200) {
+    $span->setStatus(StatusCode::STATUS_OK);
+}
+
+// BAD: setting OK speculatively
+$span->setStatus(StatusCode::STATUS_OK);
+return someFunction(); // might still fail after this point
 ```
 
 ---

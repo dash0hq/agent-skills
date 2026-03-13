@@ -308,7 +308,7 @@ export async function withSpan<T>(
       return await fn();
     } catch (error) {
       span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR });
+      span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
       throw error;
     } finally {
       span.end();
@@ -316,6 +316,45 @@ export async function withSpan<T>(
   });
 }
 ```
+
+### Span status rules
+
+See [span status code](../spans.md#span-status-code) for the full rules.
+This section shows how to apply them in Next.js (same API as Node.js).
+
+#### Always include a status message with `ERROR`
+
+The `message` field on the status object must contain the error class and a short explanation — enough to understand the failure without opening the full trace.
+
+```typescript
+// BAD: no status message
+span.setStatus({ code: SpanStatusCode.ERROR });
+
+// BAD: generic message with no diagnostic value
+span.setStatus({ code: SpanStatusCode.ERROR, message: 'something went wrong' });
+
+// GOOD: specific message with error class and context
+span.setStatus({
+  code: SpanStatusCode.ERROR,
+  message: `TimeoutError: upstream payment service did not respond within 5s`,
+});
+```
+
+Do not include stack traces in the status message.
+Record those in a log record with `exception.stacktrace` instead.
+
+```typescript
+// BAD: stack trace in the status message
+span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).stack });
+
+// GOOD: short message only
+span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+```
+
+#### Use `OK` only for confirmed success
+
+Set status to `OK` when application logic has explicitly verified the operation succeeded.
+Leave status `UNSET` if the code simply did not encounter an error.
 
 ---
 
@@ -391,7 +430,7 @@ export async function GET(request: NextRequest) {
       );
     } catch (error) {
       span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR });
+      span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
       logger.error('api.request.failed', {
         error_message: (error as Error).message,
       });

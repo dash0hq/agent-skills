@@ -89,7 +89,9 @@ Each span has exactly one kind. Choose based on the communication pattern, not t
 
 ## Span status code
 
-Leave span status `UNSET` by default. Only set it to `ERROR` when the operation genuinely failed.
+Leave span status `UNSET` by default.
+Only set it to `ERROR` when the operation genuinely failed.
+You can set the span status code to `OK` only on confirmed success and, if unsure, leave it to `UNSET`.
 
 ### HTTP status code mapping
 
@@ -141,6 +143,37 @@ span.setStatus({
 ```
 
 Verify this rule in integration tests — see [testing trace data](#error-status-has-a-message).
+
+### Do not set `ERROR` for handled or retried errors
+
+Only set span status to `ERROR` when the failure is final.
+Do not set it for errors that were retried and ultimately succeeded, or for errors that were intentionally handled (e.g., a fallback path that produces a valid result).
+
+When retrying inside a span, record each failed attempt as a span event and set `ERROR` only after all retries are exhausted.
+
+```javascript
+async function fetchWithRetry(url, maxRetries) {
+  return tracer.startActiveSpan('http.fetch_with_retry', async (span) => {
+    let lastError;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url);
+        return response;
+      } catch (error) {
+        lastError = error;
+        span.addEvent('retry', { attempt, error: error.message });
+      }
+    }
+
+    // All retries exhausted — now set ERROR.
+    span.setStatus({ code: SpanStatusCode.ERROR, message: lastError.message });
+    span.end();
+    throw lastError;
+  });
+}
+```
+
+See the language-specific SDK rules for idiomatic examples in each language.
 
 ### Recording exceptions
 

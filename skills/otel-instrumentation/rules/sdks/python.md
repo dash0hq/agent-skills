@@ -243,6 +243,7 @@ Add business context to auto-instrumented traces:
 
 ```python
 from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 
 tracer = trace.get_tracer("my-service")
 
@@ -256,7 +257,60 @@ def process_order(order):
             return result
         except Exception as error:
             span.record_exception(error)
+            span.set_status(StatusCode.ERROR, str(error))
             raise
+```
+
+### Span status rules
+
+See [span status code](../spans.md#span-status-code) for the full rules.
+This section shows how to apply them in Python.
+
+#### Always include a status message with `ERROR`
+
+The second argument to `set_status` is the status message.
+It must contain the error type and a short explanation — enough to understand the failure without opening the full trace.
+
+```python
+from opentelemetry.trace import StatusCode
+
+# BAD: no status message
+span.set_status(StatusCode.ERROR)
+
+# BAD: generic message with no diagnostic value
+span.set_status(StatusCode.ERROR, "something went wrong")
+
+# GOOD: specific message with error type and context
+span.set_status(StatusCode.ERROR, f"TimeoutError: upstream payment service did not respond within 5s")
+```
+
+Do not include tracebacks in the status message.
+Record those in a log record with `exception.stacktrace` instead.
+
+```python
+import traceback
+
+# BAD: traceback in the status message
+span.set_status(StatusCode.ERROR, traceback.format_exc())
+
+# GOOD: short message only
+span.set_status(StatusCode.ERROR, str(error))
+```
+
+#### Use `OK` only for confirmed success
+
+Set status to `OK` when application logic has explicitly verified the operation succeeded.
+Leave status `UNSET` if the code simply did not encounter an error.
+
+```python
+# GOOD: explicit confirmation from downstream
+response = requests.get(url)
+if response.ok:
+    span.set_status(StatusCode.OK)
+
+# BAD: setting OK speculatively
+span.set_status(StatusCode.OK)
+return some_function()  # might still fail after this point
 ```
 
 ---

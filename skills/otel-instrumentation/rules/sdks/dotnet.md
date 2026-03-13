@@ -250,6 +250,56 @@ public class OrderService
 }
 ```
 
+### Span status rules
+
+See [span status code](../spans.md#span-status-code) for the full rules.
+This section shows how to apply them in .NET.
+
+#### Always include a status message with `ERROR`
+
+The second argument to `SetStatus` is the status message.
+It must contain the exception type and a short explanation — enough to understand the failure without opening the full trace.
+
+```csharp
+// BAD: no status message
+activity?.SetStatus(ActivityStatusCode.Error);
+
+// BAD: generic message with no diagnostic value
+activity?.SetStatus(ActivityStatusCode.Error, "something went wrong");
+
+// GOOD: specific message with exception type and context
+activity?.SetStatus(ActivityStatusCode.Error, $"{ex.GetType().Name}: {ex.Message}");
+```
+
+Do not include stack traces in the status message.
+Record those in a log record with `exception.stacktrace` instead.
+
+```csharp
+// BAD: stack trace in the status message
+activity?.SetStatus(ActivityStatusCode.Error, ex.ToString());
+
+// GOOD: short message only
+activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+```
+
+#### Use `OK` only for confirmed success
+
+Set status to `OK` when application logic has explicitly verified the operation succeeded.
+Leave status `UNSET` if the code simply did not encounter an error.
+
+```csharp
+// GOOD: explicit confirmation from downstream
+var response = await httpClient.GetAsync(url);
+if (response.IsSuccessStatusCode)
+{
+    activity?.SetStatus(ActivityStatusCode.Ok);
+}
+
+// BAD: setting OK speculatively
+activity?.SetStatus(ActivityStatusCode.Ok);
+return await SomeMethodAsync(); // might still fail after this point
+```
+
 ---
 
 ## Structured logging

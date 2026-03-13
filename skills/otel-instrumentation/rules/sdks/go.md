@@ -382,6 +382,103 @@ func processOrder(ctx context.Context, order Order) error {
 }
 ```
 
+### Span status rules
+
+See [span status code](../spans.md#span-status-code) for the full rules.
+This section shows how to apply them in Go.
+
+#### Always include a status message with `ERROR`
+
+The second argument to `SetStatus` is the status message.
+It must contain the error type and a short explanation — enough to understand the failure without opening the full trace.
+
+```go
+// BAD: no status message
+span.SetStatus(codes.Error, "")
+
+// BAD: generic message with no diagnostic value
+span.SetStatus(codes.Error, "something went wrong")
+
+// GOOD: specific message with error type and context
+span.SetStatus(codes.Error, fmt.Sprintf("*net.OpError: dial tcp %s: connection refused", addr))
+```
+
+For wrapped errors, use the outermost message.
+Do not call `fmt.Sprintf("%+v", err)` in the status message — stack traces belong in a log record with `exception.stacktrace`, not in the status message.
+
+```go
+// BAD: stack trace in the status message
+span.SetStatus(codes.Error, fmt.Sprintf("%+v", err))
+
+// GOOD: short message only
+span.SetStatus(codes.Error, err.Error())
+```
+
+#### Set the status message on the server span from `otelhttp`
+
+`otelhttp` sets the SERVER span status to `ERROR` for 5xx responses, but it cannot populate the status message because it only sees the HTTP status code, not the application error.
+Without an explicit `SetStatus` call in the handler, the root span of every error trace has no diagnostic information.
+
+Always set the status message on the server span inside the handler when returning a 5xx response.
+Use `trace.SpanFromContext` to retrieve the span that `otelhttp` created:
+
+```go
+import (
+	"net/http"
+
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+)
+
+func handleOrder(w http.ResponseWriter, r *http.Request) {
+	order, err := decodeOrder(r)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	if err := processOrder(r.Context(), order); err != nil {
+		// Set the status message on the SERVER span created by otelhttp.
+		trace.SpanFromContext(r.Context()).SetStatus(codes.Error, err.Error())
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+```
+
+```go
+// BAD: relies on otelhttp alone — root span says "Error" with no message
+func handleOrder(w http.ResponseWriter, r *http.Request) {
+	if err := processOrder(r.Context(), order); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+}
+```
+
+#### Use `OK` only for confirmed success
+
+Set status to `OK` when application logic has explicitly verified the operation succeeded.
+Leave status `UNSET` if the code simply did not encounter an error.
+
+```go
+// GOOD: explicit confirmation from downstream
+resp, err := client.Do(req)
+if err != nil {
+	span.SetStatus(codes.Error, err.Error())
+	return err
+}
+if resp.StatusCode == http.StatusOK {
+	span.SetStatus(codes.Ok, "")
+}
+
+// BAD: setting OK speculatively
+span.SetStatus(codes.Ok, "")
+return someFunction(ctx) // might still fail after this point
+```
+
 ---
 
 ## Structured logging

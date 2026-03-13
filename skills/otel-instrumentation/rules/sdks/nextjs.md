@@ -317,6 +317,28 @@ export async function withSpan<T>(
 }
 ```
 
+### Retrieving the active span
+
+Auto-instrumentation creates spans you do not control directly (e.g., the `SERVER` span for an API route).
+To enrich these spans with business context or set their status, retrieve the active span from the current context.
+See [adding attributes to auto-instrumented spans](../spans.md#adding-attributes-to-auto-instrumented-spans) for when to use this pattern.
+
+The API is the same as Node.js:
+
+```typescript
+import { trace } from "@opentelemetry/api";
+
+export async function GET(request: NextRequest) {
+  const span = trace.getActiveSpan();
+  span?.setAttribute("order.id", request.nextUrl.searchParams.get("id") ?? "");
+  span?.setAttribute("tenant.id", request.headers.get("x-tenant-id") ?? "");
+  // ... handler logic
+}
+```
+
+`trace.getActiveSpan()` returns `undefined` if no span is active.
+Always use optional chaining (`?.`) when calling methods on the result.
+
 ### Span status rules
 
 See [span status code](../spans.md#span-status-code) for the full rules.

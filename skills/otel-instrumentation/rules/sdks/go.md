@@ -382,6 +382,31 @@ func processOrder(ctx context.Context, order Order) error {
 }
 ```
 
+### Retrieving the active span
+
+Auto-instrumentation creates spans you do not control directly (e.g., the `SERVER` span created by `otelhttp`).
+To enrich these spans with business context or set their status, retrieve the span from the request context.
+See [adding attributes to auto-instrumented spans](../spans.md#adding-attributes-to-auto-instrumented-spans) for when to use this pattern.
+
+Go does not have a global "current span" — the span is always carried in a `context.Context`.
+Use `trace.SpanFromContext` to retrieve it:
+
+```go
+import "go.opentelemetry.io/otel/trace"
+
+func handleOrder(w http.ResponseWriter, r *http.Request) {
+	span := trace.SpanFromContext(r.Context())
+	span.SetAttributes(
+		attribute.String("order.id", order.ID),
+		attribute.String("tenant.id", r.Header.Get("X-Tenant-Id")),
+	)
+	// ... handler logic
+}
+```
+
+`trace.SpanFromContext` returns a non-recording span if no span is in the context.
+Calling `SetAttributes` or `SetStatus` on a non-recording span is a no-op, so no nil check is needed.
+
 ### Span status rules
 
 See [span status code](../spans.md#span-status-code) for the full rules.

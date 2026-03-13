@@ -281,6 +281,26 @@ async function processOrder(order) {
 }
 ```
 
+### Retrieving the active span
+
+Auto-instrumentation creates spans you do not control directly (e.g., the `SERVER` span for an HTTP request).
+To enrich these spans with business context or set their status, retrieve the active span from the current context.
+See [adding attributes to auto-instrumented spans](../spans.md#adding-attributes-to-auto-instrumented-spans) for when to use this pattern.
+
+```javascript
+import { trace } from "@opentelemetry/api";
+
+app.post("/api/orders", async (req, res) => {
+  const span = trace.getActiveSpan();
+  span?.setAttribute("order.id", req.body.orderId);
+  span?.setAttribute("tenant.id", req.headers["x-tenant-id"]);
+  // ... handler logic
+});
+```
+
+`trace.getActiveSpan()` returns `undefined` if no span is active (e.g., when instrumentation is disabled).
+Always use optional chaining (`?.`) when calling methods on the result.
+
 ### Span status rules
 
 See [span status code](../spans.md#span-status-code) for the full rules.

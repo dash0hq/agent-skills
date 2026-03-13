@@ -3,6 +3,7 @@ title: "Java Instrumentation"
 impact: HIGH
 tags:
   - java
+  - jvm
   - backend
   - server
 ---
@@ -44,7 +45,7 @@ All environment variables that control the SDK behavior:
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `http/protobuf` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
 | `OTEL_RESOURCE_ATTRIBUTES` | No | - | Additional resource attributes (e.g., `deployment.environment=production`) |
 
-**Note**: Unlike Node.js, the Java agent defaults all exporters to `otlp` and the protocol to `http/protobuf`.
+**Note**: The Java agent defaults all exporters to `otlp` and the protocol to `http/protobuf`.
 
 ### Where to get configuration values
 
@@ -247,6 +248,27 @@ public class OrderService {
     }
 }
 ```
+
+### Retrieving the active span
+
+Auto-instrumentation creates spans you do not control directly (e.g., the `SERVER` span for an HTTP request).
+To enrich these spans with business context or set their status, retrieve the active span from the current context.
+See [adding attributes to auto-instrumented spans](../spans.md#adding-attributes-to-auto-instrumented-spans) for when to use this pattern.
+
+```java
+import io.opentelemetry.api.trace.Span;
+
+@PostMapping("/api/orders")
+public ResponseEntity<Order> createOrder(@RequestBody OrderRequest request) {
+    Span span = Span.current();
+    span.setAttribute("order.id", request.getOrderId());
+    span.setAttribute("tenant.id", request.getTenantId());
+    // ... handler logic
+}
+```
+
+`Span.current()` returns a non-recording span if no span is active.
+Calling `setAttribute` or `setStatus` on a non-recording span is a no-op, so no null check is needed.
 
 ### Span status rules
 

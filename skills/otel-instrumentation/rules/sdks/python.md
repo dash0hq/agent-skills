@@ -261,6 +261,26 @@ def process_order(order):
             raise
 ```
 
+### Retrieving the active span
+
+Auto-instrumentation creates spans you do not control directly (e.g., the `SERVER` span for an HTTP request).
+To enrich these spans with business context or set their status, retrieve the active span from the current context.
+See [adding attributes to auto-instrumented spans](../spans.md#adding-attributes-to-auto-instrumented-spans) for when to use this pattern.
+
+```python
+from opentelemetry import trace
+
+@app.route("/api/orders", methods=["POST"])
+def create_order():
+    span = trace.get_current_span()
+    span.set_attribute("order.id", request.json["order_id"])
+    span.set_attribute("tenant.id", request.headers.get("X-Tenant-Id"))
+    # ... handler logic
+```
+
+`trace.get_current_span()` returns a non-recording span if no span is active.
+Calling `set_attribute` or `set_status` on a non-recording span is a no-op, so no guard is needed.
+
 ### Span status rules
 
 See [span status code](../spans.md#span-status-code) for the full rules.

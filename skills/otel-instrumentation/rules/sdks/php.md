@@ -279,6 +279,23 @@ function processOrder(array $order): mixed
 }
 ```
 
+### Retrieving the active span
+
+Auto-instrumentation creates spans you do not control directly (e.g., the `SERVER` span for an HTTP request).
+To enrich these spans with business context or set their status, retrieve the active span from the current context.
+See [adding attributes to auto-instrumented spans](../spans.md#adding-attributes-to-auto-instrumented-spans) for when to use this pattern.
+
+```php
+use OpenTelemetry\API\Trace\Span;
+
+$span = Span::getCurrent();
+$span->setAttribute('order.id', $order['id']);
+$span->setAttribute('tenant.id', $request->getHeaderLine('X-Tenant-Id'));
+```
+
+`Span::getCurrent()` returns a non-recording span if no span is active.
+Calling `setAttribute` or `setStatus` on a non-recording span is a no-op, so no null check is needed.
+
 ### Span status rules
 
 See [span status code](../spans.md#span-status-code) for the full rules.

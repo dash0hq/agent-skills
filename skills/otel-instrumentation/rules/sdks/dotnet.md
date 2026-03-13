@@ -250,6 +250,30 @@ public class OrderService
 }
 ```
 
+### Retrieving the active span
+
+Auto-instrumentation creates spans you do not control directly (e.g., the `SERVER` span for an HTTP request).
+To enrich these spans with business context or set their status, retrieve the active activity from the current context.
+See [adding attributes to auto-instrumented spans](../spans.md#adding-attributes-to-auto-instrumented-spans) for when to use this pattern.
+
+.NET uses `System.Diagnostics.Activity` instead of spans.
+`Activity.Current` returns the active activity (span) on the current thread:
+
+```csharp
+using System.Diagnostics;
+
+[HttpPost("/api/orders")]
+public IActionResult CreateOrder([FromBody] OrderRequest request)
+{
+    Activity.Current?.SetTag("order.id", request.OrderId);
+    Activity.Current?.SetTag("tenant.id", request.TenantId);
+    // ... handler logic
+}
+```
+
+`Activity.Current` returns `null` if no activity is active.
+Always use null-conditional (`?.`) when calling methods on the result.
+
 ### Span status rules
 
 See [span status code](../spans.md#span-status-code) for the full rules.

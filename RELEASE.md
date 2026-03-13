@@ -36,8 +36,10 @@ Follow semantic versioning (`MAJOR.MINOR.PATCH`):
 1. **Validate skills** — checks that every directory under `skills/` contains a `SKILL.md` and a `rules/` directory.
 2. **Compute next version** — reads the latest tag and increments the selected component (e.g., `v1.2.3` with `minor` becomes `v1.3.0`).
    If no tag exists yet, the base version is `v0.0.0`.
-3. **Create tag** — creates and pushes an annotated `vMAJOR.MINOR.PATCH` tag.
-4. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag.
+3. **Generate changelog** — collects commits since the last tag, groups them by conventional commit type (`feat` → Added, `fix` → Fixed, everything else → Changed), and prepends a new entry to `CHANGELOG.md`.
+4. **Commit changelog** — commits the updated `CHANGELOG.md` to `main`.
+5. **Create tag** — creates and pushes an annotated `vMAJOR.MINOR.PATCH` tag on the changelog commit.
+6. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag.
 
 ## Post-release verification
 

@@ -73,6 +73,88 @@ jobs:
           esac
 
           echo "tag=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog entry
+        id: changelog
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          LAST_TAG: ${{ steps.version.outputs.last_tag }}
+        run: |
+          if [ "$LAST_TAG" = "v0.0.0" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LAST_TAG}..HEAD"
+          fi
+
+          FEATS=""
+          FIXES=""
+          OTHER=""
+
+          while IFS= read -r line; do
+            # Strip conventional commit prefix and optional scope for the summary
+            summary=$(echo "$line" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //')
+            case "$line" in
+              feat*)  FEATS="${FEATS}- ${summary}\n" ;;
+              fix*)   FIXES="${FIXES}- ${summary}\n" ;;
+              *)      OTHER="${OTHER}- ${summary}\n" ;;
+            esac
+          done < <(git log --pretty=format:"%s" "$RANGE")
+
+          {
+            echo "## ${TAG} ($(date +%Y-%m-%d))"
+            echo ""
+            if [ -n "$FEATS" ]; then
+              echo "### Added"
+              echo ""
+              echo -e "$FEATS"
+            fi
+            if [ -n "$FIXES" ]; then
+              echo "### Fixed"
+              echo ""
+              echo -e "$FIXES"
+            fi
+            if [ -n "$OTHER" ]; then
+              echo "### Changed"
+              echo ""
+              echo -e "$OTHER"
+            fi
+          } > entry.md
+
+          cat entry.md
+
+      - name: Update CHANGELOG.md
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            # Insert the new entry after the first heading line
+            awk '
+              NR==1 { print; found_header=1; next }
+              found_header && !inserted {
+                # Print a blank line, the entry, then continue
+                while ((getline line < "entry.md") > 0) print line
+                print ""
+                inserted=1
+              }
+              { print }
+            ' CHANGELOG.md > CHANGELOG.tmp
+            mv CHANGELOG.tmp CHANGELOG.md
+          else
+            {
+              echo "# Changelog"
+              echo ""
+              cat entry.md
+            } > CHANGELOG.md
+          fi
+
+          rm entry.md
+
+      - name: Commit changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "chore: update changelog for ${{ steps.version.outputs.tag }}"
+          git push origin HEAD
 
       - name: Create tag
         run: |

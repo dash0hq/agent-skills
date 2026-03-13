@@ -29,6 +29,9 @@ Set it via the `OTEL_SERVICE_NAME` environment variable:
 export OTEL_SERVICE_NAME="order-api"
 ```
 
+> [!NOTE]
+> The value of `service.name` is the same in every environment and instance — set it in application code, a shared `.env` file, or a deployment descriptor.
+
 Choose a name that is:
 - **Stable** — does not change across deployments or restarts.
 - **Unique per logical service** — two different services must not share the same name.
@@ -40,16 +43,32 @@ Pick a naming convention (kebab-case, snake_case, or camelCase) and apply it con
 
 ## Recommended attributes
 
+### `service.namespace`
+
+Groups related services within the same application or product.
+Use it to scope services that belong together — for example, a `checkout`, `payment`, and `inventory` service might all share the namespace `acme-webstore`.
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="service.namespace=acme-webstore"
+```
+
+Without a namespace, identically named services across different products become ambiguous.
+
+> [!NOTE]
+> The value of `service.namespace` is the same in every environment and instance — set it in application code or a shared `.env` file, like `service.name`.
+
 ### `deployment.environment.name`
 
 Distinguish production from staging, development, and other environments.
 Without it, production and test telemetry are mixed together, making dashboards and alerts unreliable.
 
 ```bash
-export OTEL_RESOURCE_ATTRIBUTES="service.version=1.4.2,deployment.environment.name=production"
+export OTEL_RESOURCE_ATTRIBUTES="deployment.environment.name=production"
 ```
 
-Do not hardcode a deployment environment string — derive it from the deployment pipeline or existing framework variables.
+> [!NOTE]
+> The value of `deployment.environment.name` changes per environment — inject it from the deployment pipeline (e.g., Helm values, CI/CD variable), not from application code.
+
 See [resolving configuration values](./resolve-values.md#deploymentenvironmentname) for ordered lookup strategies.
 
 ### `service.version`
@@ -61,19 +80,10 @@ This attribute is invaluable during rollouts to compare how the new version and 
 export OTEL_RESOURCE_ATTRIBUTES="service.version=1.4.2"
 ```
 
-Never hardcode a version string that must be updated manually — derive it from the build pipeline.
+> [!NOTE]
+> The value of `service.version` changes per release — derive it from the build pipeline (e.g., git tag, CI build number), never hardcode it in application code.
+
 See [resolving configuration values](./resolve-values.md#serviceversion) for ordered lookup strategies to find the version value.
-
-### `service.namespace`
-
-Groups related services within the same application or product.
-Use it to scope services that belong together — for example, a `checkout`, `payment`, and `inventory` service might all share the namespace `acme-webstore`.
-
-```bash
-export OTEL_RESOURCE_ATTRIBUTES="service.namespace=acme-webstore,service.version=1.4.2"
-```
-
-Without a namespace, identically named services across different products become ambiguous.
 
 ### `service.instance.id`
 
@@ -81,16 +91,24 @@ Uniquely identifies a single instance of the service.
 The triplet (`service.namespace`, `service.name`, `service.instance.id`) must be globally unique.
 Without it, instance-level analysis (e.g., identifying a single unhealthy pod) is not possible.
 
-The value must be stable for the lifetime of the process and should be an opaque identifier — do not expose infrastructure details like pod names or container IDs directly.
+> [!NOTE]
+> The value of `service.instance.id` changes per instance — generate it at startup (e.g., UUID v4) or inject it from the deployment platform (e.g., Kubernetes downward API), never hardcode it in application code.
+
+It must be stable for the lifetime of the process and should be an opaque identifier — do not expose infrastructure details like pod names or container IDs directly.
 See [resolving configuration values](./resolve-values.md#serviceinstanceid) for generation strategies (UUID v4, UUID v5, and common pitfalls).
 
 Setting `service.instance.id` does not replace the need to also set `k8s.pod.uid` in Kubernetes.
 Both attributes serve different purposes: `service.instance.id` is a logical, opaque identifier, while `k8s.pod.uid` is used by the `k8sattributes` processor for Kubernetes metadata enrichment.
 
-## Kubernetes attributes
+### Kubernetes attributes
 
-For applications running in Kubernetes, resource attributes must include enough metadata for telemetry to be correlated with the correct pod, workload, node, and cluster.
-See [Kubernetes deployment](platforms/k8s.md) for the full list of Kubernetes attributes, downward API configuration, and a complete pod spec example.
+`k8s.*` attributes describe the infrastructure running the service, not the service itself.
+
+> [!NOTE]
+> Set `k8s.*` attributes via the Kubernetes downward API in pod specs or let the `k8sattributes` Collector processor resolve them automatically — never set them in application code.
+
+Follow the guidance issued in [Kubernetes deployment](platforms/k8s.md).
+For configuring the `k8sattributes` processor in the Collector, see the [processors](../../../otel-collector/rules/processors.md#kubernetes-attributes) rule in the `otel-collector` skill.
 
 ## Setting resource attributes
 
@@ -109,9 +127,15 @@ export OTEL_RESOURCE_ATTRIBUTES="service.version=1.4.2,deployment.environment.na
 
 ### Complete `.env.local` example
 
+This example is suitable for local development.
+Application-identity attributes are set directly; deployment-context attributes use placeholder values that the deployment pipeline would replace in production.
+
 ```bash
+# Application-identity attributes (same in every environment)
 OTEL_SERVICE_NAME=order-api
-OTEL_RESOURCE_ATTRIBUTES=service.namespace=acme-webstore,service.version=1.4.2,deployment.environment.name=production
+OTEL_RESOURCE_ATTRIBUTES=service.namespace=acme-webstore,service.version=local-dev,deployment.environment.name=development
+
+# Exporter configuration
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
 OTEL_LOGS_EXPORTER=otlp
@@ -119,6 +143,8 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 NODE_OPTIONS=--import @opentelemetry/auto-instrumentations-node/register
 ```
+
+In a production deployment descriptor (e.g., Kubernetes manifest, Docker Compose, or CI/CD pipeline), override `service.version` and `deployment.environment.name` with values derived from the build and deployment pipeline.
 
 ## Anti-patterns
 

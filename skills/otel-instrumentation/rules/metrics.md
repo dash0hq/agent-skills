@@ -238,6 +238,16 @@ Only use attributes with a small, bounded set of values.
 
 High-cardinality attributes like `user.id` or `order.id` belong on spans and logs, not on metrics.
 
+### Flushing providers on shutdown or crash
+
+OpenTelemetry SDKs batch telemetry before exporting.
+If the process exits before the batch is flushed, buffered metrics are lost.
+Every application must ensure providers are shut down or flushed before process exit.
+
+Abrupt termination (`SIGKILL`, OOM kill, segfault) bypasses all shutdown hooks — no in-process mitigation exists.
+
+See the `Graceful shutdown` in the language-specific SDK rules for the idiomatic shutdown pattern in each runtime.
+
 ## Testing metric data
 
 Treat metric shape — instrument types, units, attribute cardinality, and naming — as a functional requirement.

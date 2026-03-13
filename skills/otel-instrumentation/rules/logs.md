@@ -110,6 +110,16 @@ Configure your logging framework to serialize exceptions into the `exception.sta
 (While the semantic conventions for logs foresee `exception.stacktrace` as an OTLP log attribute fields, using them also in structured logs makes things easier down the line.)
 See the language-specific SDK guides for framework-level configuration.
 
+### Flushing providers on shutdown or crash
+
+OpenTelemetry SDKs batch telemetry before exporting.
+If the process exits before the batch is flushed, buffered log records are lost — including data from the request that caused the crash.
+Every application must ensure providers are shut down or flushed before process exit.
+
+Abrupt termination (`SIGKILL`, OOM kill, segfault) bypasses all shutdown hooks — no in-process mitigation exists.
+
+See the `Graceful shutdown` in the language-specific SDK rules for the idiomatic shutdown pattern in each runtime.
+
 ## Container runtimes
 
 In containerized environments, always write logs to stdout/stderr.

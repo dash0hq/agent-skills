@@ -18,8 +18,6 @@ Instrument Java applications to generate traces, logs, and metrics for deep insi
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
----
-
 ## Installation
 
 ```sh
@@ -27,8 +25,6 @@ wget https://github.com/open-telemetry/opentelemetry-java-instrumentation/releas
 ```
 
 **Note**: The javaagent.jar contains both the agent and instrumentation libraries, enabling automatic instrumentation without modifying source code.
-
----
 
 ## Environment variables
 
@@ -55,8 +51,6 @@ All environment variables that control the SDK behavior:
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
-
----
 
 ## Configuration
 
@@ -108,8 +102,6 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
 ```
 
----
-
 ## Complete setup
 
 ### Using environment variables
@@ -153,8 +145,6 @@ java \
   -jar myapp.jar
 ```
 
----
-
 ## Local development
 
 ### Console exporter
@@ -182,20 +172,14 @@ This is expected behavior.
 2. Run a local OpenTelemetry Collector
 3. Point directly to your observability backend
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
----
-
 ## Kubernetes setup
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
-
----
 
 ## Supported libraries
 
@@ -213,8 +197,6 @@ The auto-instrumentation agent automatically instruments:
 | AWS | AWS SDK v1, AWS SDK v2 |
 
 Refer to the [OpenTelemetry registry](https://opentelemetry.io/ecosystem/registry/?language=java) for the complete list.
-
----
 
 ## Custom spans
 
@@ -337,8 +319,6 @@ span.setStatus(StatusCode.OK);
 return someMethod(); // might still fail after this point
 ```
 
----
-
 ## Structured logging
 
 Configure your logging framework to serialize exceptions into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -386,7 +366,23 @@ Log4j2's `JsonTemplateLayout` produces single-line JSON output with stack traces
 
 Avoid using `PatternLayout` for production logging — it produces multi-line stack traces that break log collectors.
 
----
+## Graceful shutdown
+
+The Java agent registers a JVM shutdown hook automatically.
+When the JVM receives `SIGTERM` or `Runtime.getRuntime().exit()` is called, the hook flushes all pending spans, metrics, and log records before the process terminates.
+No additional code is needed.
+
+If you use a programmatic SDK setup (without the agent), register a shutdown hook manually:
+
+```java
+Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+    tracerProvider.close();
+    meterProvider.close();
+    loggerProvider.close();
+}));
+```
+
+`close()` calls `shutdown()` internally, which flushes pending batches and releases resources.
 
 ## Troubleshooting
 
@@ -432,8 +428,6 @@ Some very old library versions may not be covered by the auto-instrumentation.
 
 Running multiple Java agents (e.g., APM agents) alongside the OpenTelemetry agent can cause conflicts.
 Remove other Java agents before attaching the OpenTelemetry agent.
-
----
 
 ## Resources
 

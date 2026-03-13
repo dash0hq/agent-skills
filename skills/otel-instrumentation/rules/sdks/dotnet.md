@@ -17,8 +17,6 @@ Instrument .NET applications to generate traces, logs, and metrics for deep insi
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
----
-
 ## Installation
 
 Download and run the auto-instrumentation install script:
@@ -31,8 +29,6 @@ curl -L -O https://github.com/open-telemetry/opentelemetry-dotnet-instrumentatio
 
 **Note**: This script is not supported on Apple Silicon.
 For Windows, use the [PowerShell guide](https://opentelemetry.io/docs/zero-code/dotnet/getting-started/).
-
----
 
 ## Environment variables
 
@@ -59,8 +55,6 @@ All environment variables that control the SDK behavior:
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
-
----
 
 ## Configuration
 
@@ -106,8 +100,6 @@ export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
 ```
-
----
 
 ## Complete setup
 
@@ -158,8 +150,6 @@ Add environment variables to your `Properties/launchSettings.json`:
 
 **Note**: You must still source the instrument script before running `dotnet run`.
 
----
-
 ## Local development
 
 ### Console exporter
@@ -188,20 +178,14 @@ This is expected behavior.
 2. Run a local OpenTelemetry Collector
 3. Point directly to your observability backend
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
----
-
 ## Kubernetes setup
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
-
----
 
 ## Supported libraries
 
@@ -217,8 +201,6 @@ The auto-instrumentation package automatically instruments:
 | Runtime | .NET Runtime metrics, process metrics |
 
 Refer to [OpenTelemetry documentation](https://opentelemetry.io/docs/zero-code/dotnet/instrumentations/) for the complete list.
-
----
 
 ## Custom spans
 
@@ -337,8 +319,6 @@ activity?.SetStatus(ActivityStatusCode.Ok);
 return await SomeMethodAsync(); // might still fail after this point
 ```
 
----
-
 ## Structured logging
 
 Configure your logging framework to serialize exceptions into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -389,7 +369,25 @@ catch (Exception ex)
 
 The JSON console formatter serializes exceptions into a structured field, keeping each log record on a single line.
 
----
+## Graceful shutdown
+
+The .NET auto-instrumentation (`instrument.sh`) registers a shutdown hook automatically.
+When the process receives `SIGTERM` or exits normally, the hook flushes all pending spans, metrics, and log records before termination.
+No additional code is needed for the auto-instrumented setup.
+
+If you use the NuGet SDK packages (programmatic setup), the ASP.NET Core host shuts down registered providers when the application stops.
+For non-host applications (console apps, workers), dispose the providers explicitly:
+
+```csharp
+var tracerProvider = Sdk.CreateTracerProviderBuilder()
+    .AddOtlpExporter()
+    .Build();
+
+// On shutdown:
+tracerProvider?.Dispose();
+```
+
+`Dispose()` calls `Shutdown()` internally, which flushes pending batches and releases resources.
 
 ## Troubleshooting
 
@@ -426,8 +424,6 @@ Set it explicitly:
 ```bash
 export OTEL_TRACES_EXPORTER="otlp"
 ```
-
----
 
 ## Resources
 

@@ -17,8 +17,6 @@ Instrument Node.js applications to generate traces, logs, and metrics for deep i
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
----
-
 ## Installation
 
 ```bash
@@ -26,8 +24,6 @@ npm install @opentelemetry/auto-instrumentations-node
 ```
 
 **Note**: Installing the package alone is insufficient—you must activate the SDK AND enable exporters.
-
----
 
 ## Environment variables
 
@@ -54,8 +50,6 @@ All environment variables that control the SDK behavior:
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
-
----
 
 ## Configuration
 
@@ -106,8 +100,6 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
 ```
-
----
 
 ## Complete setup
 
@@ -187,8 +179,6 @@ npm run start:otel:console  # Run with console output (no collector needed)
 npm run dev                 # Development with watch mode + telemetry
 ```
 
----
-
 ## Local development
 
 ### Console exporter
@@ -220,20 +210,14 @@ Error: 14 UNAVAILABLE: No connection established. Last error: connect ECONNREFUS
 2. Run a local OpenTelemetry Collector
 3. Point directly to your observability backend
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
----
-
 ## Kubernetes setup
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
-
----
 
 ## Supported libraries
 
@@ -251,8 +235,6 @@ The auto-instrumentation package automatically instruments:
 | gRPC | @grpc/grpc-js |
 
 Refer to [OpenTelemetry documentation](https://opentelemetry.io/ecosystem/registry/?language=js) for the complete list.
-
----
 
 ## Custom spans
 
@@ -359,8 +341,6 @@ span.setStatus({ code: SpanStatusCode.OK });
 return await someFunction(); // might still fail after this point
 ```
 
----
-
 ## Structured logging
 
 Configure your logging framework to serialize exceptions into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -411,7 +391,50 @@ try {
 
 Without `winston.format.errors({ stack: true })`, the stack trace is silently dropped from JSON output.
 
----
+## Graceful shutdown
+
+The Node.js auto-instrumentation registers shutdown hooks for `SIGTERM` and `SIGINT` automatically.
+No additional code is needed for normal process termination.
+
+However, unhandled exceptions and unhandled promise rejections cause immediate process exit before the SDK flushes its buffers.
+Register handlers that flush the tracer provider before exiting so that spans from the failing request are not lost.
+
+```javascript
+import { trace } from "@opentelemetry/api";
+
+function forceFlushAll() {
+  const promises = [];
+  const tp = trace.getTracerProvider();
+  if (typeof tp.forceFlush === "function") promises.push(tp.forceFlush());
+  return Promise.allSettled(promises);
+}
+
+process.on("uncaughtException", (error) => {
+  logger.error({
+    'exception.type': error.name,
+    'exception.message': error.message,
+    'exception.stacktrace': error.stack,
+  }, "uncaught.exception");
+  forceFlushAll().finally(() => process.exit(1));
+});
+
+process.on("unhandledRejection", (reason) => {
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  logger.error({
+    'exception.type': error.name,
+    'exception.message': error.message,
+    'exception.stacktrace': error.stack,
+  }, "unhandled.rejection");
+  forceFlushAll().finally(() => process.exit(1));
+});
+```
+
+`forceFlush()` on the tracer provider only flushes span processors — it does not flush the logger or meter providers.
+In the auto-instrumented setup, the `logger` reference here is a pino/winston logger writing to stdout (see [structured logging](#structured-logging)), so the log record reaches the Collector through stdout capture, not through the OTel log provider.
+If you use the OTel Logs SDK directly, add its provider to `forceFlushAll()`.
+
+`forceFlush()` is available on the SDK-level `NodeTracerProvider` which the auto-instrumentation registers as the global provider.
+The call returns a promise; `finally` ensures the process exits even if the flush fails or times out.
 
 ## Troubleshooting
 
@@ -461,8 +484,6 @@ Usually means `OTEL_TRACES_EXPORTER` (or metrics/logs) is not set. Set it explic
 ```bash
 export OTEL_TRACES_EXPORTER="otlp"
 ```
-
----
 
 ## Resources
 

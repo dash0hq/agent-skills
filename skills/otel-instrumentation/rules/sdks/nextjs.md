@@ -22,8 +22,6 @@ Full-stack OpenTelemetry setup for Next.js 13+ with App Router. Server-side uses
   - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
   - For browser telemetry, use a token with limited permissions (Ingesting only)
 
----
-
 ## Quick Start
 
 ### 1. Install Packages
@@ -132,14 +130,38 @@ export async function register() {
 
     sdk.start();
 
-    // Graceful shutdown
-    process.on('SIGTERM', () => {
-      sdk
-        .shutdown()
-        .then(() => loggerProvider.shutdown())
-        .then(() => console.log('Telemetry shut down'))
-        .catch((err) => console.error('Shutdown error', err))
-        .finally(() => process.exit(0));
+    // Graceful shutdown — flush all providers before exit
+    async function shutdown() {
+      await loggerProvider.forceFlush();
+      await Promise.allSettled([
+        sdk.shutdown(),
+        loggerProvider.shutdown(),
+      ]);
+    }
+
+    function logExceptionAndExit(message: string, error: Error, exitCode: number) {
+      logs.getLogger('shutdown').emit({
+        severityNumber: 17, // ERROR
+        severityText: 'ERROR',
+        body: message,
+        attributes: {
+          'exception.type': error.name,
+          'exception.message': error.message,
+          'exception.stacktrace': error.stack,
+        },
+      });
+      shutdown().finally(() => process.exit(exitCode));
+    }
+
+    process.on('SIGTERM', () => shutdown().finally(() => process.exit(0)));
+    process.on('SIGINT', () => shutdown().finally(() => process.exit(0)));
+
+    process.on('uncaughtException', (error) => {
+      logExceptionAndExit('uncaught.exception', error, 1);
+    });
+    process.on('unhandledRejection', (reason) => {
+      const error = reason instanceof Error ? reason : new Error(String(reason));
+      logExceptionAndExit('unhandled.rejection', error, 1);
     });
   }
 }
@@ -196,14 +218,10 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
-
----
 
 ## Common Gotchas
 
@@ -236,8 +254,6 @@ Client-side env vars are inlined at build time. Changes won't take effect withou
 
 - Use `resourceFromAttributes` (not `new Resource()`)
 - Use `addSignalAttribute` (not `addAttributes`) for Dash0 SDK
-
----
 
 ## Custom Telemetry Helper
 
@@ -385,8 +401,6 @@ span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message }
 Set status to `OK` when application logic has explicitly verified the operation succeeded.
 Leave status `UNSET` if the code simply did not encounter an error.
 
----
-
 ## Demo: API Route with Full Telemetry
 
 Create `src/app/api/demo/route.ts`:
@@ -473,8 +487,6 @@ export async function GET(request: NextRequest) {
 }
 ```
 
----
-
 ## Verification
 
 ### Check Console Output
@@ -493,8 +505,6 @@ Browser DevTools → Network → Filter by "v1/traces" or "v1/logs" to see OTLP 
 ### Check Dash0
 
 Navigate to Dash0 → Explore → filter by `service.name = "my-nextjs-app"`.
-
----
 
 ## Resources
 

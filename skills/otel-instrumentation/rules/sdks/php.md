@@ -17,8 +17,6 @@ Instrument PHP applications to generate traces, logs, and metrics for deep insig
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
----
-
 ## Installation
 
 ### Step 1: Install Composer packages
@@ -58,8 +56,6 @@ Set the `OTEL_PHP_AUTOLOAD_ENABLED` environment variable to `true` so the SDK au
 
 **Note**: Installing the packages and extension alone is insufficient—you must enable auto-loading AND configure exporters.
 
----
-
 ## Environment variables
 
 All environment variables that control the SDK behavior:
@@ -86,8 +82,6 @@ All environment variables that control the SDK behavior:
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
-
----
 
 ## Configuration
 
@@ -131,8 +125,6 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
 ```
-
----
 
 ## Complete setup
 
@@ -188,8 +180,6 @@ OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN" \
 php -S localhost:8000 -t public
 ```
 
----
-
 ## Local development
 
 ### Console exporter
@@ -218,20 +208,14 @@ This is expected behavior.
 2. Run a local OpenTelemetry Collector
 3. Point directly to your observability backend
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
----
-
 ## Kubernetes setup
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
-
----
 
 ## Supported libraries
 
@@ -244,8 +228,6 @@ The auto-instrumentation packages automatically instrument:
 | Database | PDO |
 
 Refer to [OpenTelemetry documentation](https://opentelemetry.io/ecosystem/registry/?language=php) for the complete list.
-
----
 
 ## Custom spans
 
@@ -354,8 +336,6 @@ $span->setStatus(StatusCode::STATUS_OK);
 return someFunction(); // might still fail after this point
 ```
 
----
-
 ## Structured logging
 
 Configure your logging framework to serialize exceptions into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -389,7 +369,20 @@ try {
 
 Monolog's `JsonFormatter` serializes exceptions (including the stack trace) into a structured `context.exception` field as a single-line JSON entry.
 
----
+## Graceful shutdown
+
+PHP's traditional execution model is request-scoped: each HTTP request starts a new process (or reuses one from a pool), and the SDK flushes telemetry when the request ends.
+No explicit shutdown code is needed for standard web requests.
+
+For long-running PHP processes (queue workers, daemons), register a shutdown function to flush providers before exit:
+
+```php
+register_shutdown_function(function () {
+    \OpenTelemetry\API\Globals::tracerProvider()->shutdown();
+});
+```
+
+`shutdown()` flushes pending batches and releases resources.
 
 ## Troubleshooting
 
@@ -447,8 +440,6 @@ composer require \
   open-telemetry/exporter-otlp \
   open-telemetry/opentelemetry-auto-psr18
 ```
-
----
 
 ## Resources
 

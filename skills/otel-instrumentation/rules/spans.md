@@ -208,6 +208,16 @@ Include `trace_id` and `span_id` so the exception log record can be correlated w
 Set `exception.type`, `exception.message`, and `exception.stacktrace` as log record attributes.
 Serialize the stack trace as a single string — see [exception stack traces](./logs.md#exception-stack-traces) for formatting rules.
 
+### Flushing providers on shutdown or crash
+
+OpenTelemetry SDKs batch telemetry before exporting.
+If the process exits before the batch is flushed, buffered spans are lost — including data from the request that caused the crash.
+Every application must ensure providers are shut down or flushed before process exit.
+
+Abrupt termination (`SIGKILL`, OOM kill, segfault) bypasses all shutdown hooks — no in-process mitigation exists.
+
+See the `Graceful shutdown` in the language-specific SDK rules for the idiomatic shutdown pattern in each runtime.
+
 ## Span attributes
 
 Auto-instrumentation libraries set protocol-level attributes (`http.request.method`, `db.operation.name`, `url.path`, etc.) automatically.

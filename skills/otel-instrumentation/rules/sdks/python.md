@@ -17,8 +17,6 @@ Instrument Python applications to generate traces, logs, and metrics for deep in
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
----
-
 ## Installation
 
 ```bash
@@ -30,8 +28,6 @@ The `opentelemetry-distro` package includes dependencies for auto-instrumentatio
 The `opentelemetry-bootstrap` command detects installed libraries and installs the corresponding instrumentation packages automatically.
 
 **Note**: Installing the packages alone is insufficient—you must activate the SDK AND configure exporters.
-
----
 
 ## Environment variables
 
@@ -58,8 +54,6 @@ All environment variables that control the SDK behavior:
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
-
----
 
 ## Configuration
 
@@ -108,8 +102,6 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 ```bash
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
 ```
-
----
 
 ## Complete setup
 
@@ -171,8 +163,6 @@ make run-otel          # Run with OTLP export to backend
 make run-otel-console  # Run with console output (no collector needed)
 ```
 
----
-
 ## Local development
 
 ### Console exporter
@@ -203,20 +193,14 @@ Failed to export batch. UNAVAILABLE: failed to connect to all addresses
 2. Run a local OpenTelemetry Collector
 3. Point directly to your observability backend
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
----
-
 ## Kubernetes setup
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
-
----
 
 ## Supported libraries
 
@@ -235,8 +219,6 @@ The auto-instrumentation packages automatically instrument:
 
 Refer to [OpenTelemetry documentation](https://opentelemetry.io/ecosystem/registry/?language=python) for the complete list.
 
----
-
 ## Custom spans
 
 Add business context to auto-instrumented traces:
@@ -246,7 +228,6 @@ from opentelemetry import trace
 from opentelemetry.trace import StatusCode
 
 tracer = trace.get_tracer("my-service")
-
 
 def process_order(order):
     with tracer.start_as_current_span("order.process") as span:
@@ -340,8 +321,6 @@ span.set_status(StatusCode.OK)
 return some_function()  # might still fail after this point
 ```
 
----
-
 ## Structured logging
 
 Configure your logging framework to serialize exceptions into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -401,7 +380,24 @@ except Exception:
 
 The `format_exc_info` processor converts the stack trace into a single string field before JSON serialization.
 
----
+## Graceful shutdown
+
+The `opentelemetry-instrument` command registers an `atexit` hook automatically.
+When the process exits normally (including unhandled exceptions in most WSGI/ASGI servers), the hook flushes all pending spans, metrics, and log records before termination.
+No additional code is needed for the auto-instrumented setup.
+
+If you use a programmatic SDK setup (without `opentelemetry-instrument`), register a shutdown hook manually:
+
+```python
+import atexit
+
+atexit.register(tracer_provider.shutdown)
+atexit.register(meter_provider.shutdown)
+atexit.register(logger_provider.shutdown)
+```
+
+`shutdown()` flushes pending batches and releases resources.
+The call blocks until export completes or the timeout expires (default 30 seconds).
 
 ## Troubleshooting
 
@@ -455,8 +451,6 @@ opentelemetry-bootstrap -a install
 ```
 
 Ensure the bootstrap command runs in the same virtual environment as your application.
-
----
 
 ## Resources
 

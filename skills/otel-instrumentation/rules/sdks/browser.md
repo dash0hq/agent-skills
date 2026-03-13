@@ -20,8 +20,6 @@ Instrument web applications to monitor performance, user sessions, requests, and
 - **End-to-End Tracing**: Connect frontend interactions with backend traces
 - **Custom Instrumentation**: Monitor specific user interactions or business logic workflows
 
----
-
 ## Option 1: Dash0 SDK Web (Recommended)
 
 100% open source. Designed to work with Dash0. Simplest setup with sensible defaults.
@@ -33,7 +31,6 @@ Instrument web applications to monitor performance, user sessions, requests, and
    - Format: `https://<region>.your-platform.com`
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
-
 
 **Security**: Browser auth tokens are exposed in client code. Use a dedicated auth token with:
 
@@ -97,8 +94,6 @@ sendEvent('checkout.completed', { order_id: '123' });
 ### Resources
 
 - [GitHub Repository](https://github.com/dash0hq/dash0-sdk-web)
-
----
 
 ## Option 2: OpenTelemetry JS SDK
 
@@ -192,8 +187,6 @@ Open your website in a browser. Network tab will show calls to the Dash0 ingesti
 ### Resources
 
 - [OpenTelemetry JS Documentation](https://opentelemetry.io/docs/languages/js/getting-started/browser/)
-
----
 
 ## Browser-to-Server Correlation
 

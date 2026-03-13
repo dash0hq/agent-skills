@@ -17,8 +17,6 @@ Instrument Go applications to generate traces, logs, and metrics for deep insigh
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
----
-
 ## Installation
 
 Go does not have a single auto-instrumentation package.
@@ -38,8 +36,6 @@ go get go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc
 Install instrumentation packages for the libraries you use from the [OpenTelemetry Registry](https://opentelemetry.io/ecosystem/registry/?language=go).
 
 **Note**: Installing the packages alone is insufficient—you must write initialization code to activate the SDK AND enable exporters.
-
----
 
 ## Environment variables
 
@@ -66,8 +62,6 @@ All environment variables that control the SDK behavior:
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
-
----
 
 ## Configuration
 
@@ -194,8 +188,6 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
 ```
 
----
-
 ## Complete setup
 
 ### Using environment variables
@@ -261,8 +253,6 @@ make run-otel          # Run with OTLP export to backend
 make run-otel-console  # Run with console output (no collector needed)
 ```
 
----
-
 ## Local development
 
 ### Console exporter
@@ -302,20 +292,14 @@ rpc error: code = Unavailable desc = connection error: desc = "transport: Error 
 2. Run a local OpenTelemetry Collector
 3. Point directly to your observability backend
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
----
-
 ## Kubernetes setup
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
-
----
 
 ## Supported libraries
 
@@ -351,8 +335,6 @@ client := &http.Client{
 	Transport: otelhttp.NewTransport(http.DefaultTransport),
 }
 ```
-
----
 
 ## Custom spans
 
@@ -509,8 +491,6 @@ span.SetStatus(codes.Ok, "")
 return someFunction(ctx) // might still fail after this point
 ```
 
----
-
 ## Structured logging
 
 Configure your logging framework to serialize errors into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -557,7 +537,38 @@ if err != nil {
 
 zerolog serializes the error into an `"error"` field as a single string value.
 
----
+## Graceful shutdown
+
+Go uses a programmatic SDK setup, so the application must shut down providers explicitly.
+The `initTelemetry` function in the [configuration section](#activate-the-sdk) returns a `shutdown` closure that flushes and shuts down all providers.
+
+`os.Exit`, `log.Fatal`, and unhandled signals bypass `defer` — so relying on `defer shutdown()` alone loses telemetry in most real shutdown scenarios.
+Call `shutdown()` explicitly in the signal handler, before the process exits:
+
+```go
+func main() {
+	ctx := context.Background()
+	shutdown, err := initTelemetry(ctx)
+	if err != nil {
+		log.Fatalf("failed to initialize telemetry: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	srv := &http.Server{Addr: ":8080", Handler: handler}
+	go func() { _ = srv.ListenAndServe() }()
+
+	<-ctx.Done()
+	_ = srv.Shutdown(context.Background())
+	shutdown()
+}
+```
+
+Each provider's `Shutdown` method flushes pending batches and releases resources.
+The call blocks until export completes or the context deadline expires.
+
+For short-lived programs (CLI tools, batch jobs) that return from `main` normally, `defer shutdown()` is sufficient.
 
 ## Troubleshooting
 
@@ -609,8 +620,6 @@ Each library requires its own instrumentation wrapper from `go.opentelemetry.io/
 
 **Fix**: Always pass `context.Context` through your call chain.
 Go instrumentation relies on context propagation to link parent and child spans.
-
----
 
 ## Resources
 

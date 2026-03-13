@@ -17,8 +17,6 @@ Instrument Ruby applications to generate traces, logs, and metrics for deep insi
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
----
-
 ## Installation
 
 ```bash
@@ -26,8 +24,6 @@ bundle add opentelemetry-sdk opentelemetry-instrumentation-all opentelemetry-exp
 ```
 
 **Note**: Installing the gems alone is insufficient—you must initialize the SDK AND enable exporters.
-
----
 
 ## Environment variables
 
@@ -54,8 +50,6 @@ All environment variables that control the SDK behavior:
 2. **Auth Token**: API token for telemetry ingestion
    - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
 3. **Service Name**: Choose a descriptive name (e.g., `order-api`, `checkout-service`)
-
----
 
 ## Configuration
 
@@ -115,8 +109,6 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN,Dash0-Dataset=my-dataset"
 ```
 
----
-
 ## Complete setup
 
 ### Using environment variables
@@ -156,8 +148,6 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 bundle exec rails server
 ```
 
----
-
 ## Local development
 
 ### Console exporter
@@ -185,20 +175,14 @@ This is expected behavior.
 2. Run a local OpenTelemetry Collector
 3. Point directly to your observability backend
 
----
-
 ## Resource configuration
 
 Set `service.name`, `service.version`, and `deployment.environment.name` for every deployment.
 See [resource attributes](../resources.md) for the full list of required and recommended attributes.
 
----
-
 ## Kubernetes setup
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
-
----
 
 ## Supported libraries
 
@@ -215,8 +199,6 @@ The auto-instrumentation package automatically instruments:
 | Logging | Logger |
 
 Refer to the [OpenTelemetry Ruby Contrib repository](https://github.com/open-telemetry/opentelemetry-ruby-contrib/tree/main/instrumentation) for the complete list.
-
----
 
 ## Custom spans
 
@@ -310,8 +292,6 @@ span.status = OpenTelemetry::Trace::Status.ok
 some_method # might still fail after this point
 ```
 
----
-
 ## Structured logging
 
 Configure your logging framework to serialize exceptions into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -349,7 +329,22 @@ config.lograge.formatter = Lograge::Formatters::Json.new
 Lograge does not handle exception backtraces directly.
 Pair it with semantic_logger or a JSON formatter that serializes exceptions as single-line fields.
 
----
+## Graceful shutdown
+
+The Ruby SDK does not register shutdown hooks automatically.
+Register an `at_exit` hook to flush and shut down providers before the process terminates, so buffered spans, metrics, and log records are not lost.
+
+```ruby
+at_exit do
+  OpenTelemetry.tracer_provider.shutdown if OpenTelemetry.respond_to?(:tracer_provider)
+  OpenTelemetry.meter_provider.shutdown if OpenTelemetry.respond_to?(:meter_provider)
+  OpenTelemetry.logger_provider.shutdown if OpenTelemetry.respond_to?(:logger_provider)
+end
+```
+
+Place the `at_exit` block immediately after `OpenTelemetry::SDK.configure` in your initializer.
+`shutdown` flushes pending batches and releases resources.
+The call blocks until export completes or the timeout expires (default 30 seconds).
 
 ## Troubleshooting
 
@@ -386,8 +381,6 @@ Set it explicitly:
 ```bash
 export OTEL_TRACES_EXPORTER="otlp"
 ```
-
----
 
 ## Resources
 

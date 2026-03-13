@@ -21,7 +21,7 @@ Follow semantic versioning (`MAJOR.MINOR.PATCH`):
    ```
 
 3. Verify that `README.md` reflects the current set of skills and their descriptions.
-4. Confirm that every skill directory contains a valid `SKILL.md` and a `rules/` directory.
+4. Confirm that every skill directory contains a valid `SKILL.md`.
 
 ## Creating the release
 
@@ -33,7 +33,7 @@ Follow semantic versioning (`MAJOR.MINOR.PATCH`):
 
 ## What the workflow does
 
-1. **Validate skills** — checks that every directory under `skills/` contains a `SKILL.md` and a `rules/` directory.
+1. **Validate skills** — checks that every directory under `skills/` contains a `SKILL.md`.
 2. **Compute next version** — reads the latest tag and increments the selected component (e.g., `v1.2.3` with `minor` becomes `v1.3.0`).
    If no tag exists yet, the base version is `v0.0.0`.
 3. **Generate changelog** — collects commits since the last tag, groups them by conventional commit type (`feat` → Added, `fix` → Fixed, everything else → Changed), and prepends a new entry to `CHANGELOG.md`.

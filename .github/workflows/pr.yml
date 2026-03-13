@@ -25,10 +25,6 @@ jobs:
               echo "::error::Skill '$skill_name' is missing SKILL.md"
               exit_code=1
             fi
-            if [ ! -d "$skill_dir/rules" ]; then
-              echo "::error::Skill '$skill_name' is missing rules/ directory"
-              exit_code=1
-            fi
           done
           exit $exit_code
 

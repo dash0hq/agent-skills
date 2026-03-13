@@ -491,6 +491,125 @@ span.SetStatus(codes.Ok, "")
 return someFunction(ctx) // might still fail after this point
 ```
 
+## Context propagation
+
+**This section applies only to distributed-traces instrumentation.**
+If the application uses only logs and/or metrics, context propagation is not required.
+
+Go carries the active span inside a `context.Context` value.
+Every function in a call chain that should participate in a trace must accept a `context.Context` as its first parameter and pass it to downstream calls.
+If any function in the chain drops or ignores the context, the trace breaks at that point and child spans become orphaned roots.
+
+### Ensuring every function accepts a context
+
+When adding tracing to an existing codebase, audit every function on the request path.
+Any function that does not already take a `context.Context` must be refactored before it can carry trace context.
+
+Add `ctx context.Context` as the **first parameter** (the standard Go convention):
+
+```go
+// BEFORE: no context — trace breaks here
+func getUser(id string) (*User, error) {
+	return db.QueryUser(id)
+}
+
+// AFTER: context flows through — child spans link to the parent
+func getUser(ctx context.Context, id string) (*User, error) {
+	return db.QueryUser(ctx, id)
+}
+```
+
+Update every call site to pass the context:
+
+```go
+// BEFORE
+user, err := getUser(order.UserID)
+
+// AFTER
+user, err := getUser(ctx, order.UserID)
+```
+
+### Common context-propagation breaks
+
+Apply the following rules when the code matches one of these patterns.
+
+#### Goroutines
+
+Pass the parent context (or a derived context) to goroutines explicitly.
+Do **not** rely on closure capture of a `ctx` variable that may be cancelled before the goroutine runs.
+
+```go
+// GOOD: pass context explicitly
+go func(ctx context.Context) {
+	processAsync(ctx, item)
+}(ctx)
+
+// BAD: closure captures ctx that may be cancelled by the caller
+go func() {
+	processAsync(ctx, item)
+}()
+```
+
+If the goroutine must outlive the request (e.g., background work), create a new root context with `context.Background()` and link it to the original span:
+
+```go
+asyncCtx := context.Background()
+asyncCtx, span := tracer.Start(asyncCtx, "async.process",
+	trace.WithLinks(trace.LinkFromContext(ctx)),
+)
+go func() {
+	defer span.End()
+	processAsync(asyncCtx, item)
+}()
+```
+
+#### Callbacks and interface implementations
+
+When a framework or library defines a callback or interface method without a `context.Context` parameter, the trace context cannot flow through it.
+Check whether the framework offers a context-aware variant (e.g., `http.Handler` carries context in `*http.Request`).
+
+If no context-aware API exists, store the context before the callback and retrieve it inside:
+
+```go
+// Store context in a struct field before the callback
+type handler struct {
+	ctx context.Context
+}
+
+func (h *handler) OnMessage(msg Message) {
+	ctx, span := tracer.Start(h.ctx, "message.process")
+	defer span.End()
+	// ...
+}
+```
+
+#### Channel consumers
+
+When reading from a channel, the producing side must send the context alongside the data.
+Define a wrapper struct that pairs the payload with its context:
+
+```go
+type work struct {
+	ctx  context.Context
+	item Item
+}
+
+// Producer
+ch <- work{ctx: ctx, item: item}
+
+// Consumer
+w := <-ch
+ctx, span := tracer.Start(w.ctx, "consume.item")
+defer span.End()
+process(ctx, w.item)
+```
+
+### Verifying context propagation
+
+After refactoring, verify that all spans in a request are connected into a single trace.
+Export to a backend or use the console exporter and confirm that every span shares the same `TraceID` and has the expected `ParentSpanID`.
+Orphaned root spans (spans with no parent that should have one) indicate a broken context chain.
+
 ## Structured logging
 
 Configure your logging framework to serialize errors into a single structured field so that stack traces do not break the one-line-per-record contract.
@@ -616,10 +735,10 @@ Each library requires its own instrumentation wrapper from `go.opentelemetry.io/
 
 ### Context propagation issues
 
-**Symptom**: Spans are created but not connected into traces.
+**Symptom**: Spans are created but not connected into traces (orphaned root spans).
 
-**Fix**: Always pass `context.Context` through your call chain.
-Go instrumentation relies on context propagation to link parent and child spans.
+**Fix**: Every function on the request path must accept and forward a `context.Context` struct.
+See [context propagation](#context-propagation) for refactoring patterns covering goroutines, callbacks, and channel consumers.
 
 ## Resources
 

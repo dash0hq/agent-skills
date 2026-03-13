@@ -404,7 +404,12 @@ import { trace } from "@opentelemetry/api";
 
 function forceFlushAll() {
   const promises = [];
-  const tp = trace.getTracerProvider();
+  let tp = trace.getTracerProvider();
+  // The auto-instrumentation wraps the real provider in a ProxyTracerProvider
+  // that does not expose forceFlush(). Unwrap it to reach the SDK provider.
+  if (typeof tp.forceFlush !== "function" && typeof tp.getDelegate === "function") {
+    tp = tp.getDelegate();
+  }
   if (typeof tp.forceFlush === "function") promises.push(tp.forceFlush());
   return Promise.allSettled(promises);
 }
@@ -433,7 +438,8 @@ process.on("unhandledRejection", (reason) => {
 In the auto-instrumented setup, the `logger` reference here is a pino/winston logger writing to stdout (see [structured logging](#structured-logging)), so the log record reaches the Collector through stdout capture, not through the OTel log provider.
 If you use the OTel Logs SDK directly, add its provider to `forceFlushAll()`.
 
-`forceFlush()` is available on the SDK-level `NodeTracerProvider` which the auto-instrumentation registers as the global provider.
+`trace.getTracerProvider()` returns a `ProxyTracerProvider` that does not expose `forceFlush()`.
+Call `getDelegate()` to unwrap it and reach the SDK-level provider (`NodeTracerProvider`) where `forceFlush()` is defined.
 The call returns a promise; `finally` ensures the process exits even if the flush fails or times out.
 
 ## Troubleshooting

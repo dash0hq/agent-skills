@@ -15,22 +15,22 @@ Skills are automatically available once installed. The agent will use them when 
 
 **Examples:**
 ```
-Add OpenTelemetry to my Node.js app
+Add OpenTelemetry instrumentation to my app
 ```
 ```
-Set up browser tracing with Dash0
+My traces are broken — spans show up as separate roots instead of a connected trace
 ```
 ```
-Help me reduce my telemetry costs
+Set up an OpenTelemetry Collector pipeline that forwards to Dash0
 ```
 ```
-Write an OTTL expression to redact sensitive headers
+Write an OTTL expression to redact credit card numbers from log bodies
 ```
 ```
-Which attributes should I use for my database spans?
+Ensure that my HTTP server spans have the correct attributes
 ```
 ```
-Help me fix my span naming to follow semantic conventions
+Help me fix high-cardinality metrics that are blowing up my costs
 ```
 
 ## Why semantic conventions matter
@@ -147,6 +147,71 @@ Expert guidance for writing and debugging OpenTelemetry Transformation Language 
 - Convert (change data types and formats)
 
 **Contexts:** resource, scope, span, spanevent, metric, datapoint, log
+
+## Automation with Claude Code
+
+You can configure [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to apply these skills automatically — both in interactive sessions and in headless CI/CD pipelines.
+
+### Project instructions via CLAUDE.md
+
+Add a `CLAUDE.md` file to your repository root with instructions that tell Claude Code when to use the skills.
+Claude Code loads this file at the start of every session.
+
+```markdown
+# Observability
+
+This project uses OpenTelemetry for observability.
+When adding or modifying instrumentation, follow the guidance from the installed `dash0hq/agent-skills` skills.
+
+When working on application code or deployment specs, use the `otel-instrumentation` skill.
+When working on Collector configuration, use the `otel-collector` skill.
+When choosing or reviewing telemetry attributes, use the `otel-semantic-conventions` skill.
+```
+
+### Headless mode in CI/CD
+
+Use `claude -p` to run Claude Code non-interactively in a pipeline.
+This enables automated instrumentation reviews, skill-guided code generation, and PR checks.
+
+```bash
+# Review instrumentation quality on a pull request
+claude -p "Review the OpenTelemetry instrumentation changes in this PR. \
+  Check for missing context propagation, incorrect span status handling, \
+  and semantic convention violations." \
+  --allowedTools "Read,Grep,Glob"
+```
+
+#### GitHub Actions example
+
+```yaml
+name: Instrumentation review
+
+on: [pull_request]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install skills
+        run: npx skills add dash0hq/agent-skills
+
+      - name: Review instrumentation
+        run: |
+          claude -p "Review the OpenTelemetry instrumentation in this PR \
+            for correctness and semantic convention compliance. \
+            Post your findings as a summary." \
+            --allowedTools "Read,Grep,Glob" \
+            --output-format json > review.json
+
+      - name: Comment on PR
+        run: |
+          findings=$(jq -r '.result' review.json)
+          gh pr comment "$PR_NUMBER" --body "## Instrumentation review"$'\n\n'"$findings"
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+```
 
 ## Skill structure
 

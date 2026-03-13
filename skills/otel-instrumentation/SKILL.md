@@ -31,6 +31,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 | [go](./rules/sdks/go.md) | Go instrumentation setup |
 | [python](./rules/sdks/python.md) | Python instrumentation setup |
 | [java](./rules/sdks/java.md) | Java instrumentation setup |
+| [scala](./rules/sdks/scala.md) | Scala instrumentation setup |
 | [dotnet](./rules/sdks/dotnet.md) | .NET instrumentation setup |
 | [ruby](./rules/sdks/ruby.md) | Ruby instrumentation setup |
 | [php](./rules/sdks/php.md) | PHP instrumentation setup |
@@ -75,6 +76,7 @@ SDK (AlwaysOn)  →  Collector (sampling)  →  Backend (retention)
 | Go backend | [go](./rules/sdks/go.md) |
 | Python backend | [python](./rules/sdks/python.md) |
 | Java backend | [java](./rules/sdks/java.md) |
+| Scala backend | [scala](./rules/sdks/scala.md) |
 | .NET backend | [dotnet](./rules/sdks/dotnet.md) |
 | Ruby backend | [ruby](./rules/sdks/ruby.md) |
 | PHP backend | [php](./rules/sdks/php.md) |

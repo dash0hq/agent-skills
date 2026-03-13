@@ -256,8 +256,15 @@ def process_order(order):
             result = save_order(order)
             return result
         except Exception as error:
-            span.record_exception(error)
             span.set_status(StatusCode.ERROR, str(error))
+            ctx = span.get_span_context()
+            logger.error("order.process.failed", extra={
+                "trace_id": format(ctx.trace_id, "032x"),
+                "span_id": format(ctx.span_id, "016x"),
+                "exception.type": type(error).__name__,
+                "exception.message": str(error),
+                "exception.stacktrace": traceback.format_exc(),
+            })
             raise
 ```
 

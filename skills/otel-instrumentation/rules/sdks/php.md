@@ -269,8 +269,15 @@ function processOrder(array $order): mixed
         $result = saveOrder($order);
         return $result;
     } catch (\Throwable $e) {
-        $span->recordException($e);
         $span->setStatus(\OpenTelemetry\API\Trace\StatusCode::STATUS_ERROR, $e->getMessage());
+        $ctx = $span->getContext();
+        $logger->error('order.process.failed', [
+            'trace_id' => $ctx->getTraceId(),
+            'span_id' => $ctx->getSpanId(),
+            'exception.type' => get_class($e),
+            'exception.message' => $e->getMessage(),
+            'exception.stacktrace' => $e->getTraceAsString(),
+        ]);
         throw $e;
     } finally {
         $scope->detach();

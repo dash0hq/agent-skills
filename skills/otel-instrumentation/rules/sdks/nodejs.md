@@ -271,8 +271,15 @@ async function processOrder(order) {
       const result = await saveOrder(order);
       return result;
     } catch (error) {
-      span.recordException(error);
       span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      const ctx = span.spanContext();
+      logger.error({
+        'trace_id': ctx.traceId,
+        'span_id': ctx.spanId,
+        'exception.type': error.name,
+        'exception.message': error.message,
+        'exception.stacktrace': error.stack,
+      }, 'order.process.failed');
       throw error;
     } finally {
       span.end();

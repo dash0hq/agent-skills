@@ -177,9 +177,12 @@ See the language-specific SDK rules for idiomatic examples in each language.
 
 ### Recording exceptions
 
-Record exception details as a log record with the `exception` event name, not as a span event.
+Record exception details as a structured log record, not as a span event.
 The [Span Event API is being deprecated](https://github.com/open-telemetry/opentelemetry-specification/blob/main/oteps/4430-span-event-api-deprecation-plan.md) in favour of log-based events.
-Emit the exception as a log record within the active span context so that it carries `trace_id` and `span_id` automatically.
+Emit the exception as a log record within the active span context so that it carries `trace_id` and `span_id` automatically according to the [logs guidance](./logs.md).
+
+Use a log message that describes the failed operation — not a generic label like `"exception"` or `"error"`.
+The `exception.*` attributes carry the exception details; the message provides the operational context that makes the log record useful when scanning a log stream.
 
 ```typescript
 import { trace, context } from '@opentelemetry/api';
@@ -187,9 +190,12 @@ import { trace, context } from '@opentelemetry/api';
 // BAD: uses the deprecated Span Event API
 span.recordException(error);
 
-// GOOD: emit exception as a structured log record with trace correlation
+// BAD: generic message with no operational context
+logger.error('exception', { 'exception.type': error.name, ... });
+
+// GOOD: descriptive message with exception attributes and trace correlation
 const spanContext = trace.getSpan(context.active())?.spanContext();
-logger.error('exception', {
+logger.error('order.charge.failed', {
   'trace_id': spanContext?.traceId,
   'span_id': spanContext?.spanId,
   'exception.type': error.name,

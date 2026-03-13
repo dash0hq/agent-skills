@@ -307,8 +307,15 @@ export async function withSpan<T>(
       });
       return await fn();
     } catch (error) {
-      span.recordException(error as Error);
       span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+      const ctx = span.spanContext();
+      logger.error(`${name}.failed`, {
+        'trace_id': ctx.traceId,
+        'span_id': ctx.spanId,
+        'exception.type': (error as Error).name,
+        'exception.message': (error as Error).message,
+        'exception.stacktrace': (error as Error).stack,
+      });
       throw error;
     } finally {
       span.end();
@@ -451,10 +458,12 @@ export async function GET(request: NextRequest) {
         },
       );
     } catch (error) {
-      span.recordException(error as Error);
       span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+      // Record exception as a log record, not a span event — see spans.md#recording-exceptions
       logger.error('api.request.failed', {
-        error_message: (error as Error).message,
+        'exception.type': (error as Error).name,
+        'exception.message': (error as Error).message,
+        'exception.stacktrace': (error as Error).stack,
       });
       return NextResponse.json({ success: false }, { status: 500 });
     } finally {

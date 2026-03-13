@@ -233,8 +233,14 @@ def process_order(order)
     result = save_order(order)
     result
   rescue StandardError => e
-    span.record_exception(e)
     span.status = OpenTelemetry::Trace::Status.error(e.message)
+    ctx = span.context
+    logger.error('order.process.failed',
+      trace_id: ctx.hex_trace_id,
+      span_id: ctx.hex_span_id,
+      'exception.type': e.class.name,
+      'exception.message': e.message,
+      'exception.stacktrace': e.backtrace&.join("\n"))
     raise
   end
 end

@@ -231,6 +231,12 @@ public class OrderService {
     private static final Tracer tracer =
         GlobalOpenTelemetry.getTracer("my-service");
 
+    private static String stackTraceAsString(Throwable t) {
+        var sw = new java.io.StringWriter();
+        t.printStackTrace(new java.io.PrintWriter(sw));
+        return sw.toString();
+    }
+
     public Order processOrder(Order order) {
         Span span = tracer.spanBuilder("order.process").startSpan();
         try (var scope = span.makeCurrent()) {
@@ -240,7 +246,14 @@ public class OrderService {
             return result;
         } catch (Exception e) {
             span.setStatus(StatusCode.ERROR, e.getMessage());
-            span.recordException(e);
+            var ctx = span.getSpanContext();
+            logger.atError()
+                .addKeyValue("trace_id", ctx.getTraceId())
+                .addKeyValue("span_id", ctx.getSpanId())
+                .addKeyValue("exception.type", e.getClass().getName())
+                .addKeyValue("exception.message", e.getMessage())
+                .addKeyValue("exception.stacktrace", stackTraceAsString(e))
+                .log("order.process.failed");
             throw e;
         } finally {
             span.end();

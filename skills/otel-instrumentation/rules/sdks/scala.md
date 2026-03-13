@@ -266,6 +266,12 @@ The OpenTelemetry Java API is used directly from Scala.
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.{Span, StatusCode}
 
+private def stackTraceAsString(t: Throwable): String = {
+  val sw = new java.io.StringWriter()
+  t.printStackTrace(new java.io.PrintWriter(sw))
+  sw.toString
+}
+
 object OrderService {
 
   private val tracer = GlobalOpenTelemetry.getTracer("my-service")
@@ -280,7 +286,15 @@ object OrderService {
     } catch {
       case e: Exception =>
         span.setStatus(StatusCode.ERROR, e.getMessage)
-        span.recordException(e)
+        // Record exception as a log record — see spans.md#recording-exceptions
+        val ctx = span.getSpanContext
+        logger.atError()
+          .addKeyValue("trace_id", ctx.getTraceId)
+          .addKeyValue("span_id", ctx.getSpanId)
+          .addKeyValue("exception.type", e.getClass.getName)
+          .addKeyValue("exception.message", e.getMessage)
+          .addKeyValue("exception.stacktrace", stackTraceAsString(e))
+          .log("order.process.failed")
         throw e
     } finally {
       scope.close()
@@ -315,7 +329,15 @@ object OrderService {
     } catch {
       case e: Exception =>
         span.setStatus(StatusCode.ERROR, e.getMessage)
-        span.recordException(e)
+        // Record exception as a log record — see spans.md#recording-exceptions
+        val ctx = span.getSpanContext
+        logger.atError()
+          .addKeyValue("trace_id", ctx.getTraceId)
+          .addKeyValue("span_id", ctx.getSpanId)
+          .addKeyValue("exception.type", e.getClass.getName)
+          .addKeyValue("exception.message", e.getMessage)
+          .addKeyValue("exception.stacktrace", stackTraceAsString(e))
+          .log("order.process.failed")
         throw e
     } finally {
       span.end()
@@ -363,7 +385,15 @@ object OrderService {
       result => { span.end(); result },
       error  => {
         span.setStatus(StatusCode.ERROR, error.getMessage)
-        span.recordException(error)
+        // Record exception as a log record — see spans.md#recording-exceptions
+        val ctx = span.getSpanContext
+        logger.atError()
+          .addKeyValue("trace_id", ctx.getTraceId)
+          .addKeyValue("span_id", ctx.getSpanId)
+          .addKeyValue("exception.type", error.getClass.getName)
+          .addKeyValue("exception.message", error.getMessage)
+          .addKeyValue("exception.stacktrace", stackTraceAsString(error))
+          .log("order.process.failed")
         span.end()
         error
       }

@@ -373,8 +373,13 @@ func processOrder(ctx context.Context, order Order) error {
 	)
 
 	if err := saveOrder(ctx, order); err != nil {
-		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
+		slog.ErrorContext(ctx, "order.process.failed",
+			"trace_id", span.SpanContext().TraceID().String(),
+			"span_id", span.SpanContext().SpanID().String(),
+			"exception.type", fmt.Sprintf("%T", err),
+			"exception.message", err.Error(),
+		)
 		return err
 	}
 

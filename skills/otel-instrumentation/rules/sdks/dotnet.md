@@ -244,6 +244,19 @@ public class OrderService
         catch (Exception ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            // ILogger message templates do not support dots in parameter names,
+            // so use BeginScope to set the exception.* and trace context attributes.
+            using (logger.BeginScope(new Dictionary<string, object>
+            {
+                ["trace_id"] = activity?.TraceId.ToString() ?? "",
+                ["span_id"] = activity?.SpanId.ToString() ?? "",
+                ["exception.type"] = ex.GetType().FullName!,
+                ["exception.message"] = ex.Message,
+                ["exception.stacktrace"] = ex.ToString(),
+            }))
+            {
+                logger.LogError("order.process.failed");
+            }
             throw;
         }
     }

@@ -102,7 +102,7 @@ exporters:
     resolver:
       dns:
         hostname: otel-collector-gateway-headless.otel.svc.cluster.local
-        port: 4317
+        port: "4317"
   otlp:
     endpoint: <OTLP_ENDPOINT>
     headers:

@@ -37,10 +37,15 @@ All environment variables that control the SDK behavior:
 | `OTEL_LOGS_EXPORTER` | No | `none` | Set to `otlp` to export logs |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4317` | OTLP collector endpoint |
 | `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `grpc` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `http/protobuf` when using `auto-instrumentations-node`; `grpc` otherwise | Protocol: `grpc`, `http/protobuf`, or `http/json` |
 | `OTEL_RESOURCE_ATTRIBUTES` | No | - | Additional resource attributes (e.g., `deployment.environment=production`) |
 
 **Critical**: Without `OTEL_TRACES_EXPORTER=otlp`, the SDK defaults to `none` and no telemetry is exported.
+
+**Protocol mismatch pitfall.**
+`@opentelemetry/auto-instrumentations-node` defaults to `http/protobuf`, not `grpc`.
+When targeting a Collector gRPC receiver on port 4317, always set `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` explicitly.
+Omitting it causes a parse error on the Collector side (`Parse Error: Expected HTTP/`) and silent span loss on the SDK side.
 
 ### Where to get configuration values
 

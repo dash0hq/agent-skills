@@ -7,6 +7,8 @@ tags:
   - operator
   - dash0
   - auto-instrumentation
+  - gitops
+  - argocd
 ---
 
 # Dash0 Kubernetes Operator
@@ -335,6 +337,105 @@ kubectl delete crd dash0monitoring.operator.dash0.com
 kubectl delete crd dash0operatorconfigurations.operator.dash0.com
 ```
 
+## GitOps compatibility
+
+When deploying workloads via GitOps tools (ArgoCD, Flux) in a cluster where the Dash0 Operator is installed, the operator's auto-instrumentation modifies pod specs by adding environment variables, labels, and init containers.
+These modifications conflict with GitOps tools that enforce declarative state, causing settings to flip-flop between the GitOps-desired state and the operator's instrumentation.
+
+### Avoiding environment variable conflicts
+
+Do not define the following environment variables in GitOps-managed workload manifests.
+The Dash0 Operator manages these automatically, and redefining them in Git causes reconciliation loops.
+
+| Environment variable | Purpose |
+|----------------------|---------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP export endpoint |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | OTLP export protocol |
+| `OTEL_PROPAGATORS` | Context propagation format |
+| `LD_PRELOAD` | Injector shared library preload |
+| `DASH0_NODE_IP` | Node IP for collector routing |
+| `DASH0_OTEL_COLLECTOR_BASE_URL` | Collector base URL |
+| `OTEL_INJECTOR_K8S_NAMESPACE_NAME` | Kubernetes namespace |
+| `OTEL_INJECTOR_K8S_POD_NAME` | Pod name |
+| `OTEL_INJECTOR_K8S_POD_UID` | Pod UID |
+| `OTEL_INJECTOR_K8S_CONTAINER_NAME` | Container name |
+| `OTEL_INJECTOR_SERVICE_NAME` | OTel service name |
+| `OTEL_INJECTOR_SERVICE_NAMESPACE` | OTel service namespace |
+| `OTEL_INJECTOR_SERVICE_VERSION` | OTel service version |
+| `OTEL_INJECTOR_RESOURCE_ATTRIBUTES` | OTel resource attributes |
+
+This restriction applies only to workloads in namespaces with a `Dash0Monitoring` resource whose `instrumentWorkloads.mode` is not `none`.
+Workloads excluded via the `dash0.com/enable: "false"` label are also unaffected.
+
+### ArgoCD: ignoring operator-generated TLS diffs
+
+The Dash0 Operator Helm chart regenerates TLS certificates for in-cluster communication on every Helm template render.
+When deploying the operator itself via ArgoCD, the regenerated certificates and `caBundle` values show up as permanent diffs in the ArgoCD UI, even when nothing has changed in Git.
+ArgoCD's hard refresh also triggers this, since it re-renders the Helm templates.
+
+Add `ignoreDifferences` to the ArgoCD `Application` resource that manages the Dash0 Operator:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dash0-operator
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  source:
+    chart: dash0-operator
+    repoURL: https://dash0hq.github.io/dash0-operator
+    targetRevision: "..."
+  # ... remaining spec
+  ignoreDifferences:
+    - kind: Secret
+      name: dash0-operator-certificates
+      jsonPointers:
+        - /data/ca.crt
+        - /data/tls.crt
+        - /data/tls.key
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: dash0-operator-injector
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: dash0-operator-monitoring-mutating
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: dash0-operator-operator-configuration-mutating
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: dash0-operator-monitoring-validator
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: dash0-operator-operator-configuration-validator
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+```
+
+### Recommended GitOps strategy
+
+Follow this decision process when using the Dash0 Operator with GitOps:
+
+1. **Set `instrumentWorkloads.mode` to `created-and-updated`** in the `Dash0Monitoring` resource.
+   This avoids immediate pod restarts and lets GitOps-driven deployments pick up instrumentation naturally on the next rollout.
+2. **Remove operator-managed environment variables from workload manifests in Git.**
+   Refer to the table above.
+   If a workload already defines any of these variables, delete them from the Git manifest and let the operator inject them.
+3. **If a workload must not be instrumented**, add `dash0.com/enable: "false"` to the workload's `metadata.labels` in Git.
+   This is safe to commit — the operator will skip that workload entirely, so no conflict arises.
+4. **If deploying the Dash0 Operator itself via ArgoCD**, add the `ignoreDifferences` block from the section above to the ArgoCD `Application` resource.
+
 ## Anti-patterns
 
 - **Using `mode: all` without a maintenance window.**
@@ -355,6 +456,10 @@ kubectl delete crd dash0operatorconfigurations.operator.dash0.com
 - **Enabling Python auto-instrumentation without verifying prerequisites.**
   Python requires 3.9+, `http/protobuf` protocol, and no existing OTel instrumentation.
   Missing any prerequisite causes silent deactivation.
+- **Defining operator-managed environment variables in GitOps manifests.**
+  Variables like `OTEL_EXPORTER_OTLP_ENDPOINT` or `LD_PRELOAD` in Git-managed workload specs conflict with the operator's auto-instrumentation.
+  This causes reconciliation loops where the GitOps tool and operator overwrite each other.
+  See [GitOps compatibility](#gitops-compatibility).
 
 ## References
 

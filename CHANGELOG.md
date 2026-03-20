@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.4 (2026-03-20)
+
+### Added
+
+- document in collector skill how to improve Dash0 Operator in GitOps setups
+
+### Changed
+
+- fix changelog update
+
+
 ## v1.0.3 (2026-03-20)
 
 ### Added

@@ -166,6 +166,7 @@ When adding or modifying instrumentation, follow the guidance from the installed
 When working on application code or deployment specs, use the `otel-instrumentation` skill.
 When working on Collector configuration, use the `otel-collector` skill.
 When choosing or reviewing telemetry attributes, use the `otel-semantic-conventions` skill.
+When writing or debugging OTTL expressions, use the `otel-ottl` skill.
 ```
 
 ### Headless mode in CI/CD

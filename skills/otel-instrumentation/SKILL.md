@@ -27,6 +27,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 | [spans](./rules/spans.md) | Spans - naming, kind, status, and hygiene |
 | [logs](./rules/logs.md) | Logs - structured logging, severity, trace correlation |
 | [metrics](./rules/metrics.md) | Metrics - instrument types, naming, units, cardinality |
+| [sensitive-data](./rules/sensitive-data.md) | Sensitive data - PII prevention, sanitization, redaction |
 | [nodejs](./rules/sdks/nodejs.md) | Node.js instrumentation setup |
 | [go](./rules/sdks/go.md) | Go instrumentation setup |
 | [python](./rules/sdks/python.md) | Python instrumentation setup |
@@ -89,4 +90,5 @@ SDK (AlwaysOn)  →  Collector (sampling)  →  Backend (retention)
 | Cardinality management | [metrics](./rules/metrics.md) |
 | Span naming, kind, status | [spans](./rules/spans.md) |
 | Writing logs | [logs](./rules/logs.md) |
+| Sensitive data / PII | [sensitive-data](./rules/sensitive-data.md) |
 | Signal overview | [telemetry](./rules/telemetry.md) |

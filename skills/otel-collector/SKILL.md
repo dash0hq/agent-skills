@@ -72,6 +72,7 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 | Local development with Docker Compose | [raw-manifests](./rules/deployment/raw-manifests.md) |
 | Reduce trace volume | [sampling](./rules/sampling.md) |
 | Keep errors and slow traces, drop the rest | [sampling](./rules/sampling.md) |
+| Redact sensitive data in the pipeline | [processors](./rules/processors.md#sensitive-data-redaction) |
 | Generate RED metrics from traces | [red-metrics](./rules/red-metrics.md) |
 
 ## Official documentation

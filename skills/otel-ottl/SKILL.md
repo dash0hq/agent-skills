@@ -125,9 +125,105 @@ set(resource.attributes["k8s.cluster.name"], "prod-aws-us-west-2")
 
 ### Redact sensitive data
 
+Replace known sensitive attributes with a fixed placeholder.
+Always guard with a `nil` check to avoid creating the attribute when it does not exist.
+
 ```
 set(span.attributes["http.request.header.authorization"], "REDACTED") where span.attributes["http.request.header.authorization"] != nil
 ```
+
+#### Redact authorization and session headers
+
+```yaml
+processors:
+  transform/redact-headers:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(span.attributes["http.request.header.authorization"], "REDACTED") where span.attributes["http.request.header.authorization"] != nil
+          - set(span.attributes["http.request.header.cookie"], "REDACTED") where span.attributes["http.request.header.cookie"] != nil
+          - set(span.attributes["http.response.header.set-cookie"], "REDACTED") where span.attributes["http.response.header.set-cookie"] != nil
+    log_statements:
+      - context: log
+        statements:
+          - set(log.attributes["http.request.header.authorization"], "REDACTED") where log.attributes["http.request.header.authorization"] != nil
+          - set(log.attributes["http.request.header.cookie"], "REDACTED") where log.attributes["http.request.header.cookie"] != nil
+```
+
+#### Mask credit card numbers in log bodies
+
+Use `replace_pattern` to replace patterns matching sensitive data while preserving the rest of the field.
+For example, the following pattern matches 13–19 digit sequences (covering Visa, Mastercard, Amex, and others) and replaces them with a masked value.
+
+```yaml
+processors:
+  transform/redact-credit-cards:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - replace_pattern(log.body["string"], "\\b(\\d{4})\\d{5,11}(\\d{4})\\b", "$$1****$$2")
+```
+
+#### Replace email addresses with a hash
+
+Use a hash function to replace email addresses with a non-reversible identifier that still allows correlation across records.
+
+```yaml
+processors:
+  transform/hash-emails:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(span.attributes["user.email"], SHA256(span.attributes["user.email"])) where span.attributes["user.email"] != nil
+    log_statements:
+      - context: log
+        statements:
+          - set(log.attributes["user.email"], SHA256(log.attributes["user.email"])) where log.attributes["user.email"] != nil
+```
+
+#### Delete attributes that should never be exported
+
+Use `delete_key` to remove attributes entirely rather than replacing them with a placeholder.
+
+```yaml
+processors:
+  transform/delete-sensitive:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(span.attributes, "credit-card.number") where IsMatch(span.attributes["credit-card.number"], "(?i)(password|secret|token)")
+    log_statements:
+      - context: log
+        statements:
+          - delete_key(log.attributes, "request.body")
+```
+
+#### Drop log records containing sensitive data
+
+Use the filter processor to drop entire log records that match a sensitive pattern, when redaction is not sufficient.
+
+```yaml
+processors:
+  filter/drop-sensitive-logs:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'IsMatch(log.body["string"], "(?i)-----BEGIN (RSA |EC )?PRIVATE KEY-----")'
+```
+
+#### Pipeline placement
+
+Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters.
+Redaction must run after all attributes have been set, but before telemetry leaves the Collector.
+See [processor ordering](../otel-collector/rules/processors.md#processor-ordering) for the full ordering guidance.
+
+Application-level sanitization is the first line of defence.
+Use Collector-side redaction as a safety net, not a substitute for source-level prevention.
+See the [sensitive data](../otel-instrumentation/rules/sensitive-data.md) rule in the `otel-instrumentation` skill for application-level guidance.
 
 ### Drop telemetry by pattern
 

@@ -306,6 +306,25 @@ A name-only filter risks dropping a legitimate metric with the same name from a 
 
 Add a comment with the library version that caused the mismatch and a note to remove the filter once the library upgrades.
 
+### Sensitive data redaction
+
+Use the `transform` processor to redact, hash, or delete sensitive data before it reaches the backend.
+This acts as a safety net for data that slipped through application-level sanitization.
+
+Common redaction tasks:
+- Replace authentication headers (`Authorization`, `Cookie`) with `"REDACTED"`.
+- Mask credit card numbers or other financial identifiers in log bodies.
+- Hash email addresses or usernames to preserve correlation without exposing PII.
+- Delete attributes that should never be exported (e.g., request bodies, unsanitized database queries).
+
+Use the `filter` processor to drop entire telemetry records that contain data which cannot be safely redacted (e.g., private keys in log bodies).
+
+Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters in the pipeline.
+Redaction must run after all attributes have been set.
+
+For OTTL expressions and complete configuration examples, see the [redacting sensitive data](../../otel-ottl/SKILL.md#redact-sensitive-data) section in the `otel-ottl` skill.
+For application-level prevention (the first line of defence), see [sensitive data](../../otel-instrumentation/rules/sensitive-data.md) in the `otel-instrumentation` skill.
+
 ## Processor ordering
 
 Follow this numbered decision process to determine processor order in a pipeline:
@@ -313,7 +332,8 @@ Follow this numbered decision process to determine processor order in a pipeline
 1. **First**: `memory_limiter` — always first to apply backpressure before memory is allocated.
 2. **Second**: `resourcedetection` and `k8sattributes` — enrich telemetry with metadata early so downstream processors can use it.
 3. **Third**: `resource` — set static attributes after auto-detection to override or supplement detected values.
-4. **Fourth**: Transform and filter processors — modify or drop telemetry based on enriched attributes.
+4. **Fourth**: Redaction processors (`transform/redact-*`, `filter/drop-sensitive-*`) — remove or mask sensitive data before export.
+5. **Fifth**: Other transform and filter processors — modify or drop telemetry based on enriched attributes.
 
 Batching is handled by the exporter's `sending_queue`, not by a processor.
 See [batching and the sending queue](#batching-and-the-sending-queue).
@@ -329,6 +349,7 @@ service:
         - resourcedetection
         - k8sattributes
         - resource
+        - transform/redact-headers
         - filter/drop-outdated-http-metrics
         - transform
       exporters: [otlp]

@@ -30,6 +30,21 @@ logger.info('order.placed', {
 });
 ```
 
+When selecting fields to include in structured log records, never spread entire objects (request bodies, headers, form data) — explicitly pick safe fields to avoid accidentally logging sensitive data.
+See [structured logging safeguards](./sensitive-data.md#structured-logging-safeguards) for rules and examples.
+
+```javascript
+// BAD: spreads the entire request body — may contain passwords, tokens, PII
+logger.info('user.signup', { ...req.body, ...getTraceContext() });
+
+// GOOD: explicitly select safe fields
+logger.info('user.signup', {
+  ...getTraceContext(),
+  user_id: req.body.userId,
+  plan: req.body.plan,
+});
+```
+
 ## Severity
 
 Always set `severityNumber` on log records.

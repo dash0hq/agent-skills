@@ -71,8 +71,7 @@ jobs:
           echo "tag=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
           echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Generate changelog entry
-        id: changelog
+      - name: Update CHANGELOG.md
         env:
           TAG: ${{ steps.version.outputs.tag }}
           LAST_TAG: ${{ steps.version.outputs.last_tag }}
@@ -87,7 +86,7 @@ jobs:
           FIXES=""
           OTHER=""
 
-          while IFS= read -r line; do
+          while IFS= read -r line || [ -n "$line" ]; do
             # Strip conventional commit prefix and optional scope for the summary
             summary=$(echo "$line" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //')
             case "$line" in
@@ -97,7 +96,7 @@ jobs:
             esac
           done < <(git log --pretty=format:"%s" "$RANGE")
 
-          {
+          generate_entry() {
             echo "## ${TAG} ($(date +%Y-%m-%d))"
             echo ""
             if [ -n "$FEATS" ]; then
@@ -115,34 +114,23 @@ jobs:
               echo ""
               echo -e "$OTHER"
             fi
-          } > entry.md
+          }
 
-          cat entry.md
-
-      - name: Update CHANGELOG.md
-        run: |
           if [ -f CHANGELOG.md ]; then
-            # Insert the new entry after the first heading line
-            awk '
-              NR==1 { print; found_header=1; next }
-              found_header && !inserted {
-                # Print a blank line, the entry, then continue
-                while ((getline line < "entry.md") > 0) print line
-                print ""
-                inserted=1
-              }
-              { print }
-            ' CHANGELOG.md > CHANGELOG.tmp
+            {
+              head -1 CHANGELOG.md
+              echo ""
+              generate_entry
+              tail -n +2 CHANGELOG.md
+            } > CHANGELOG.tmp
             mv CHANGELOG.tmp CHANGELOG.md
           else
             {
               echo "# Changelog"
               echo ""
-              cat entry.md
+              generate_entry
             } > CHANGELOG.md
           fi
-
-          rm entry.md
 
       - name: Commit changelog
         run: |

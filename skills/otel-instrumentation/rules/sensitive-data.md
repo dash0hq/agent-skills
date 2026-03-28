@@ -80,6 +80,33 @@ function redactSensitiveParams(url, sensitiveKeys) {
 span.setAttribute('url.full', redactSensitiveParams(req.url, ['token', 'api_key', 'session']));
 ```
 
+### URL path parameterization
+
+URL paths that embed entity IDs produce high-cardinality span names and attributes.
+Replace dynamic path segments with placeholders before setting `http.route` or `url.full`.
+
+```go
+import "regexp"
+
+var (
+	reNumericID = regexp.MustCompile(`/\d+`)
+	reUUID      = regexp.MustCompile(`/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`)
+)
+
+// sanitizeHTTPRoute replaces numeric IDs and UUIDs with low-cardinality placeholders.
+func sanitizeHTTPRoute(path string) string {
+	path = reUUID.ReplaceAllString(path, "/{uuid}")
+	path = reNumericID.ReplaceAllString(path, "/{id}")
+	return path
+}
+
+// Usage
+span.SetAttributes(attribute.String("http.route", sanitizeHTTPRoute(r.URL.Path)))
+```
+
+Most HTTP framework instrumentations derive `http.route` from the router pattern automatically (e.g., `/users/:id` in Express, `{id}` in Go chi).
+Use path parameterization only when the instrumentation library does not normalize the route — for example, when using `http.ServeMux` in Go before version 1.22 or a custom routing layer.
+
 ### Database query sanitization
 
 Database instrumentation libraries may capture full query text, including literal parameter values.
@@ -91,6 +118,27 @@ span.setAttribute('db.query.text', "SELECT * FROM users WHERE email = 'alice@exa
 
 // GOOD: parameterized query — no literal values
 span.setAttribute('db.query.text', 'SELECT * FROM users WHERE email = $1');
+```
+
+Java — sanitize queries by replacing string literals and numeric values with placeholders:
+
+```java
+import java.util.regex.Pattern;
+
+public class DbQuerySanitizer {
+    private static final Pattern STRING_LITERAL = Pattern.compile("'[^']*'");
+    private static final Pattern NUMERIC_LITERAL = Pattern.compile("\\b\\d+(\\.\\d+)?\\b");
+
+    public static String sanitize(String query) {
+        if (query == null) return "unknown";
+        String sanitized = STRING_LITERAL.matcher(query).replaceAll("?");
+        sanitized = NUMERIC_LITERAL.matcher(sanitized).replaceAll("?");
+        return sanitized.length() > 1000 ? sanitized.substring(0, 1000) + "..." : sanitized;
+    }
+}
+
+// Usage
+span.setAttribute("db.query.text", DbQuerySanitizer.sanitize(sql));
 ```
 
 Follow this decision process when the auto-instrumentation library captures unsanitized queries:
@@ -140,6 +188,21 @@ function hashForTelemetry(value, key) {
 
 // Use the hash as the attribute value
 span.setAttribute('user.id', hashForTelemetry(user.email, process.env.TELEMETRY_HASH_KEY));
+```
+
+Python — the same HMAC approach:
+
+```python
+import hmac
+import hashlib
+import os
+
+def hash_for_telemetry(value: str) -> str:
+    key = os.environ["TELEMETRY_HASH_KEY"].encode()
+    return hmac.new(key, value.encode(), hashlib.sha256).hexdigest()
+
+# Usage
+span.set_attribute("user.id", hash_for_telemetry(user.email))
 ```
 
 Store the mapping between hashes and original values in a separate, access-controlled system — never in the observability backend.
@@ -220,6 +283,45 @@ provider.addSpanProcessor(new BatchSpanProcessor(new OTLPTraceExporter()));
 provider.register();
 ```
 
+Python — equivalent `SpanProcessor`:
+
+```python
+from opentelemetry.sdk.trace.export import SpanProcessor
+from urllib.parse import urlparse, urlunparse
+
+SENSITIVE_ATTRIBUTES = [
+    "http.request.header.authorization",
+    "http.request.header.cookie",
+    "http.response.header.set-cookie",
+]
+
+class SensitiveDataRedactingSpanProcessor(SpanProcessor):
+    def on_end(self, span):
+        for attr in SENSITIVE_ATTRIBUTES:
+            if attr in span.attributes:
+                span.attributes[attr] = "REDACTED"
+
+        url = span.attributes.get("url.full")
+        if isinstance(url, str):
+            try:
+                parsed = urlparse(url)
+                span.attributes["url.full"] = urlunparse(parsed._replace(query=""))
+            except Exception:
+                pass
+```
+
+Register it before the export processor:
+
+```python
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+provider = TracerProvider()
+provider.add_span_processor(SensitiveDataRedactingSpanProcessor())
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+```
+
 ### When to use a span processor vs other approaches
 
 | Approach | Use when |
@@ -242,6 +344,81 @@ The [otel-ottl](../../otel-ottl/SKILL.md) skill covers how to write OTTL express
 
 Treat Collector-side redaction as a safety net, not a substitute for source-level sanitization.
 The Collector processes telemetry after it has been serialized and exported — the data has already left the application process and traversed the network.
+
+## Log body sanitization
+
+Log messages assembled from user-controlled data or error details can contain credit card numbers, government identifiers, JWTs, or API keys.
+Apply pattern-based redaction before emitting log records.
+
+```javascript
+const REDACTION_PATTERNS = [
+  // Credit card numbers (Visa, Mastercard, Amex)
+  { pattern: /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g, replacement: '****-****-****-****' },
+  // US Social Security Numbers
+  { pattern: /\b\d{3}-\d{2}-\d{4}\b/g, replacement: '***-**-****' },
+  // JWT tokens
+  { pattern: /\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/g, replacement: 'JWT_REDACTED' },
+  // API keys with common prefixes
+  { pattern: /\b(?:sk_|pk_|key_)[a-zA-Z0-9_-]{20,}/g, replacement: 'API_KEY_REDACTED' },
+];
+
+function sanitizeLogMessage(message) {
+  let sanitized = message;
+  for (const { pattern, replacement } of REDACTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, replacement);
+  }
+  return sanitized;
+}
+```
+
+Use this function wherever log messages are assembled from dynamic data.
+It does not replace structured logging best practices (selecting explicit fields) — it catches PII that leaks through despite explicit field selection, for example when an upstream library logs a full error message containing user input.
+
+## Testing redaction
+
+Write tests that verify sensitive data does not survive the redaction pipeline.
+Tests prevent regressions when new attributes are added or instrumentation libraries are updated.
+
+```javascript
+import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+
+describe('SensitiveDataRedactingSpanProcessor', () => {
+  let exporter;
+  let provider;
+
+  beforeEach(() => {
+    exporter = new InMemorySpanExporter();
+    provider = new NodeTracerProvider();
+    provider.addSpanProcessor(new SensitiveDataRedactingSpanProcessor());
+    provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+    provider.register();
+  });
+
+  it('redacts authorization headers', () => {
+    const tracer = provider.getTracer('test');
+    const span = tracer.startSpan('test');
+    span.setAttribute('http.request.header.authorization', 'Bearer secret-token');
+    span.end();
+
+    const [exported] = exporter.getFinishedSpans();
+    expect(exported.attributes['http.request.header.authorization']).toBe('REDACTED');
+  });
+
+  it('strips query parameters from url.full', () => {
+    const tracer = provider.getTracer('test');
+    const span = tracer.startSpan('test');
+    span.setAttribute('url.full', 'https://example.com/cb?token=secret&ref=home');
+    span.end();
+
+    const [exported] = exporter.getFinishedSpans();
+    expect(exported.attributes['url.full']).toBe('https://example.com/cb');
+  });
+});
+```
+
+Run these tests in CI alongside application tests.
+If a test fails, a sensitive attribute has been introduced that the redaction processor does not cover.
 
 ## Anti-patterns
 
@@ -285,6 +462,24 @@ span.setStatus({
   message: 'ValidationError: invalid email format',
 });
 ```
+
+## Compliance quick reference
+
+When a compliance framework applies, use this table to determine the required redaction action for each data category.
+
+| Data category | GDPR | PCI DSS | HIPAA |
+|---------------|------|---------|-------|
+| User identifiers (email, name) | Delete or hash with HMAC | Not required unless tied to cardholder | Delete or hash if part of PHI |
+| Credit card numbers (PAN) | Delete if not needed | Mask: show first 6 and last 4 digits only | Not applicable |
+| CVV / PIN | Delete | Never store, not even masked | Not applicable |
+| Health records / patient IDs | Delete if not needed for purpose | Not applicable | Delete or hash; retain only de-identified data |
+| IP addresses | Truncate or delete (considered personal data) | Not required | Anonymize if part of PHI |
+| Government identifiers (SSN, passport) | Delete | Not applicable | Delete or hash |
+
+Apply the strictest applicable rule when multiple frameworks overlap.
+For example, if both GDPR and PCI DSS apply, delete credit card numbers entirely rather than masking them.
+
+Collector-side enforcement for these rules uses OTTL processors — see the [otel-ottl skill](../../otel-ottl/SKILL.md#redact-sensitive-data) for configuration patterns.
 
 ## References
 

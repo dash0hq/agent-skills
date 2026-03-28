@@ -508,6 +508,12 @@ Editors modify telemetry data in-place. They are lowercase.
 | `URL` | `URL(url_string)` | Parses URL into components (scheme, host, path, etc.) |
 | `UserAgent` | `UserAgent(value)` | Parses user-agent string into map (name, version, OS) |
 
+## Rules
+
+| Rule | Description |
+|------|-------------|
+| [recipes](./rules/recipes.md) | End-to-end OTTL recipes — PCI compliance, multi-tenant routing, cache patterns, performance |
+
 ## References
 
 - [OTTL Guide](https://www.dash0.com/guides/opentelemetry-transformation-language-ottl)

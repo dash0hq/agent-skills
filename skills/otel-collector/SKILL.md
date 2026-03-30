@@ -31,6 +31,7 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 | [raw-manifests](./rules/deployment/raw-manifests.md) | Raw Kubernetes manifests — DaemonSet, Deployment, RBAC, Docker Compose |
 | [sampling](./rules/sampling.md) | Sampling — head, tail, load balancing |
 | [red-metrics](./rules/red-metrics.md) | RED metrics — span-derived request rate, error rate, duration histograms |
+| [custom-distributions](./rules/custom-distributions.md) | Custom distributions — building a stripped-down Collector binary with OCB |
 
 ## Key principles
 
@@ -74,6 +75,7 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 | Keep errors and slow traces, drop the rest | [sampling](./rules/sampling.md) |
 | Redact sensitive data in the pipeline | [processors](./rules/processors.md#sensitive-data-redaction) |
 | Generate RED metrics from traces | [red-metrics](./rules/red-metrics.md) |
+| Build a custom Collector binary | [custom-distributions](./rules/custom-distributions.md) |
 
 ## Official documentation
 

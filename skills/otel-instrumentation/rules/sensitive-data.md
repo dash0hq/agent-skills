@@ -80,6 +80,11 @@ function redactSensitiveParams(url, sensitiveKeys) {
 span.setAttribute('url.full', redactSensitiveParams(req.url, ['token', 'api_key', 'session']));
 ```
 
+### Path parameterization
+
+URL paths with embedded identifiers cause cardinality explosion and may leak internal IDs.
+See [path parameterization](./spans.md#path-parameterization) in the spans rule for replacement patterns.
+
 ### Database query sanitization
 
 Database instrumentation libraries may capture full query text, including literal parameter values.
@@ -163,6 +168,38 @@ logger.info('user.signup', {
 
 Never pass user-controlled objects (request bodies, form data, headers) directly to logging or span attribute calls.
 
+### Log message pattern-based redaction
+
+Even with structured logging, sensitive data can slip into the message string itself — for example, when interpolating user input or when a library logs a raw request.
+Apply regex-based redaction as a safety net before emitting the log record.
+
+```javascript
+const SENSITIVE_PATTERNS = [
+  { pattern: /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g, replacement: '****-****-****-****' },  // credit card numbers
+  { pattern: /\b\d{3}-\d{2}-\d{4}\b/g,                     replacement: '***-**-****' },           // SSNs
+  { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, replacement: '[EMAIL]' },     // email addresses
+  { pattern: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, replacement: '[JWT]' },      // JWT tokens
+  { pattern: /\b(sk_|pk_|key_|token_)[a-zA-Z0-9_-]{20,}/g,  replacement: '[API_KEY]' },            // API key prefixes
+];
+
+function redactMessage(message) {
+  let result = message;
+  for (const { pattern, replacement } of SENSITIVE_PATTERNS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
+// Usage in structured logging
+logger.info(redactMessage(`Payment processed for ${userEmail}`), {
+  ...getTraceContext(),
+  payment_method: 'credit_card',
+});
+```
+
+Pattern-based redaction is not exhaustive — it catches common formats but cannot guarantee coverage of all sensitive data.
+Treat it as a defence-in-depth layer alongside the [never-instrument list](#never-instrument-list) and [Collector-side redaction](#defence-in-depth-with-the-collector).
+
 ## Redacting auto-instrumented telemetry
 
 Auto-instrumentation libraries create spans and log records that application code does not control directly.
@@ -242,6 +279,62 @@ The [otel-ottl](../../otel-ottl/SKILL.md) skill covers how to write OTTL express
 
 Treat Collector-side redaction as a safety net, not a substitute for source-level sanitization.
 The Collector processes telemetry after it has been serialized and exported — the data has already left the application process and traversed the network.
+
+## Testing sensitive data protection
+
+Write assertions that verify redaction processors work correctly.
+Run these after integration tests that exercise instrumented code paths handling user data.
+
+### Sensitive attributes are redacted
+
+Assert that no exported span contains raw values for known sensitive headers.
+
+```typescript
+function assertSensitiveHeadersRedacted() {
+  const SENSITIVE_HEADERS = [
+    'http.request.header.authorization',
+    'http.request.header.cookie',
+    'http.response.header.set-cookie',
+  ];
+
+  for (const span of getSpans()) {
+    for (const header of SENSITIVE_HEADERS) {
+      const value = span.attributes[header];
+      if (value !== undefined && value !== 'REDACTED') {
+        throw new Error(
+          `Span "${span.name}" contains unredacted header "${header}"`,
+        );
+      }
+    }
+  }
+}
+```
+
+### User identifiers are hashed
+
+Assert that `user.id` attributes are opaque hashes, not raw email addresses or usernames.
+
+```typescript
+function assertUserIdIsHashed() {
+  const PII_PATTERNS = [
+    /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, // email
+    /\s/,                                                   // contains spaces (likely a display name)
+  ];
+
+  for (const span of getSpans()) {
+    const userId = span.attributes['user.id'];
+    if (typeof userId === 'string') {
+      for (const pattern of PII_PATTERNS) {
+        if (pattern.test(userId)) {
+          throw new Error(
+            `Span "${span.name}" has user.id matching PII pattern: "${userId}"`,
+          );
+        }
+      }
+    }
+  }
+}
+```
 
 ## Anti-patterns
 

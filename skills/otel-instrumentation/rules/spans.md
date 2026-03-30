@@ -38,6 +38,28 @@ The number of unique span names in a system must be bounded and small.
 | `send_invoice_#98765` | `send invoice` | Invoice number is an attribute |
 | `validation_failed` | `validate user_input` | Name the operation, not the outcome |
 
+### Path parameterization
+
+URL paths with embedded identifiers (`/api/users/12345`, `/orders/550e8400-e29b-41d4-a716-446655440000`) cause cardinality explosion in span names and attributes, and may leak internal IDs.
+Replace dynamic path segments with placeholders before attaching the path to a span.
+
+```javascript
+// BAD: high-cardinality path with embedded IDs
+span.setAttribute('url.path', '/api/users/12345/orders/550e8400-e29b-41d4-a716-446655440000');
+
+// GOOD: parameterized path
+function parameterizePath(path) {
+  return path
+    .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/{uuid}')
+    .replace(/\/\d+/g, '/{id}');
+}
+span.setAttribute('url.path', parameterizePath(req.path));
+// Result: '/api/users/{id}/orders/{uuid}'
+```
+
+Many HTTP instrumentation libraries already parameterize routes (e.g., Express `req.route.path` yields `/api/users/:id`).
+Use the framework-provided route template when available; fall back to regex replacement only when the framework does not expose one.
+
 ### Per-signal naming
 
 | Signal | Format | Example |

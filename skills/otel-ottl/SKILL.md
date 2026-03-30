@@ -297,6 +297,97 @@ and
 IsMatch(ConvertCase(String(resource.attributes["service.namespace"]), "lower"), "^platform.*$")
 ```
 
+### Normalize high-cardinality attributes
+
+High-cardinality attributes — URL paths with embedded IDs, long freeform strings, or unbounded attribute maps — inflate storage costs and degrade query performance.
+Use OTTL in a transform processor to normalize these attributes before export.
+
+#### Replace dynamic path segments
+
+Replace numeric IDs and UUIDs in `url.path` and `http.route` with fixed placeholders to collapse cardinality.
+
+```yaml
+processors:
+  transform/normalize-paths:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - replace_pattern(span.attributes["url.path"], "/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "/{uuid}") where span.attributes["url.path"] != nil
+          - replace_pattern(span.attributes["url.path"], "/\\d+", "/{id}") where span.attributes["url.path"] != nil
+          - replace_pattern(span.attributes["http.route"], "/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "/{uuid}") where span.attributes["http.route"] != nil
+          - replace_pattern(span.attributes["http.route"], "/\\d+", "/{id}") where span.attributes["http.route"] != nil
+```
+
+#### Mask IP addresses to subnet
+
+Replace the last octet of IPv4 addresses with `0` to reduce cardinality while preserving subnet-level information.
+
+```yaml
+processors:
+  transform/mask-ips:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - replace_pattern(span.attributes["client.address"], "(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\.\\d{1,3}", "$$1.0") where span.attributes["client.address"] != nil
+    log_statements:
+      - context: log
+        statements:
+          - replace_pattern(log.attributes["client.address"], "(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})\\.\\d{1,3}", "$$1.0") where log.attributes["client.address"] != nil
+```
+
+#### Limit attribute count and value length
+
+Use `limit` and `truncate_all` to enforce bounds on attribute maps that may grow unboundedly.
+
+```yaml
+processors:
+  transform/limit-attributes:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - limit(span.attributes, 64, [])
+          - truncate_all(span.attributes, 256)
+    log_statements:
+      - context: log
+        statements:
+          - limit(log.attributes, 64, [])
+          - truncate_all(log.attributes, 256)
+```
+
+### Enrich telemetry with static attributes
+
+When `resourcedetection` or `k8sattributes` processors are not available — for example, in non-Kubernetes deployments or when the Collector runs outside the cluster — set resource attributes explicitly.
+
+```yaml
+processors:
+  resource/static-env:
+    attributes:
+      - key: deployment.environment.name
+        value: production
+        action: upsert
+      - key: k8s.cluster.name
+        value: prod-us-west-2
+        action: upsert
+```
+
+Use the `resource` processor (not the `transform` processor) for static resource attributes.
+The `resource` processor operates at the resource level directly, while `transform` requires a `resource` context and explicit path expressions.
+
+To copy a resource attribute down to the span or log level — for example, when the backend does not propagate resource context — use the transform processor:
+
+```yaml
+processors:
+  transform/copy-resource:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(span.attributes["deployment.environment.name"], resource.attributes["deployment.environment.name"]) where resource.attributes["deployment.environment.name"] != nil
+```
+
 ## Error handling
 
 ### Compilation errors

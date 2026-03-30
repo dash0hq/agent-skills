@@ -28,6 +28,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 | [logs](./rules/logs.md) | Logs - structured logging, severity, trace correlation |
 | [metrics](./rules/metrics.md) | Metrics - instrument types, naming, units, cardinality |
 | [sensitive-data](./rules/sensitive-data.md) | Sensitive data - PII prevention, sanitization, redaction |
+| [validation](./rules/validation.md) | Telemetry validation - post-deployment verification checklist |
 | [nodejs](./rules/sdks/nodejs.md) | Node.js instrumentation setup |
 | [go](./rules/sdks/go.md) | Go instrumentation setup |
 | [python](./rules/sdks/python.md) | Python instrumentation setup |
@@ -91,4 +92,5 @@ SDK (AlwaysOn)  →  Collector (sampling)  →  Backend (retention)
 | Span naming, kind, status | [spans](./rules/spans.md) |
 | Writing logs | [logs](./rules/logs.md) |
 | Sensitive data / PII | [sensitive-data](./rules/sensitive-data.md) |
+| Verify telemetry reaches the backend | [validation](./rules/validation.md) |
 | Signal overview | [telemetry](./rules/telemetry.md) |

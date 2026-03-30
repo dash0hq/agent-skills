@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.0 (2026-03-30)
+
+### Added
+
+- add OCB, more info on http.route recording, and OTTL support
+
+
 ## v1.0.4 (2026-03-20)
 
 ### Added

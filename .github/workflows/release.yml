@@ -78,15 +78,11 @@ jobs:
           for manifest in ".claude-plugin/plugin.json" ".cursor-plugin/plugin.json" "gemini-extension.json"; do 
             jq ".version = \"${TAG}\"" "${manifest}" > "${manifest}.tmp"
             mv "${manifest}.tmp" "${manifest}"
+            git add "${manifest}"
           done
 
-      - name: Commit plugin manifests
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ".claude-plugin/plugin.json" ".cursor-plugin/plugin.json" "gemini-extension.json"
           if git diff --cached --quiet; then
             echo "plugin manifests unchanged, skipping commit."
           else

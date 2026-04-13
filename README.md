@@ -3,11 +3,116 @@
 A collection of skills for AI coding agents to make applications observable with OpenTelemetry and [Dash0](https://www.dash0.com).
 Skills are packaged instructions and scripts that extend agent capabilities, following the [Agent Skills](https://agentskills.io/) format.
 
-## Installation
+## 🚀 How to use
+
+**Install with [skills](https://skills.sh/) CLI** (universal, works with any [Agent Skills](https://agentskills.io)-compatible tool):
 
 ```bash
-npx skills add dash0hq/agent-skills
+npx skills add https://github.com/dash0hq/agent-skills --all
+# or a single skill:
+npx skills add https://github.com/dash0hq/agent-skills --skill otel-semantic-conventions
 ```
+
+<details>
+<summary>Claude Code</summary>
+
+```bash
+/plugin marketplace add dash0hq/agent-skills
+/plugin install dash0-agent-skills@dash0hq
+```
+
+</details>
+
+<details>
+<summary>Gemini CLI</summary>
+
+```bash
+gemini extensions install https://github.com/dash0hq/agent-skills
+```
+
+Update with `gemini extensions update dash0-agent-skills`.
+
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+Copy skills into the cross-client discovery directory:
+
+```bash
+git clone https://github.com/dash0hq/agent-skills.git  ~/.cursor/skills/dash0-agent-skills
+```
+
+Cursor auto-discovers skills from `.agents/skills/` and `.cursor/skills/`.
+
+</details>
+
+<details>
+<summary>Copilot</summary>
+
+Copy skills into the cross-client discovery directory:
+
+```bash
+/plugin install https://github.com/dash0hq/agent-skills
+# or
+git clone https://github.com/dash0hq/agent-skills.git ~/.copilot/skills/dash0-agent-skills
+```
+
+Copilot auto-discovers skills from `.copilot/skills/`.
+
+</details>
+
+<details>
+<summary>OpenCode</summary>
+
+Copy skills into the cross-client discovery directory:
+
+```bash
+git clone https://github.com/dash0hq/agent-skills.git ~/.agents/skills/dash0-agent-skills
+```
+
+OpenCode auto-discovers skills from `.agents/skills/`, `.opencode/skills/`, and `.claude/skills/`.
+
+</details>
+
+<details>
+<summary>Codex (OpenAI)</summary>
+
+Clone into the cross-client discovery path:
+
+```bash
+git clone https://github.com/dash0hq/agent-skills.git ~/.agents/skills/dash0-agent-skills
+```
+
+Codex auto-discovers skills from `~/.agents/skills/` and `.agents/skills/`. Update with `git -C ~/.agents/skills/dash0-agent-skills pull`.
+
+</details>
+
+<details>
+<summary>Antigravity</summary>
+
+Clone and symlink into the cross-client discovery path:
+
+```bash
+git clone https://github.com/dash0hq/agent-skills.git ~/.antigravity/skills/dash0-agent-skills
+```
+
+Update with `git -C ~/.antigravity/skills/dash0-agent-skills pull`.
+
+</details>
+
+<details>
+<summary>Openclaw</summary>
+
+Copy skills into the cross-client discovery directory:
+
+```bash
+git clone https://github.com/dash0hq/agent-skills.git ~/.openclaw/skills/dash0-agent-skills
+# or in workspace:
+git clone https://github.com/dash0hq/agent-skills.git ~/.openclaw/workspace/skills/dash0-agent-skills
+```
+
+</details>
 
 ## Usage
 

@@ -71,6 +71,29 @@ jobs:
           echo "tag=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
           echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Update plugin manifests
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          for manifest in ".claude-plugin/plugin.json" ".cursor-plugin/plugin.json" "gemini-extension.json"; do 
+            jq ".version = \"${TAG}\"" "${manifest}" > "${manifest}.tmp"
+            mv "${manifest}.tmp" "${manifest}"
+          done
+
+      - name: Commit plugin manifests
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ".claude-plugin/plugin.json" ".cursor-plugin/plugin.json" "gemini-extension.json"
+          if git diff --cached --quiet; then
+            echo "plugin manifests unchanged, skipping commit."
+          else
+            git commit -m "chore: update plugin manifests for ${TAG}"
+            git push origin HEAD
+          fi
+ 
       - name: Update CHANGELOG.md
         env:
           TAG: ${{ steps.version.outputs.tag }}
@@ -133,6 +156,8 @@ jobs:
           fi
 
       - name: Commit changelog
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -140,19 +165,22 @@ jobs:
           if git diff --cached --quiet; then
             echo "CHANGELOG.md unchanged, skipping commit."
           else
-            git commit -m "chore: update changelog for ${{ steps.version.outputs.tag }}"
+            git commit -m "chore: update changelog for ${TAG}"
             git push origin HEAD
           fi
 
       - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          git tag -a "${{ steps.version.outputs.tag }}" -m "${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          git tag -a "${TAG}" -m "${TAG}"
+          git push origin "${TAG}"
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.version.outputs.tag }}" \
+          gh release create "${TAG}" \
+            --title "${TAG}" \
             --generate-notes

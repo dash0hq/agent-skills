@@ -38,10 +38,10 @@ jobs:
           fetch-depth: 0
 
       - name: Check conventional commit format
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          BASE="${{ github.event.pull_request.base.sha }}"
-          HEAD="${{ github.event.pull_request.head.sha }}"
-
           # Allowed types aligned with the changelog categories in release.yml:
           #   feat     -> Added
           #   fix      -> Fixed

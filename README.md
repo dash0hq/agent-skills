@@ -17,8 +17,8 @@ npx skills add https://github.com/dash0hq/agent-skills --skill otel-semantic-con
 <summary>Claude Code</summary>
 
 ```bash
-/plugin marketplace add dash0hq/agent-skills
-/plugin install dash0-agent-skills@dash0hq
+/plugin marketplace add dash0hq/claude-marketplace
+/plugin install dash0-agent-skills@dash0
 ```
 
 </details>

@@ -319,7 +319,7 @@ Span attributes tolerate higher cardinality than metric attributes, but unbounde
 | `feature_flag.key` (bounded set) | `url.full` with query params (unbounded) |
 | `payment.method` (bounded set) | Serialized objects or arrays |
 
-See [attribute placement](../metrics.md#attribute-placement) for how cardinality tolerance differs across signals.
+See [attribute placement](./metrics.md#attribute-placement) for how cardinality tolerance differs across signals.
 
 ## Span hygiene
 

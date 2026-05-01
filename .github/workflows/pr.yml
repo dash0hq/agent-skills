@@ -28,6 +28,34 @@ jobs:
           done
           exit $exit_code
 
+  lint-skills:
+    name: Lint skills
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - uses: tesslio/setup-tessl@v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+
+      - name: Lint skills for broken links
+        run: |
+          exit_code=0
+          for skill_dir in skills/*/; do
+            skill_name=$(basename "$skill_dir")
+            output=$(tessl skill lint "$skill_dir" 2>&1 || true)
+            # Fail only on genuinely broken links (File not found),
+            # not on valid cross-skill references (points outside tile).
+            broken=$(echo "$output" | grep "File not found:" || true)
+            if [ -n "$broken" ]; then
+              echo "::error::Skill '$skill_name' has broken links:"
+              echo "$broken"
+              exit_code=1
+            fi
+          done
+          exit $exit_code
+
   validate-commits:
     name: Validate commit messages
     runs-on: ubuntu-latest

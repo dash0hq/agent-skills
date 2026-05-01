@@ -6,10 +6,9 @@ metadata:
   author: dash0
   version: '1.0.0'
   workflow_type: 'advisory'
-  signals:
-    - traces
-    - metrics
-    - logs
+  supports-traces: "true"
+  supports-metrics: "true"
+  supports-logs: "true"
 ---
 
 # OpenTelemetry Collector configuration guide

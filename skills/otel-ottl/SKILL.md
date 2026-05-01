@@ -39,7 +39,7 @@ resource.attributes["service.name"]
 
 ### Enumerations
 
-Several fields accept int64 values exposed as global constants:
+Use int64 constants for enumeration fields:
 
 ```
 span.status.code == STATUS_CODE_ERROR
@@ -56,7 +56,7 @@ span.kind == SPAN_KIND_SERVER
 
 ### Functions
 
-**Converters** (uppercase, pure functions that return values):
+**Converters** (uppercase, return values):
 
 ```
 ToUpperCase(span.attributes["http.request.method"])
@@ -65,7 +65,7 @@ Concat(["prefix", span.attributes["request.id"]], "-")
 IsMatch(metric.name, "^k8s\\..*$")
 ```
 
-**Editors** (lowercase, functions with side-effects that modify data):
+**Editors** (lowercase, modify data in-place):
 
 ```
 set(span.attributes["region"], "us-east-1")
@@ -75,7 +75,7 @@ limit(log.attributes, 10, [])
 
 ### Conditional statements
 
-The `where` clause applies transformations conditionally:
+Use `where` to apply transformations conditionally:
 
 ```
 span.attributes["db.statement"] = "REDACTED" where resource.attributes["service.name"] == "accounting"
@@ -83,7 +83,7 @@ span.attributes["db.statement"] = "REDACTED" where resource.attributes["service.
 
 ### Nil checks
 
-OTTL uses `nil` for absence checking (not `null`):
+Use `nil` for absence checking (not `null`):
 
 ```
 resource.attributes["service.name"] != nil
@@ -91,10 +91,8 @@ resource.attributes["service.name"] != nil
 
 ## Validation workflow
 
-Before deploying OTTL expressions to production, validate them with a staged approach:
-
-1. **Validate config syntax** — run `otelcol validate --config=config.yaml` to catch compilation errors (unknown functions, invalid paths, syntax errors) before starting the Collector.
-2. **Test with the debug exporter** — route transformed telemetry to a `debug` exporter and inspect the output to verify attributes, values, and dropped records behave as expected:
+1. **Validate config syntax** — run `otelcol validate --config=config.yaml` to catch compilation errors before starting the Collector.
+2. **Test with the debug exporter** — route transformed telemetry to a `debug` exporter and inspect the output:
 
 ```yaml
 exporters:
@@ -109,10 +107,8 @@ service:
       exporters: [debug]   # swap in production exporter once validated
 ```
 
-3. **Set `error_mode: ignore` in production** — see [Error handling](#error-handling) below to avoid silently dropping telemetry.
-4. **Promote to production exporters** — once the debug output confirms correct behavior, replace the `debug` exporter with the production exporter.
-
-For destructive operations (redaction, deletion, filtering), always complete steps 1–3 before promoting.
+3. **Set `error_mode: ignore` in production** — see [Error handling](#error-handling).
+4. **Promote to production exporters** — replace `debug` with the production exporter.
 
 ## Common patterns
 
@@ -124,8 +120,7 @@ set(resource.attributes["k8s.cluster.name"], "prod-aws-us-west-2")
 
 ### Redact sensitive data
 
-Always guard with a `nil` check to avoid creating the attribute when it does not exist.
-Choose the redaction strategy based on the use case:
+Guard with a `nil` check to avoid creating the attribute when it does not exist.
 
 | Strategy | Function | When to use |
 |----------|----------|-------------|
@@ -164,12 +159,9 @@ processors:
 Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters.
 See [processor ordering](../otel-collector/rules/processors.md#processor-ordering) for the full ordering guidance.
 
-Application-level sanitization is the first line of defence; use Collector-side redaction as a safety net.
-See the [sensitive data](../otel-instrumentation/rules/sensitive-data.md) rule in the `otel-instrumentation` skill for application-level guidance.
+See the [sensitive data](../otel-instrumentation/rules/sensitive-data.md) rule for application-level sanitization.
 
 ### Drop telemetry by pattern
-
-In a filter processor, matching expressions cause data to be dropped:
 
 ```
 IsMatch(metric.name, "^k8s\\.replicaset\\..*$")
@@ -231,8 +223,6 @@ service:
 
 ### Defensive nil checks
 
-Always check for `nil` before operating on optional attributes:
-
 ```
 resource.attributes["service.namespace"] != nil
 and
@@ -241,12 +231,9 @@ IsMatch(ConvertCase(String(resource.attributes["service.namespace"]), "lower"), 
 
 ### Normalize high-cardinality attributes
 
-High-cardinality attributes — URL paths with embedded IDs, long freeform strings, or unbounded attribute maps — inflate storage costs and degrade query performance.
-Use OTTL in a transform processor to normalize these attributes before export.
-
 #### Replace dynamic path segments
 
-Replace numeric IDs and UUIDs in `url.path` and `http.route` with fixed placeholders to collapse cardinality.
+Replace numeric IDs and UUIDs in `url.path` and `http.route` with fixed placeholders.
 
 ```yaml
 processors:
@@ -263,8 +250,6 @@ processors:
 
 #### Mask IP addresses to subnet
 
-Replace the last octet of IPv4 addresses with `0` to reduce cardinality while preserving subnet-level information.
-
 ```yaml
 processors:
   transform/mask-ips:
@@ -280,8 +265,6 @@ processors:
 ```
 
 #### Limit attribute count and value length
-
-Use `limit` and `truncate_all` to enforce bounds on attribute maps that may grow unboundedly.
 
 ```yaml
 processors:
@@ -301,7 +284,7 @@ processors:
 
 ### Enrich telemetry with static attributes
 
-Use the `resource` processor (not the `transform` processor) for static resource attributes — it operates at the resource level directly, while `transform` requires a `resource` context and explicit path expressions.
+Use the `resource` processor (not `transform`) for static resource attributes.
 
 ```yaml
 processors:
@@ -315,7 +298,7 @@ processors:
         action: upsert
 ```
 
-To copy a resource attribute down to the span or log level — for example, when the backend does not propagate resource context — use the transform processor:
+To copy a resource attribute down to the span or log level, use the transform processor:
 
 ```yaml
 processors:
@@ -347,7 +330,6 @@ Occur during telemetry processing:
 ### Error mode configuration
 
 Always set `error_mode` explicitly.
-The default (`propagate`) stops processing the current item on any error, which can silently drop telemetry in production.
 
 | Mode | Behavior | When to use |
 |------|----------|-------------|
@@ -367,8 +349,6 @@ processors:
 
 ## Performance
 
-OTTL statements compile once at startup and execute as optimized function chains at runtime.
-There is no need to optimize for compilation speed — focus on reducing the number of statements that evaluate per telemetry item.
 Use `where` clauses to skip items early rather than applying unconditional transforms.
 
 ## Function reference

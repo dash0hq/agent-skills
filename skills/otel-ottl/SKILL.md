@@ -375,6 +375,31 @@ OTTL statements compile once at startup and execute as optimized function chains
 There is no need to optimize for compilation speed — focus on reducing the number of statements that evaluate per telemetry item.
 Use `where` clauses to skip items early rather than applying unconditional transforms.
 
+## Validation
+
+Validate OTTL statements **before** deploying them to the Collector.
+A syntax error in a statement causes the Collector to reject the entire configuration at startup.
+
+### Validation workflow
+
+1. **Write statements** — draft OTTL expressions following the patterns in this skill.
+2. **Test in the playground** — paste the full processor YAML into [ottl.run](https://ottl.run), supply sample telemetry as JSON, and verify the output matches expectations.
+3. **Validate the full config** — run `otelcol validate --config=config.yaml` to catch wiring errors (undeclared components, missing pipelines).
+4. **Smoke-test with the debug exporter** — deploy with a `debug` exporter in the pipeline, send representative telemetry, and inspect stdout to confirm transforms apply correctly.
+
+Use [ottl.run](https://ottl.run) for every non-trivial statement.
+It catches errors that `otelcol validate` does not — such as runtime type mismatches, incorrect `where` clauses, and regex issues — because it executes the statements against real telemetry data rather than only checking structural validity.
+
+### What to test in the playground
+
+| Check | How |
+|-------|-----|
+| Statement compiles | Paste the YAML; the playground reports syntax errors inline |
+| Correct field is modified | Compare input and output JSON side by side |
+| `where` clause filters correctly | Provide one matching and one non-matching telemetry item |
+| `nil` safety | Provide telemetry that is missing the target attribute |
+| Regex patterns | Provide input strings that should and should not match |
+
 ## Function reference
 
 See [function-reference](./rules/function-reference.md) for the full list of editors and converters.

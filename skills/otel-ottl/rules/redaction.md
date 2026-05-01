@@ -37,6 +37,6 @@ processors:
 ```
 
 Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters.
-See [processor ordering](../otel-collector/rules/processors.md#processor-ordering) for the full ordering guidance.
+See [processor ordering](../../otel-collector/rules/processors.md#processor-ordering) for the full ordering guidance.
 
-See the [sensitive data](../otel-instrumentation/rules/sensitive-data.md) rule for application-level sanitization.
+See the [sensitive data](../../otel-instrumentation/rules/sensitive-data.md) rule for application-level sanitization.

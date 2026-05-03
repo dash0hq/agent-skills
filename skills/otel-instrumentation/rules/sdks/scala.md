@@ -33,25 +33,22 @@ wget "https://github.com/open-telemetry/opentelemetry-java-instrumentation/relea
 
 **Note**: The javaagent.jar contains both the agent and instrumentation libraries, enabling automatic instrumentation without modifying source code.
 
-For sbt projects, add a task to download the agent:
+For sbt projects, resolve the agent from Maven Central via the [sbt-javaagent](https://github.com/sbt/sbt-javaagent) plugin.
+Maven artifacts are immutable and checksum-verified, which avoids the unpinned-runtime-download risk of fetching the JAR directly from GitHub release URLs.
+
+```scala
+// project/plugins.sbt
+addSbtPlugin("com.github.sbt" % "sbt-javaagent" % "0.1.7")
+```
 
 ```scala
 // build.sbt
-// Update otelJavaVersion to the latest stable tag from:
-// https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases
-val otelJavaVersion = "v2.27.0"
-lazy val downloadAgent = taskKey[File]("Download the OpenTelemetry Java agent")
-downloadAgent := {
-  val agentFile = target.value / "opentelemetry-javaagent.jar"
-  if (!agentFile.exists()) {
-    val url = new java.net.URL(
-      s"https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/${otelJavaVersion}/opentelemetry-javaagent.jar"
-    )
-    IO.transfer(url.openStream(), agentFile)
-  }
-  agentFile
-}
+enablePlugins(JavaAgent)
+javaAgents += "io.opentelemetry.javaagent" % "opentelemetry-javaagent" % "2.27.0"
 ```
+
+The plugin resolves the agent JAR through sbt's dependency resolution (Maven Central), caches it in the local Ivy/Coursier cache, and wires `-javaagent:<resolved-path>` into the `run`, `test`, and packaging tasks automatically.
+Bump the version when a new release is published: [Maven Central — opentelemetry-javaagent](https://central.sonatype.com/artifact/io.opentelemetry.javaagent/opentelemetry-javaagent).
 
 Add the OpenTelemetry API dependency for custom spans:
 
@@ -92,7 +89,13 @@ All environment variables that control the SDK behavior:
 
 The SDK is activated by attaching the Java agent to the JVM.
 
-**Via sbt `javaOptions`:**
+**Via sbt-javaagent plugin (recommended):**
+The plugin (declared above under [Installation](#installation)) wires `-javaagent:<resolved-path>` into the relevant tasks automatically, including forked `run`.
+No additional `javaOptions` setting is required.
+
+**Via sbt `javaOptions` (manual JAR path):**
+Use this only if you are not using the sbt-javaagent plugin and have downloaded the JAR yourself.
+
 ```scala
 // build.sbt
 run / javaOptions += s"-javaagent:${target.value}/opentelemetry-javaagent.jar"

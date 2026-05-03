@@ -21,13 +21,14 @@ Wrong attributes — or attributes at the wrong level — make telemetry unquery
 1. **Registry first.**
    Before creating a custom attribute, search the [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/).
    If a registered attribute exists for your concept, use it — even if the name is not exactly what you would choose.
-2. **No custom attributes unless necessary.**
+2. **No custom attributes unless necessary. All custom attributes must be namespaced.**
    Custom attributes fragment querying and break tooling.
    Only create them for truly domain-specific concepts that have no registry equivalent.
-   When you must, use a namespaced prefix (e.g., `com.acme.order.priority`).
-3. **Low cardinality in metric attributes, high cardinality in span attributes.**
-   Metric attribute values must be bounded.
-   Put variable data (IDs, paths, user inputs) into span attributes, not metric attributes.
+   When you must, prefix with your reverse-DNS company namespace: `com.company.domain.attribute_name` (e.g., `com.acme.order.priority`, `dash0.queue.depth`).
+   An attribute name without a namespace prefix is invalid — never use bare names like `order_priority` or `queue_depth`.
+3. **Low cardinality in names, high cardinality in attributes.**
+   Span names and metric attribute values must be bounded.
+   Put variable data (IDs, paths, user inputs) into span attributes instead.
 4. **Right level, every time.**
    Place attributes at the correct telemetry level (resource, scope, span, log, metric data point).
    Never duplicate resource-level data on every span.
@@ -88,6 +89,17 @@ Wrong attributes — or attributes at the wrong level — make telemetry unquery
 | `network.protocol.version` | string | Recommended | `http.flavor` (values changed: `2.0` → `2`) |
 | `user_agent.original` | string | Recommended | `http.user_agent` |
 | `error.type` | string | Conditionally required | *(new)* |
+
+**HTTP client spans vs server spans — URL attribute selection:**
+
+| Span kind | Use these URL attributes | Do NOT use |
+|-----------|--------------------------|------------|
+| `CLIENT` | `url.full` (full URL including scheme, host, path, query) | `url.path`, `url.query` on their own |
+| `SERVER` | `url.path`, `url.query`, `url.scheme` | `url.full` |
+
+`url.full` replaces the deprecated `http.url` and is **only** for outbound HTTP client calls.
+`url.path` and `url.query` replace parts of `http.target` and are **only** for inbound server spans.
+Mixing these (e.g., using `url.full` on server spans or `url.path` on client spans) is a regression error.
 
 #### Database
 

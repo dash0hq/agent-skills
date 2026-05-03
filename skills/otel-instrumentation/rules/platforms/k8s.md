@@ -73,14 +73,26 @@ spec:
               fieldPath: spec.nodeName
         - name: OTEL_SERVICE_NAME
           value: <service-name>
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: <otlp-endpoint>
         - name: OTEL_EXPORTER_OTLP_HEADERS
           valueFrom:
             secretKeyRef:
               name: otel-auth
               key: token
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_METRICS_EXPORTER
+          value: otlp
+        - name: OTEL_LOGS_EXPORTER
+          value: otlp
         - name: OTEL_RESOURCE_ATTRIBUTES
           value: "service.version=<service-version or commit sha>,deployment.environment.name=<dev-env>,k8s.pod.uid=$(K8S_POD_UID),k8s.pod.name=$(K8S_POD_NAME),k8s.node.name=$(K8S_NODE_NAME),k8s.container.name=<container-name>"
 ```
+
+`OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, and `OTEL_LOGS_EXPORTER` must be set to `otlp` explicitly.
+The OTel specification defines `otlp` as the default, but older SDK versions and manual SDK setups (such as Node.js without an auto-instrumentation package) default to `none`, which silently discards all telemetry.
+Do not rely on SDK defaults — always set all three.
 
 The `$(K8S_POD_UID)` syntax is a Kubernetes dependent environment variable reference — Kubernetes substitutes it with the value of the `K8S_POD_UID` variable defined earlier in the same `env` block.
 

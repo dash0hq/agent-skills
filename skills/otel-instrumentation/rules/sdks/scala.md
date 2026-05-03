@@ -23,8 +23,12 @@ Instrument Scala applications to generate traces, logs, and metrics for deep ins
 Scala runs on the JVM, so it uses the same OpenTelemetry Java agent as Java applications.
 Download the agent JAR:
 
+Fetch the current stable version tag from the GitHub API so the download URL is pinned to an immutable release asset:
+
 ```sh
-wget https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+OTEL_JAVA_VERSION=$(curl -sf "https://api.github.com/repos/open-telemetry/opentelemetry-java-instrumentation/releases/latest" \
+  | grep '"tag_name"' | cut -d'"' -f4)
+wget "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/${OTEL_JAVA_VERSION}/opentelemetry-javaagent.jar"
 ```
 
 **Note**: The javaagent.jar contains both the agent and instrumentation libraries, enabling automatic instrumentation without modifying source code.
@@ -33,12 +37,15 @@ For sbt projects, add a task to download the agent:
 
 ```scala
 // build.sbt
+// Update otelJavaVersion to the latest stable tag from:
+// https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases
+val otelJavaVersion = "v2.27.0"
 lazy val downloadAgent = taskKey[File]("Download the OpenTelemetry Java agent")
 downloadAgent := {
   val agentFile = target.value / "opentelemetry-javaagent.jar"
   if (!agentFile.exists()) {
     val url = new java.net.URL(
-      "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar"
+      s"https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/${otelJavaVersion}/opentelemetry-javaagent.jar"
     )
     IO.transfer(url.openStream(), agentFile)
   }

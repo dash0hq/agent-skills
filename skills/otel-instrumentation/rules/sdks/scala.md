@@ -45,7 +45,7 @@ Find the current version at [sbt-javaagent releases](https://github.com/sbt/sbt-
 ```scala
 // build.sbt
 enablePlugins(JavaAgent)
-javaAgents += "io.opentelemetry.javaagent" % "opentelemetry-javaagent" % "2.27.0"
+javaAgents += "io.opentelemetry.javaagent" % "opentelemetry-javaagent" % "<version>"
 ```
 
 The plugin resolves the agent JAR through sbt's dependency resolution (Maven Central), caches it in the local Ivy/Coursier cache, and wires `-javaagent:<resolved-path>` into the `run`, `test`, and packaging tasks automatically.
@@ -55,8 +55,10 @@ Add the OpenTelemetry API dependency for custom spans:
 
 ```scala
 // build.sbt
-libraryDependencies += "io.opentelemetry" % "opentelemetry-api" % "1.47.0"
+libraryDependencies += "io.opentelemetry" % "opentelemetry-api" % "<version>"
 ```
+
+Find the current version at [Maven Central — opentelemetry-api](https://central.sonatype.com/artifact/io.opentelemetry/opentelemetry-api).
 
 ## Environment variables
 

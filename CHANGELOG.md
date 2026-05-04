@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.2.4 (2026-05-04)
+
+### Fixed
+
+- replace hardcoded opentelemetry-javaagent version with placeholder
+- tighten SDK install scripts and k8s note
+- switch scala sbt example to Maven Central via sbt-javaagent
+- harden custom-namespace and CLIENT/SERVER URL rules
+- set OTEL_*_EXPORTER=otlp explicitly in k8s pod spec
+- pin SDK install URLs to versioned releases
+
+### Changed
+
+- update plugin manifests for v1.2.4
+- remove zipkin from supported OTel exporter documentation for Kubernetes
+- clarify OTEL_*_EXPORTER spec semantics in k8s pod spec
+- add tessl badge
+- update installation instructions and credit Tessl for various improvements
+
+
 ## v1.2.3 (2026-05-01)
 
 ### Changed

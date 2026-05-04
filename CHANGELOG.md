@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.5 (2026-05-04)
+
+### Changed
+
+- update plugin manifests for v1.2.5
+- split patterns out from OTTL skills
+
+
 ## v1.2.4 (2026-05-04)
 
 ### Fixed

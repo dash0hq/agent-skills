@@ -33,6 +33,11 @@ These two skills have a strict boundary: **application code vs Collector configu
 When content could live in either skill, apply this rule: if the guidance tells an agent how to modify **application code or deployment specs**, it belongs in `otel-instrumentation`; if it tells an agent how to modify **Collector YAML configuration or Collector deployment manifests**, it belongs in `otel-collector`.
 Cross-reference the other skill for context, but do not duplicate Collector configuration in `otel-instrumentation` or SDK/pod-spec configuration in `otel-collector`.
 
+## Keeping SKILL.md index lists in sync with rule files
+
+Some `SKILL.md` files contain a bullet list that mirrors the `##` headings in a referenced rule file (marked with a `<!-- keep-in-sync -->` comment).
+When adding, removing, or renaming a `##` heading in the rule file, update the corresponding list in `SKILL.md` so the entries match one-to-one.
+
 ## Prose rules
 
 Follow these rules when writing or editing prose in this project.

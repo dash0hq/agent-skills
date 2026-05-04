@@ -91,8 +91,8 @@ spec:
 ```
 
 Set `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, and `OTEL_LOGS_EXPORTER` to `otlp` explicitly.
-The OTel specification defines `otlp` as the default; supported values are `otlp`, `zipkin`, `console`, and `none` (no automatically configured exporter — telemetry is dropped unless an exporter is wired up in code).
-Older SDK versions may not honor the spec default, and manual SDK setups (such as Node.js without an auto-instrumentation package) bypass these env vars entirely.
+Supported values are `otlp`, `zipkin`, `console`, and `none`.
+The OTel specification designates `otlp` as the recommended default, but older SDK versions and manual SDK setups (such as Node.js without an auto-instrumentation package) may default to `none`, silently dropping all telemetry.
 Setting them explicitly keeps the pod spec self-documenting and resilient across SDK versions.
 
 The `$(K8S_POD_UID)` syntax is a Kubernetes dependent environment variable reference — Kubernetes substitutes it with the value of the `K8S_POD_UID` variable defined earlier in the same `env` block.

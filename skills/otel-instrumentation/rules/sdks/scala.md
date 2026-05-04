@@ -23,11 +23,10 @@ Instrument Scala applications to generate traces, logs, and metrics for deep ins
 Scala runs on the JVM, so it uses the same OpenTelemetry Java agent as Java applications.
 Download the agent JAR:
 
-Fetch the current stable version tag from the GitHub API so the download URL is pinned to an immutable release asset:
-
 ```sh
 OTEL_JAVA_VERSION=$(curl -sf "https://api.github.com/repos/open-telemetry/opentelemetry-java-instrumentation/releases/latest" \
   | grep '"tag_name"' | cut -d'"' -f4)
+[ -z "$OTEL_JAVA_VERSION" ] && { echo "Failed to resolve OTel Java version" >&2; exit 1; }
 wget "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/${OTEL_JAVA_VERSION}/opentelemetry-javaagent.jar"
 ```
 
@@ -38,8 +37,10 @@ Maven artifacts are immutable and checksum-verified, which avoids the unpinned-r
 
 ```scala
 // project/plugins.sbt
-addSbtPlugin("com.github.sbt" % "sbt-javaagent" % "0.1.7")
+addSbtPlugin("com.github.sbt" % "sbt-javaagent" % "<version>")
 ```
+
+Find the current version at [sbt-javaagent releases](https://github.com/sbt/sbt-javaagent/releases).
 
 ```scala
 // build.sbt

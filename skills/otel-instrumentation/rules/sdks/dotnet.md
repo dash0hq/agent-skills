@@ -19,12 +19,12 @@ Instrument .NET applications to generate traces, logs, and metrics for deep insi
 
 ## Installation
 
-Download and run the auto-instrumentation install script.
-Fetch the current stable version tag from the GitHub API so the URL is pinned to an immutable release asset — do not use the `/releases/latest/download/` redirect, which is a moving target.
+Download and run the auto-instrumentation install script:
 
 ```bash
 OTEL_DOTNET_VERSION=$(curl -sf "https://api.github.com/repos/open-telemetry/opentelemetry-dotnet-instrumentation/releases/latest" \
   | grep '"tag_name"' | cut -d'"' -f4)
+[ -z "$OTEL_DOTNET_VERSION" ] && { echo "Failed to resolve OTel .NET version" >&2; exit 1; }
 curl -L -O "https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation/releases/download/${OTEL_DOTNET_VERSION}/otel-dotnet-auto-install.sh"
 ./otel-dotnet-auto-install.sh
 . $HOME/.otel-dotnet-auto/instrument.sh

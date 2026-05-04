@@ -26,7 +26,7 @@ Wrong attributes — or attributes at the wrong level — make telemetry unquery
    Only create them for truly domain-specific concepts that have no registry equivalent.
    When you must, prefix with your reverse-DNS company namespace: `com.company.domain.attribute_name` (e.g., `com.acme.order.priority`, `dash0.queue.depth`).
    An attribute name without a namespace prefix is invalid — never use bare names like `order_priority` or `queue_depth`.
-3. **Low cardinality in names, high cardinality in attributes.**
+3. **Low cardinality in metric attributes and span names; high cardinality in span attributes.**
    Span names and metric attribute values must be bounded.
    Put variable data (IDs, paths, user inputs) into span attributes instead.
 4. **Right level, every time.**

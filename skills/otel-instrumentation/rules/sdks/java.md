@@ -20,11 +20,12 @@ Instrument Java applications to generate traces, logs, and metrics for deep insi
 
 ## Installation
 
-Fetch the current stable version tag from the GitHub API so the download URL is pinned to an immutable release asset:
+Download the agent JAR:
 
 ```sh
 OTEL_JAVA_VERSION=$(curl -sf "https://api.github.com/repos/open-telemetry/opentelemetry-java-instrumentation/releases/latest" \
   | grep '"tag_name"' | cut -d'"' -f4)
+[ -z "$OTEL_JAVA_VERSION" ] && { echo "Failed to resolve OTel Java version" >&2; exit 1; }
 wget "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/${OTEL_JAVA_VERSION}/opentelemetry-javaagent.jar"
 ```
 

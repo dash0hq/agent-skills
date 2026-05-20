@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether the agent correctly configures a production-grade OpenTelemetry Collector YAML, using the appropriate processor ordering, persistent queue strategy, authentication pattern, and safety settings. The agent is expected to produce a collector-config.yaml that avoids common anti-patterns such as the batch processor and hardcoded credentials.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "memory_limiter first",
+      "description": "The memory_limiter processor appears as the FIRST entry in every pipeline's processors list (before any other processor)",
+      "max_score": 12
+    },
+    {
+      "name": "No batch processor",
+      "description": "The configuration does NOT include a batch processor anywhere (no 'batch:' under processors)",
+      "max_score": 12
+    },
+    {
+      "name": "sending_queue with file_storage",
+      "description": "The OTLP exporter's sending_queue has storage: file_storage (not in-memory queue)",
+      "max_score": 10
+    },
+    {
+      "name": "No hardcoded token",
+      "description": "The auth token is referenced via ${env:...} syntax, NOT hardcoded as a literal string in the Authorization header",
+      "max_score": 8
+    },
+    {
+      "name": "gzip compression",
+      "description": "The OTLP exporter has compression: gzip configured",
+      "max_score": 8
+    },
+    {
+      "name": "No debug exporter",
+      "description": "The debug exporter does NOT appear in any production pipeline's exporters list",
+      "max_score": 8
+    },
+    {
+      "name": "Separate signal pipelines",
+      "description": "The service.pipelines section defines separate pipelines for traces, metrics, AND logs (three distinct pipeline keys)",
+      "max_score": 8
+    },
+    {
+      "name": "health_check extension",
+      "description": "The configuration includes the health_check extension listed under service.extensions",
+      "max_score": 7
+    },
+    {
+      "name": "0.0.0.0 bind address",
+      "description": "The OTLP receiver gRPC and/or HTTP endpoints use 0.0.0.0 (not localhost) as the bind address",
+      "max_score": 7
+    },
+    {
+      "name": "memory_limiter sizing",
+      "description": "The memory_limiter limit_mib value is set to approximately 80% of the stated container memory limit (e.g., for a 512Mi container, limit_mib is between 400-420)",
+      "max_score": 7
+    },
+    {
+      "name": "file_storage extension declared",
+      "description": "A file_storage extension is declared in the extensions section with a directory path, AND it is listed in service.extensions",
+      "max_score": 7
+    },
+    {
+      "name": "All declared components used",
+      "description": "Every receiver, processor, and exporter declared in the config appears in at least one pipeline (no orphaned components)",
+      "max_score": 6
+    }
+  ]
+}

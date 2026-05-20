@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent correctly names custom (domain-specific) attributes using a reverse-DNS namespace prefix, avoids bare attribute names, chooses low-cardinality dimensions for metric instruments, avoids placing user or request identity on metric data points, and correctly places user identity attributes at span/log level rather than as resource attributes.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Reverse-DNS namespace prefix",
+      "description": "All custom (domain-specific) attributes use a reverse-DNS-style prefix (e.g., `com.company.`, `io.company.`) rather than bare names",
+      "max_score": 15
+    },
+    {
+      "name": "No bare custom attribute names",
+      "description": "Does NOT use bare unnamespaced custom attribute names such as `order_priority`, `merchant_tier`, or `payment_method` — every custom attribute has a dotted namespace prefix",
+      "max_score": 10
+    },
+    {
+      "name": "http.route in metric dimensions",
+      "description": "Uses `http.route` (e.g., `/v1/orders/{order_id}`) as a metric dimension for HTTP request metrics, NOT `url.path`",
+      "max_score": 10
+    },
+    {
+      "name": "No url.path in metrics",
+      "description": "Does NOT use `url.path` as an attribute on any metric instrument (histogram, counter, gauge)",
+      "max_score": 10
+    },
+    {
+      "name": "No user/order IDs in metric dimensions",
+      "description": "Does NOT use user IDs, order IDs, merchant IDs, or other high-cardinality identifiers as dimensions/labels on any metric instrument",
+      "max_score": 10
+    },
+    {
+      "name": "User identity on spans not resource",
+      "description": "User identity attributes (e.g., `user.id`, `enduser.id`) are set on spans or log records, NOT on the resource",
+      "max_score": 12
+    },
+    {
+      "name": "service.name on resource",
+      "description": "Sets `service.name` on the Resource object, NOT as a span attribute",
+      "max_score": 8
+    },
+    {
+      "name": "deployment.environment.name used",
+      "description": "Uses `deployment.environment.name` (not deprecated `deployment.environment`) when setting the deployment environment",
+      "max_score": 8
+    },
+    {
+      "name": "Registry attributes not reinvented",
+      "description": "Uses standard registry attributes (e.g., `http.request.method`, `http.response.status_code`) where applicable, rather than inventing custom equivalents",
+      "max_score": 10
+    },
+    {
+      "name": "High-cardinality values on spans",
+      "description": "High-cardinality values (order IDs, merchant IDs, user IDs) are placed as span attributes, not as metric data point labels",
+      "max_score": 7
+    }
+  ]
+}

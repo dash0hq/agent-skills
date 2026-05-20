@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether an agent correctly instruments a headless background worker, including creating a manual SERVER root span for a cron job, using correct span kinds for outbound calls, handling retry logic without incorrect ERROR status, recording exceptions as structured logs (not span events), and controlling span hygiene.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Manual SERVER root span",
+      "description": "Creates a manual span with kind SERVER (or INTERNAL) wrapping the entire headless job operation — not leaving the first DB/HTTP call as a CLIENT root span",
+      "max_score": 12
+    },
+    {
+      "name": "CLIENT kind for outbound calls",
+      "description": "Spans for database queries and external HTTP calls use SpanKind.CLIENT (not SpanKind.INTERNAL)",
+      "max_score": 10
+    },
+    {
+      "name": "AlwaysOn sampler preserved",
+      "description": "Does NOT set OTEL_TRACES_SAMPLER to 'traceidratio', 'parentbased_traceidratio', or any other sampler that drops spans — relies on default AlwaysOn",
+      "max_score": 10
+    },
+    {
+      "name": "ERROR only after retries exhausted",
+      "description": "Does NOT set span status to ERROR on a retry attempt that is later retried — sets ERROR only after the final retry fails",
+      "max_score": 10
+    },
+    {
+      "name": "Retry attempts as span events",
+      "description": "Records each failed retry attempt as a span event (e.g. span.addEvent) with attempt number or error details — before the final ERROR status is set",
+      "max_score": 8
+    },
+    {
+      "name": "ERROR status message",
+      "description": "When span status is set to ERROR, includes a non-empty status message containing the error class and a short description (not 'something went wrong' or empty)",
+      "max_score": 8
+    },
+    {
+      "name": "No span.recordException",
+      "description": "Does NOT use span.recordException(error) for exception recording — uses a structured log record with exception.type, exception.message, exception.stacktrace attributes instead",
+      "max_score": 10
+    },
+    {
+      "name": "Batch span instead of per-item spans",
+      "description": "Uses a single span with a batch.size attribute (or similar) for looping over a collection — does NOT create a new span for every item in a loop",
+      "max_score": 10
+    },
+    {
+      "name": "Exception log trace context",
+      "description": "Structured exception log records include trace_id and span_id extracted from the active span context",
+      "max_score": 8
+    },
+    {
+      "name": "forceFlush on shutdown",
+      "description": "Includes a graceful shutdown or crash handler that flushes the tracer provider before process exit (handles uncaughtException or SIGTERM)",
+      "max_score": 7
+    },
+    {
+      "name": "No more than 10 INTERNAL spans",
+      "description": "Code structure does not create more than 10 INTERNAL spans per job execution — avoids wrapping individual small helper calls in INTERNAL spans",
+      "max_score": 7
+    }
+  ]
+}

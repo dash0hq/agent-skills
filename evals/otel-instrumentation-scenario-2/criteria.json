@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether an agent correctly designs and implements custom OpenTelemetry metrics for a Node.js service, covering instrument type selection, UCUM units, naming conventions, cardinality management, and avoiding duplication of auto-instrumented metrics.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Histogram for durations",
+      "description": "Uses a Histogram instrument (not Counter or Gauge) for measuring order/job processing time or any latency distribution",
+      "max_score": 10
+    },
+    {
+      "name": "Counter for monotonic counts",
+      "description": "Uses a Counter (not Gauge or UpDownCounter) for counting completed orders or processed items that only increase",
+      "max_score": 8
+    },
+    {
+      "name": "UpDownCounter for queue depth",
+      "description": "Uses an UpDownCounter (not Gauge or Counter) for tracking queue depth or any quantity that can both increase and decrease",
+      "max_score": 10
+    },
+    {
+      "name": "UCUM units specified",
+      "description": "Every metric creation call includes a unit using UCUM notation: 's' for seconds, '1' for dimensionless counts, 'By' for bytes",
+      "max_score": 8
+    },
+    {
+      "name": "No unit in metric name",
+      "description": "Metric names do NOT include the unit as a suffix (e.g., avoids names like '.seconds', '.milliseconds', '.bytes', '.ms')",
+      "max_score": 10
+    },
+    {
+      "name": "No semconv namespace clash",
+      "description": "Custom metric names do NOT start with reserved semconv namespace prefixes such as 'http.', 'db.', 'rpc.', 'messaging.', 'system.', 'process.' unless explicitly using the matching semconv metric",
+      "max_score": 8
+    },
+    {
+      "name": "No high-cardinality metric attributes",
+      "description": "Does NOT use unbounded identifiers (user.id, order.id, request.id, account.id, url.full, or ip.address) as metric attributes",
+      "max_score": 10
+    },
+    {
+      "name": "Bounded attribute values only",
+      "description": "Metric attributes use bounded-cardinality values: e.g., status bucketed by class ('success'/'error', or '2xx'/'4xx'/'5xx'), not exact codes or IDs",
+      "max_score": 8
+    },
+    {
+      "name": "No duplicate auto-instrumented metric",
+      "description": "Does NOT manually recreate a metric already emitted by auto-instrumentation (e.g., does not manually create 'http.server.request.duration' when @opentelemetry/instrumentation-http is already installed)",
+      "max_score": 10
+    },
+    {
+      "name": "Metric shape test",
+      "description": "Includes at least one integration test (or test stub) that asserts the expected shape of a custom metric: name, instrument type, unit, and attribute keys",
+      "max_score": 8
+    },
+    {
+      "name": "Consistent units across instances",
+      "description": "All metric creation calls for the same metric name use the same unit string (no mixing 's' and 'ms' for the same metric)",
+      "max_score": 5
+    },
+    {
+      "name": "Metric name not an attribute key",
+      "description": "No metric name is identical to a semantic convention attribute key (e.g., avoids naming a metric 'http.response.status_code')",
+      "max_score": 5
+    }
+  ]
+}

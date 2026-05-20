@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent correctly configures resource attributes for a Kubernetes-hosted microservice, uses k8s.pod.uid instead of k8s.pod.ip, sets peer.service or server.address on client spans to enable service topology, avoids placing Kubernetes/service identity attributes on individual spans, and does not manually set Dash0-derived or otel.* attributes.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "service.name as resource attr",
+      "description": "Sets `service.name` on the Resource object, NOT on individual spans",
+      "max_score": 10
+    },
+    {
+      "name": "service.version as resource attr",
+      "description": "Sets `service.version` on the Resource object",
+      "max_score": 8
+    },
+    {
+      "name": "deployment.environment.name",
+      "description": "Sets `deployment.environment.name` (not deprecated `deployment.environment`) as a resource attribute",
+      "max_score": 8
+    },
+    {
+      "name": "k8s.pod.uid not k8s.pod.ip",
+      "description": "Uses `k8s.pod.uid` as the Kubernetes pod identifier resource attribute, NOT `k8s.pod.ip`",
+      "max_score": 12
+    },
+    {
+      "name": "service.name NOT on spans",
+      "description": "Does NOT set `service.name` as a span attribute on any span",
+      "max_score": 10
+    },
+    {
+      "name": "k8s metadata NOT on spans",
+      "description": "Does NOT set `k8s.pod.name`, `k8s.pod.uid`, or other Kubernetes metadata as span attributes",
+      "max_score": 8
+    },
+    {
+      "name": "peer.service or server.address on client spans",
+      "description": "Sets `peer.service` or `server.address` on CLIENT spans representing calls to downstream services",
+      "max_score": 12
+    },
+    {
+      "name": "Correct span kinds",
+      "description": "Uses appropriate span kinds: SERVER for inbound requests, CLIENT for outbound service calls — does NOT use INTERNAL for spans that cross service boundaries",
+      "max_score": 10
+    },
+    {
+      "name": "No manual dash0.* attributes",
+      "description": "Does NOT manually set any `dash0.*` attributes (e.g., `dash0.operation.name`, `dash0.span.type`) — these are derived automatically",
+      "max_score": 12
+    },
+    {
+      "name": "service.instance.id set",
+      "description": "Sets `service.instance.id` on the Resource object to uniquely identify this pod/instance",
+      "max_score": 10
+    }
+  ]
+}

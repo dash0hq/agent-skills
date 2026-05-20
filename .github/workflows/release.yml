@@ -39,6 +39,9 @@ jobs:
     name: Create GitHub release
     needs: validate
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -93,7 +96,7 @@ jobs:
             git commit -m "chore: update plugin manifests for ${TAG}"
             git push origin HEAD
           fi
- 
+
       - name: Update CHANGELOG.md
         env:
           TAG: ${{ steps.version.outputs.tag }}

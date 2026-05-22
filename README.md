@@ -65,6 +65,26 @@ Following the guidance in these skills helps your services score higher, which d
 
 ## Available skills
 
+
+### [otel-agent-context](./skills/otel-agent-context/SKILL.md)
+
+Expert guidance for instrumenting privacy-safe OpenTelemetry evidence around AI coding agent context boundaries.
+Use it when an agent, MCP client, harness, or plugin needs to prove which instructions, skills, memories, tool definitions, compactions, or security findings crossed into the agent context without storing raw prompts, secrets, tool outputs, or memory bodies.
+
+**Use when:**
+- Instrumenting AI coding agents, MCP clients, or agent harnesses
+- Reviewing GenAI traces for privacy-safe context evidence
+- Debugging tool search, deferred tool loading, memory retrieval, skill invocation, or context compaction
+- Separating loaded context from decision-relevant context
+- Avoiding raw prompt, secret, or memory-body leakage in spans and logs
+
+**Rules covered:**
+- Context-boundary span events and log records
+- Loaded, suppressed, selected, and decision-relevant context evidence
+- Hashing and bucketing for sensitive or high-cardinality values
+- Trust boundaries between MCP, tools, memory, and the agent run
+- Privacy review checks for agent telemetry
+
 ### [otel-instrumentation](./skills/otel-instrumentation/SKILL.md)
 
 Expert guidance for implementing high-quality, cost-efficient OpenTelemetry telemetry.

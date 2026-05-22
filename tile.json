@@ -15,6 +15,9 @@
     },
     "otel-semantic-conventions": {
       "path": "skills/otel-semantic-conventions/SKILL.md"
+    },
+    "otel-agent-context": {
+      "path": "skills/otel-agent-context/SKILL.md"
     }
   }
 }

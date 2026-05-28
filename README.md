@@ -1,15 +1,19 @@
-# Dash0 Agent Skills
+# OpenTelemetry Skills for AI Coding Agents
 
-A collection of skills for AI coding agents to make applications observable with OpenTelemetry and [Dash0](https://www.dash0.com).
+Vendor-neutral skills that teach AI coding agents how to instrument applications with OpenTelemetry.
+Covers SDK setup across languages, semantic conventions, Collector pipelines, and OTTL transformations.
+Works with any OTLP-compatible backend.
+
 Skills are packaged instructions and scripts that extend agent capabilities, following the [Agent Skills](https://agentskills.io/) format.
+Maintained by [Dash0](https://www.dash0.com).
 
 > [!TIP]
-> These skills have been greatly improved using [Tessl](https://tessl.io).
+> These skills have been improved using [Tessl](https://tessl.io).
 > Try it out for your own agent skills, it's worth it.
 
 [![tessl](https://img.shields.io/endpoint?url=https%3A%2F%2Fapi.tessl.io%2Fv1%2Fbadges%2Fdash0%2Fagent-skills)](https://tessl.io/registry/dash0/agent-skills)
 
-## How to use
+## Installation
 
 **Install with [skills](https://skills.sh/) CLI** (universal, works with any [Agent Skills](https://agentskills.io)-compatible tool):
 
@@ -21,9 +25,9 @@ npx skills add https://github.com/dash0hq/agent-skills --skill otel-semantic-con
 
 For tool-specific installation instructions (Claude Code, Cursor, Tessl, and others), see [INSTALL.md](./INSTALL.md).
 
-## Usage
+## How to use
 
-Skills are automatically available once installed. The agent will use them when relevant tasks are detected.
+Once installed, skills load automatically and the agent picks them up when a task matches.
 
 **Examples:**
 ```
@@ -45,6 +49,14 @@ Ensure that my HTTP server spans have the correct attributes
 Help me fix high-cardinality metrics that are blowing up my costs
 ```
 
+## Why vendor-neutral OpenTelemetry
+
+These skills are built around the OpenTelemetry specification, not any single backend.
+The output is standard OTLP telemetry that any OpenTelemetry-compatible backend can ingest.
+
+Vendor lock-in in observability comes from proprietary agents and attribute schemas.
+Skills in this repository avoid both: they guide agents to use OpenTelemetry SDKs and the OpenTelemetry Collector, and to follow the upstream [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) for attribute, span, and metric naming.
+
 ## Why semantic conventions matter
 
 [OpenTelemetry Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) define standardized names, types, and semantics for telemetry attributes, metric names, span names, and status codes.
@@ -55,13 +67,13 @@ When instrumentation follows semantic conventions:
 - Service maps, operation grouping, and error tracking derive correct results without manual configuration.
 - Cross-service queries return consistent results because every service speaks the same attribute language.
 
-When conventions are missing or inconsistent, these capabilities degrade silently — no errors, just incomplete data, broken topology views, and fragmented queries.
+When conventions are missing or inconsistent, these capabilities degrade silently: no errors, just incomplete data, broken topology views, and fragmented queries.
 
 ## Instrumentation score
 
-Some of the guidance in these skills is aligned with the [Instrumentation Score](https://github.com/instrumentation-score/spec) specification — a vendor-neutral corpus of guidance that quantifies how well a service follows OpenTelemetry best practices.
+Guidance in these skills aligns with the [Instrumentation Score](https://github.com/instrumentation-score/spec) specification, a vendor-neutral corpus of guidance that quantifies how well a service follows OpenTelemetry best practices.
 The spec defines impact-weighted rules across resources, spans, metrics, and logs.
-Following the guidance in these skills helps your services score higher, which directly translates to better observability outcomes.
+Following this guidance helps your services score higher, which means better observability outcomes downstream.
 
 ## Available skills
 
@@ -89,7 +101,7 @@ Covers backend and browser instrumentation across multiple languages.
 - .NET (auto-instrumentation, ASP.NET Core, ActivitySource)
 - Ruby (SDK setup, Rails, Sinatra)
 - PHP (auto-instrumentation, Laravel, Symfony)
-- Browser (Dash0 SDK, OpenTelemetry JS, server correlation)
+- Browser (OpenTelemetry JS, Dash0 SDK, server correlation)
 - Next.js (App Router, full-stack instrumentation, common gotchas)
 
 **Platforms:**
@@ -101,11 +113,11 @@ Covers backend and browser instrumentation across multiple languages.
 - Ruby (Rails, Sinatra, etc.)
 - PHP (Laravel, Symfony, etc.)
 - Browser (React, Vue, Next.js, etc.)
-- Dash0 or any OTLP-compatible backend
+- Any OTLP-compatible backend
 
 ### [otel-semantic-conventions](./skills/otel-semantic-conventions/SKILL.md)
 
-Expert guidance for selecting, applying, and reviewing OpenTelemetry semantic conventions — the standardized names, types, and semantics for telemetry attributes, span names, and status codes.
+Expert guidance for selecting, applying, and reviewing OpenTelemetry semantic conventions: the standardized names, types, and semantics for telemetry attributes, span names, and status codes.
 
 **Use when:**
 - Choosing attributes for spans, metrics, or logs
@@ -118,24 +130,24 @@ Expert guidance for selecting, applying, and reviewing OpenTelemetry semantic co
 **Rules covered:**
 - Attributes (registry, selection, placement, common attributes by domain, namespaces)
 - Spans (naming patterns, span kind, status code mapping)
-- Versioning (stability levels, migration, Dash0 auto-upgrades)
+- Versioning (stability levels, migration, Dash0 semantic convention upgrades)
 - Dash0 (derived attributes, feature dependencies)
 
 ### [otel-collector](./skills/otel-collector/SKILL.md)
 
 Expert guidance for configuring and deploying the OpenTelemetry Collector to receive, process, and export telemetry.
-Covers pipeline configuration, deployment patterns, and forwarding to Dash0.
+Covers pipeline configuration, deployment patterns, and forwarding to any OTLP-compatible backend.
 
 **Use when:**
 - Setting up an OpenTelemetry Collector pipeline
 - Configuring receivers, processors, or exporters
 - Deploying the Collector to Kubernetes or Docker
-- Forwarding telemetry to Dash0 or another OTLP backend
+- Forwarding telemetry to any OTLP-compatible backend
 - Tuning Collector performance (memory, batching, queuing)
 
 **Rules covered:**
 - Receivers (OTLP, Prometheus, filelog, hostmetrics)
-- Exporters (OTLP/gRPC to Dash0, debug, authentication, retry, queuing)
+- Exporters (OTLP/gRPC, debug, authentication, retry, queuing)
 - Processors (memory limiter, batch, resource detection, Kubernetes attributes, ordering)
 - Pipelines (service section, per-signal configuration, connectors, fan-out)
 - Deployment (agent vs gateway, DaemonSet, Deployment, Docker Compose, health checks)
@@ -162,7 +174,7 @@ Expert guidance for writing and debugging OpenTelemetry Transformation Language 
 
 ## Automation with Claude Code
 
-You can configure [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to apply these skills automatically — both in interactive sessions and in headless CI/CD pipelines.
+You can configure [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to apply these skills automatically, both in interactive sessions and in headless CI/CD pipelines.
 
 ### Project instructions via CLAUDE.md
 

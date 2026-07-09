@@ -19,27 +19,31 @@ Choose the pattern based on what telemetry you collect and how you process it.
 Follow these steps in order.
 Stop at the first match.
 
-### 1. Is the target environment Kubernetes?
+### 1. Can you run a Collector next to the app at all?
+
+On **serverless / sidecar-less container platforms** (AWS App Runner, Google Cloud Run, Fly.io, Azure Container Apps, container-image Lambda) you cannot deploy a co-located Collector. Use **[direct SDK-to-backend export](./deployment/serverless.md)** — the SDK ships OTLP straight to the backend, no Collector in the path. Stop here.
+
+### 2. Is the target environment Kubernetes?
 
 If **no** — use [Docker Compose or a binary](./deployment/raw-manifests.md#docker-compose-for-local-development) for local development, or a system service for bare-metal hosts.
 The remaining steps apply only to Kubernetes.
 
-### 2. Is Dash0 the observability backend?
+### 3. Is Dash0 the observability backend?
 
 If **yes** and you do not need custom Collector pipelines (custom processors, connectors, or non-standard receivers) — use the **[Dash0 Kubernetes Operator](./deployment/dash0-operator.md)**.
 It deploys and manages Collectors automatically, injects instrumentation without per-workload annotations, and synchronises dashboards and alert rules.
 
-If **yes** but you need full control over the Collector pipeline — continue to step 3.
+If **yes** but you need full control over the Collector pipeline — continue to step 4.
 Configure the Collector to export to Dash0 via OTLP (see [exporters](./exporters.md)).
 
-### 3. Do you need automatic SDK instrumentation injected into application pods?
+### 4. Do you need automatic SDK instrumentation injected into application pods?
 
 If **yes** — use the **[OpenTelemetry Operator](./deployment/opentelemetry-operator.md)**.
 It manages Collector instances via the `OpenTelemetryCollector` CRD and injects language-specific auto-instrumentation via the `Instrumentation` CRD.
 
-If **no** — continue to step 4.
+If **no** — continue to step 5.
 
-### 4. Is Helm available in the cluster?
+### 5. Is Helm available in the cluster?
 
 If **yes** — use the **[Collector Helm chart](./deployment/collector-helm-chart.md)**.
 Presets handle RBAC, volumes, and common receivers automatically.
@@ -50,6 +54,9 @@ If **no** — use **[raw Kubernetes manifests](./deployment/raw-manifests.md)**.
 ### Summary
 
 ```
+Can you run a Collector next to the app?
+├─ No (serverless: App Runner, Cloud Run, Fly, Lambda) → Direct SDK export (serverless.md)
+└─ Yes
 Is the target Kubernetes?
 ├─ No  → Docker Compose / binary
 └─ Yes
@@ -86,6 +93,7 @@ The [Dash0 Kubernetes Operator](./deployment/dash0-operator.md) manages this top
 
 ## References
 
+- [Serverless / sidecar-less (direct SDK export)](./deployment/serverless.md)
 - [Raw manifests](./deployment/raw-manifests.md)
 - [Collector Helm chart](./deployment/collector-helm-chart.md)
 - [OpenTelemetry Operator](./deployment/opentelemetry-operator.md)

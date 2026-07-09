@@ -224,6 +224,15 @@ See [resource attributes](../resources.md) for the full list of required and rec
 
 See [Kubernetes deployment](../platforms/k8s.md) for pod metadata injection, resource attributes, and Dash0 Kubernetes Operator guidance.
 
+## Serverless / sidecar-less deployment
+
+On AWS App Runner, Google Cloud Run, Fly.io, Azure Container Apps, or
+container-image Lambda you cannot run a Collector next to the app. Set the
+`OTEL_EXPORTER_OTLP_*` variables above to export **directly to the backend**
+and mind the two serverless pitfalls (internet egress must reach the ingress;
+keep the ingest token in the platform's secret store). See the
+`otel-collector` skill's [serverless deployment rule](../../../otel-collector/rules/deployment/serverless.md) for the full pattern and an App Runner worked example.
+
 ## Supported libraries
 
 The auto-instrumentation package automatically instruments:

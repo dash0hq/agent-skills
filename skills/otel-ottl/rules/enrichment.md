@@ -21,7 +21,5 @@ processors:
   transform/copy-resource:
     error_mode: ignore
     trace_statements:
-      - context: span
-        statements:
-          - set(span.attributes["deployment.environment.name"], resource.attributes["deployment.environment.name"]) where resource.attributes["deployment.environment.name"] != nil
+      - set(span.attributes["deployment.environment.name"], resource.attributes["deployment.environment.name"]) where resource.attributes["deployment.environment.name"] != nil
 ```

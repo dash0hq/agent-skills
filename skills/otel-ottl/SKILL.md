@@ -92,7 +92,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [transform, batch]
+      processors: [transform]
       exporters: [debug]   # swap in production exporter once validated
 ```
 

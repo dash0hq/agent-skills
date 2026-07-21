@@ -41,7 +41,7 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [filter, batch]
+      processors: [filter]
       exporters: [debug]
 ```
 
@@ -58,7 +58,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [transform, batch]
+      processors: [transform]
       exporters: [debug]
 ```
 

@@ -42,7 +42,7 @@ All environment variables that control the SDK behavior:
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4317` | OTLP collector endpoint |
 | `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `grpc` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
-| `OTEL_RESOURCE_ATTRIBUTES` | No | - | Additional resource attributes (e.g., `deployment.environment=production`) |
+| `OTEL_RESOURCE_ATTRIBUTES` | No | - | Additional resource attributes (e.g., `deployment.environment.name=production`) |
 
 **Note**: Unlike Node.js, the Python SDK defaults `OTEL_TRACES_EXPORTER` and `OTEL_LOGS_EXPORTER` to `otlp`, so traces and logs are exported without explicitly setting these variables.
 

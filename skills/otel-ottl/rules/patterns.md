@@ -52,7 +52,7 @@ processors:
   transform:
     trace_statements:
       - set(span.status.code, STATUS_CODE_ERROR) where span.attributes["http.response.status_code"] >= 500
-      - set(span.attributes["env"], "production") where resource.attributes["deployment.environment"] == "prod"
+      - set(span.attributes["env"], "production") where resource.attributes["deployment.environment.name"] == "prod"
 
 service:
   pipelines:

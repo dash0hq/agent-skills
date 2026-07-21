@@ -120,4 +120,4 @@ Replace the placeholders with values from your Dash0 account:
 
 ## License
 
-MIT
+Apache-2.0

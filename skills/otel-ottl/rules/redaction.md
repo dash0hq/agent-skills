@@ -24,11 +24,11 @@ processors:
       - delete_key(span.attributes, "credit-card.number")
     log_statements:
       # Mask — credit card numbers (keep first/last 4 digits)
-      - replace_pattern(log.body["string"], "\\b(\\d{4})\\d{5,11}(\\d{4})\\b", "$$1****$$2")
+      - replace_pattern(log.body.string, "\\b(\\d{4})\\d{5,11}(\\d{4})\\b", "$$1****$$2")
   filter/drop-sensitive-logs:
     error_mode: ignore
     log_conditions:
-      - 'IsMatch(log.body["string"], "(?i)-----BEGIN (RSA |EC )?PRIVATE KEY-----")'
+      - 'IsMatch(log.body.string, "(?i)-----BEGIN (RSA |EC )?PRIVATE KEY-----")'
 ```
 
 Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters.

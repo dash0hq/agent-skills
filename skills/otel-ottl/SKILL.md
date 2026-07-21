@@ -132,12 +132,12 @@ Occur during telemetry processing:
 
 ### Error mode configuration
 
-Always set `error_mode` explicitly.
+Set `error_mode` explicitly for clarity; `ignore` is the default.
 
 | Mode | Behavior | When to use |
 |------|----------|-------------|
-| `propagate` (default) | Stops processing current item | Development and strict environments where you want to catch every error |
-| `ignore` | Logs error, continues processing | **Production** — set this unless you have a specific reason not to |
+| `ignore` (default) | Logs the error and continues to the next statement | **Production and general use** — the default for the transform and filter processors |
+| `propagate` | Returns the error up the pipeline, dropping the payload from the Collector | Development and strict environments where you want to catch every error |
 | `silent` | Ignores errors without logging | High-volume pipelines with known-safe transforms where error logs are noise |
 
 ```yaml
@@ -145,10 +145,12 @@ processors:
   transform:
     error_mode: ignore
     trace_statements:
-      - context: span
-        statements:
-          - set(span.attributes["parsed"], ParseJSON(span.attributes["json_body"]))
+      - set(span.attributes["parsed"], ParseJSON(span.attributes["json_body"]))
 ```
+
+Statements are a flat list; the Collector infers the context (`span`, `metric`, `datapoint`, `log`, and so on) from the path prefixes.
+Use the object form with an explicit `context:` only when a statement group mixes paths that cannot be inferred to a single context, or when you need a group-level condition or `error_mode`.
+
 ## Performance
 
 Use `where` clauses to skip items early.

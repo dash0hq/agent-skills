@@ -15,25 +15,20 @@ processors:
   transform/redact:
     error_mode: ignore
     trace_statements:
-      - context: span
-        statements:
-          # Replace — auth and session headers
-          - set(span.attributes["http.request.header.authorization"], "REDACTED") where span.attributes["http.request.header.authorization"] != nil
-          - set(span.attributes["http.request.header.cookie"], "REDACTED") where span.attributes["http.request.header.cookie"] != nil
-          # Hash — emails (preserves correlation)
-          - set(span.attributes["user.email"], SHA256(span.attributes["user.email"])) where span.attributes["user.email"] != nil
-          # Delete — attributes that must never be exported
-          - delete_key(span.attributes, "credit-card.number")
+      # Replace — auth and session headers
+      - set(span.attributes["http.request.header.authorization"], "REDACTED") where span.attributes["http.request.header.authorization"] != nil
+      - set(span.attributes["http.request.header.cookie"], "REDACTED") where span.attributes["http.request.header.cookie"] != nil
+      # Hash — emails (preserves correlation)
+      - set(span.attributes["user.email"], SHA256(span.attributes["user.email"])) where span.attributes["user.email"] != nil
+      # Delete — attributes that must never be exported
+      - delete_key(span.attributes, "credit-card.number")
     log_statements:
-      - context: log
-        statements:
-          # Mask — credit card numbers (keep first/last 4 digits)
-          - replace_pattern(log.body["string"], "\\b(\\d{4})\\d{5,11}(\\d{4})\\b", "$$1****$$2")
+      # Mask — credit card numbers (keep first/last 4 digits)
+      - replace_pattern(log.body["string"], "\\b(\\d{4})\\d{5,11}(\\d{4})\\b", "$$1****$$2")
   filter/drop-sensitive-logs:
     error_mode: ignore
-    logs:
-      log_record:
-        - 'IsMatch(log.body["string"], "(?i)-----BEGIN (RSA |EC )?PRIVATE KEY-----")'
+    log_conditions:
+      - 'IsMatch(log.body["string"], "(?i)-----BEGIN (RSA |EC )?PRIVATE KEY-----")'
 ```
 
 Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters.

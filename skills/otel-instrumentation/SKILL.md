@@ -1,7 +1,7 @@
 ---
 name: 'otel-instrumentation'
 description: Configures trace spans, defines custom metrics, sets up log exporters, and optimizes sampling strategies for OpenTelemetry instrumentation. Use when instrumenting applications with traces, metrics, or logs. Triggers on requests for observability, telemetry, tracing, metrics collection, logging integration, or OTel setup.
-license: MIT
+license: Apache-2.0
 metadata:
   author: dash0
   version: '2.0.0'

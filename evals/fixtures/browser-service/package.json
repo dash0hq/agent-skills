@@ -1,0 +1,11 @@
+{
+  "name": "browser-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eval fixture: deliberately uninstrumented static web app (see evals/fixtures/README.md).",
+  "license": "MIT",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

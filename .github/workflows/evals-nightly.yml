@@ -1,0 +1,160 @@
+# Nightly full-matrix eval run (R12, R16, R19). The matrix comes from
+# evals-matrix.yml (nightly gate: quarantined scenarios, any FullMatrixOnly
+# scenarios, and every kind scenario included). The report job maintains one
+# rolling GitHub issue per failing scenario (label eval-failure +
+# scenario:<id>, closed on recovery) and the pinned heartbeat issue (label
+# eval-heartbeat) that the PR gate checks for staleness.
+name: Evals nightly
+
+on:
+  schedule:
+    # 03:17 UTC: an off-peak, non-round time to dodge the top-of-hour cron
+    # congestion on GitHub-hosted runners.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  matrix:
+    name: Full matrix
+    uses: ./.github/workflows/evals-matrix.yml
+    secrets: inherit
+
+  report:
+    name: Report results
+    needs: matrix
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Download evidence
+        uses: actions/download-artifact@v5
+        with:
+          pattern: evidence-*
+          path: evidence
+
+      - name: Update rolling failure issues and the heartbeat
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MATRIX: ${{ needs.matrix.outputs.matrix }}
+          KIND_MATRIX: ${{ needs.matrix.outputs.kind-matrix }}
+          QUARANTINED: ${{ needs.matrix.outputs.quarantined }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          mkdir -p evidence
+          repo="$GITHUB_REPOSITORY"
+          MATRIX="${MATRIX:-[]}"
+          KIND_MATRIX="${KIND_MATRIX:-[]}"
+          QUARANTINED="${QUARANTINED:-[]}"
+
+          # Total cost across the run, summed from the verdict JSON files
+          # each scenario job wrote (EVAL_VERDICT_DIR) and uploaded (R18).
+          total_cost=$(find evidence -name 'verdict-*.json' -exec cat {} + 2>/dev/null \
+            | jq -s '([.[].cost_usd] | add // 0) * 100 | round / 100')
+
+          # A scenario passed only when its job wrote result.json with
+          # passed=true; a missing artifact or result file counts as failed,
+          # so infrastructure deaths cannot go unreported.
+          failed=()
+          passed=()
+          for id in $(printf '%s\n%s\n' "$MATRIX" "$KIND_MATRIX" | jq -r -s 'add // [] | .[]'); do
+            result_file="evidence/evidence-${id}/result.json"
+            if [ -f "$result_file" ] && [ "$(jq -r '.passed' "$result_file")" = "true" ]; then
+              passed+=("$id")
+            else
+              failed+=("$id")
+            fi
+          done
+          total=$(( ${#failed[@]} + ${#passed[@]} ))
+          echo "Scenarios: ${total} total, ${#failed[@]} failed."
+
+          ensure_label() {
+            gh api "repos/${repo}/labels" -f name="$1" -f color="$2" > /dev/null 2>&1 || true
+          }
+          find_open_issue() {
+            gh api -X GET search/issues \
+              -f q="repo:${repo} is:issue is:open label:eval-failure label:\"scenario:$1\"" \
+              --jq '.items[0].number // empty'
+          }
+
+          ensure_label eval-failure d73a4a
+          ensure_label eval-heartbeat 0e8a16
+
+          # One rolling issue per failing scenario: create it on the first
+          # failure, comment on repeats, close on recovery.
+          for id in "${failed[@]}"; do
+            ensure_label "scenario:${id}" ededed
+            number=$(find_open_issue "$id")
+            if [ -n "$number" ]; then
+              gh api "repos/${repo}/issues/${number}/comments" \
+                -f body="Still failing in the nightly run: ${RUN_URL}" > /dev/null
+              echo "Commented on rolling issue #${number} for ${id}."
+            else
+              quarantined_note="no"
+              if [ "$(echo "$QUARANTINED" | jq --arg id "$id" 'index($id) != null')" = "true" ]; then
+                quarantined_note="yes (does not block PRs; see evals/quarantine.yaml)"
+              fi
+              body="The nightly eval run failed for scenario \`${id}\`.
+
+          - Run: ${RUN_URL}
+          - Quarantined: ${quarantined_note}
+          - Evidence: artifact \`evidence-${id}\` on the run (7-day retention)
+
+          This is a rolling issue: subsequent nightly failures comment here, and the first green nightly run closes it."
+              gh api "repos/${repo}/issues" \
+                -f title="Nightly eval failure: ${id}" \
+                -f body="$body" \
+                -f "labels[]=eval-failure" \
+                -f "labels[]=scenario:${id}" > /dev/null
+              echo "Opened a rolling issue for ${id}."
+            fi
+          done
+
+          # Close rolling issues for scenarios that recovered.
+          for id in "${passed[@]}"; do
+            number=$(find_open_issue "$id")
+            if [ -n "$number" ]; then
+              gh api "repos/${repo}/issues/${number}/comments" \
+                -f body="Recovered in the nightly run: ${RUN_URL}" > /dev/null
+              gh api -X PATCH "repos/${repo}/issues/${number}" -f state=closed > /dev/null
+              echo "Closed rolling issue #${number} for ${id} (recovered)."
+            fi
+          done
+
+          # Pinned heartbeat issue: updated on every run, green or red. The
+          # PR gate parses the "Last nightly run:" line and warns when it is
+          # older than 48 hours.
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          heartbeat_body="Last nightly run: ${now}
+          Run: ${RUN_URL}
+          Total cost: \$${total_cost} USD
+          Failed scenarios: ${#failed[@]} of ${total}
+
+          This issue is updated automatically by evals-nightly.yml; keep it open. The PR gate warns when it goes stale."
+          number=$(gh api "repos/${repo}/issues?labels=eval-heartbeat&state=open&per_page=1" --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh api -X PATCH "repos/${repo}/issues/${number}" -f body="$heartbeat_body" > /dev/null
+            echo "Updated heartbeat issue #${number}."
+          else
+            gh api "repos/${repo}/issues" \
+              -f title="Nightly eval heartbeat" \
+              -f body="$heartbeat_body" \
+              -f "labels[]=eval-heartbeat" > /dev/null
+            echo "Created the heartbeat issue."
+          fi
+
+          {
+            echo "## Nightly eval report"
+            echo ""
+            echo "- Total agent cost: \$${total_cost} USD"
+            echo "- Failed scenarios: ${#failed[@]} of ${total}"
+            if [ "${#failed[@]}" -gt 0 ]; then
+              echo "- Failing: $(printf '%s ' "${failed[@]}")"
+            fi
+            echo "- Quarantined in this matrix: $(echo "$QUARANTINED" | jq -r 'join(", ") | if . == "" then "none" else . end')"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,15 @@
+# Service in front of the checkout Deployment; the harness drives traffic
+# through it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-service
+  labels:
+    app.kubernetes.io/name: checkout-service
+spec:
+  selector:
+    app.kubernetes.io/name: checkout-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,15 @@
+<!--
+  Eval fixture: deliberately uninstrumented ASP.NET Core minimal API (see
+  evals/fixtures/README.md for the contract). Framework only: no packages.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RootNamespace>DotnetService</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -44,6 +44,8 @@ Verify that the following resource attributes are populated on the telemetry fro
 |-----------|---------------|
 | `service.name` | Identifies the service in the backend |
 | `service.version` | Enables version-to-version comparison and deployment tracking |
+| `service.namespace` | Scopes services across products, teams, or organizations sharing the backend |
+| `service.instance.id` | Distinguishes individual instances (pods, workers) sharing the same service identity |
 | `deployment.environment.name` | Separates production from staging and development data |
 | `k8s.namespace.name` (Kubernetes only) | Scopes queries to the correct namespace |
 

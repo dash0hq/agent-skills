@@ -1,0 +1,8 @@
+# Prompt-bearing content requires designated review before it can steer the
+# eval agent (plan requirement R14 and the U8 review gate): skill markdown is
+# the agent's prompt, and eval scenario code contains the task prompts.
+#
+# The @dash0hq/oss team must have write access to this repository, and branch
+# protection must require code-owner review, for these rules to take effect.
+/skills/ @dash0hq/oss
+/evals/scenarios/ @dash0hq/oss

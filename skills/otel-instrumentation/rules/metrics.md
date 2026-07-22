@@ -150,6 +150,7 @@ In case of namespace clash, as the user if they want to prefix the name of the m
 
 Examples of metrics from semantic conventions:
 
+<!-- eval:skip -->
 ```
 http.server.request.duration    # Histogram (semconv)
 http.server.active_requests     # UpDownCounter (semconv)
@@ -184,6 +185,7 @@ Before adding attributes, calculate:
 
 An example of a metric with 4 attributes:
 
+<!-- eval:skip -->
 ```
 method:    5 values
 route:     50 values (normalized)

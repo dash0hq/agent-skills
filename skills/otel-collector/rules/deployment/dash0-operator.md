@@ -166,6 +166,7 @@ Switch to `all` only during a planned maintenance window.
 
 Apply this label to any workload to prevent instrumentation:
 
+<!-- eval:k8s -->
 ```yaml
 metadata:
   labels:
@@ -188,6 +189,7 @@ No per-workload annotations are required (unlike the [OpenTelemetry Operator](./
 
 Enable Python auto-instrumentation in Helm values:
 
+<!-- eval:skip -->
 ```yaml
 operator:
   instrumentation:
@@ -217,6 +219,7 @@ The operator generates and manages the entire Collector pipeline, including rece
 The operator supports exporting to any OTLP-compatible backend alongside or instead of Dash0.
 Add an OTLP export to the `Dash0OperatorConfiguration`:
 
+<!-- eval:k8s -->
 ```yaml
 spec:
   exports:

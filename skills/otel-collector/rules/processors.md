@@ -279,6 +279,10 @@ Cluster names are human-chosen and can collide across teams or regions.
 Use `action: upsert` to set the value regardless of whether the attribute already exists.
 Use `action: insert` to set the value only when the attribute is not already present (preserves SDK-set values).
 
+Always require user confirmation `action: upsert`, `action: update`, or `action: delete` on the [service identity](../../otel-instrumentation/rules/resources.md#service-identity) attributes (`service.namespace`, `service.name`, `service.version`, `service.instance.id`).
+If asked to tamper with service identity, explain to the user the potential impact on service maps, deployment tracking, and instance-level analysis.
+If a service is missing an identity attribute, prefer fixing it at the SDK or deployment manifest — do not paper over it with a Collector-level `upsert`.
+
 ### Filter processor
 
 The `filter` processor drops telemetry that matches a condition.
@@ -379,6 +383,9 @@ service:
 - **`resourcedetection` with `override: true` overwriting SDK attributes.**
   Application-set attributes like `service.name` get replaced with auto-detected values (often `unknown_service`).
   Set `override: false` unless you intentionally want to replace SDK-set attributes.
+- **Overwriting service identity in the `resource` processor.**
+  Using `action: upsert` or `action: update` on `service.namespace`, `service.name`, `service.version`, or `service.instance.id` silently disconnects telemetry from the service that produced it.
+  Use `action: insert` for identity attributes so SDK-set values win, and see the [service identity](../../otel-instrumentation/rules/resources.md#service-identity) rule.
 
 ## References
 

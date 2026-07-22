@@ -49,6 +49,7 @@ If **no** — use **[raw Kubernetes manifests](./deployment/raw-manifests.md)**.
 
 ### Summary
 
+<!-- eval:skip -->
 ```
 Is the target Kubernetes?
 ├─ No  → Docker Compose / binary

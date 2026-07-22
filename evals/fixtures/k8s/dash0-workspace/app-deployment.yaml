@@ -1,0 +1,45 @@
+# Seed workspace for the k8s-deploy-dash0-operator scenario.
+#
+# The agent authors the Dash0Monitoring resource (monitoring.yaml) per
+# skills/otel-collector/rules/deployment/dash0-operator.md; the operator
+# itself is installed by the harness with a runtime-generated placeholder
+# token (never committed).
+#
+# The image is the deliberately uninstrumented Node.js checkout service
+# (evals/fixtures/nodejs-service): telemetry appears only when the Dash0
+# operator's auto-instrumentation works and its collector exports.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-service
+  labels:
+    app.kubernetes.io/name: checkout-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: checkout-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: checkout-service
+    spec:
+      containers:
+        - name: checkout-service
+          image: nodejs-service-eval:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DOWNSTREAM_URL
+              value: http://downstream:9090/inventory
+            # Harness-owned: carries the per-run test.id resource attribute
+            # the eval sink scopes on. OTEL_RESOURCE_ATTRIBUTES is not on the
+            # Dash0 operator's list of managed environment variables, so an
+            # explicit entry is safe to keep. Keep this entry unchanged.
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              valueFrom:
+                secretKeyRef:
+                  name: eval-otlp
+                  key: OTEL_RESOURCE_ATTRIBUTES

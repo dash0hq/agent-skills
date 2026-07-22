@@ -186,6 +186,7 @@ stringData:
 
 Reference the Secret in the pod spec:
 
+<!-- eval:k8s -->
 ```yaml
 env:
   - name: OTEL_EXPORTER_OTLP_HEADERS

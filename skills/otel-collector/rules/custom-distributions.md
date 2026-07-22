@@ -41,6 +41,7 @@ Create a `builder-config.yaml` at the root of the repository.
 All component versions should match the `otelcol_version` to avoid dependency conflicts.
 For example:
 
+<!-- eval:skip -->
 ```yaml
 dist:
   name: custom-collector

@@ -11,6 +11,23 @@ Follow semantic versioning (`MAJOR.MINOR.PATCH`):
 - **MINOR** — new skills, new rule files, or significant new guidance within existing rules.
 - **PATCH** — typo fixes, wording improvements, corrections to existing guidance, and small additions that do not change the skill surface.
 
+## Published artifact contents
+
+The eval harness and the repository docs (`evals/` and `docs/`) are maintainer-facing and must not ship in published artifacts.
+
+The Tessl tile excludes them through [`.tesslignore`](./.tesslignore) at the repository root, which `tessl tile publish` reads with gitignore-style patterns; [`.tileignore`](./.tileignore) carries the same patterns for tessl CLI versions that predate the tile-to-plugin rename.
+Verify the exclusion before releasing:
+
+```bash
+tessl tile publish . --dry-run --verbose
+```
+
+The `--verbose` file listing must contain no paths under `evals/` or `docs/`; if it does, fix the ignore files before running the release workflow.
+
+The Claude Code plugin, the Cursor plugin, and the Gemini CLI extension install by cloning this repository.
+Neither `plugin.json` nor `gemini-extension.json` supports an include or exclude field, and no ignore-file mechanism exists for those installers (verified against the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference) and the [Gemini CLI extension reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md) as of 2026-07).
+Those installs therefore contain `evals/` and `docs/`; the content is inert for consumers, and removing it would require a separate distribution repository or release archives instead of git clones.
+
 ## Pre-release checklist
 
 1. Ensure all changes are merged to `main`.
@@ -22,6 +39,7 @@ Follow semantic versioning (`MAJOR.MINOR.PATCH`):
 
 3. Verify that `README.md` reflects the current set of skills and their descriptions.
 4. Confirm that every skill directory contains a valid `SKILL.md`.
+5. Verify the Tessl tile contents with `tessl tile publish . --dry-run --verbose` and confirm the listing contains no `evals/` or `docs/` paths.
 
 ## Creating the release
 

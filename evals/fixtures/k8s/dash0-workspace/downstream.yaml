@@ -1,0 +1,40 @@
+# Stub downstream server the checkout service calls (evals/cmd/evalhelper
+# in serve mode). Harness-owned; the agent does not need to change it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: downstream
+  labels:
+    app.kubernetes.io/name: downstream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: downstream
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: downstream
+    spec:
+      containers:
+        - name: downstream
+          image: agent-skills-eval-helper:local
+          imagePullPolicy: IfNotPresent
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 9090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: downstream
+  labels:
+    app.kubernetes.io/name: downstream
+spec:
+  selector:
+    app.kubernetes.io/name: downstream
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

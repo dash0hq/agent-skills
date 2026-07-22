@@ -1,0 +1,9 @@
+# The agent authors the OpenTelemetry Collector Helm chart values in this
+# file per skills/otel-collector/rules/deployment/collector-helm-chart.md.
+# The harness installs the chart with:
+#
+#   helm install eval-collector open-telemetry/opentelemetry-collector -f values.yaml
+#
+# Exporter endpoint and bearer token come from the eval-otlp Secret at run
+# time (${env:EVAL_OTLP_ENDPOINT} and ${env:EVAL_OTLP_TOKEN}); they are
+# never written into this file.

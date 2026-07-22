@@ -1,0 +1,3 @@
+# The agent authors the Dash0Monitoring resource in this file per
+# skills/otel-collector/rules/deployment/dash0-operator.md. The harness
+# applies every YAML file of this workspace into the scenario namespace.

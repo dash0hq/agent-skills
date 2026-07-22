@@ -1,0 +1,43 @@
+# Seed workspace for the k8s-platform-downward-api scenario.
+#
+# The agent edits this Deployment per
+# skills/otel-instrumentation/rules/platforms/k8s.md: downward-API pod
+# metadata as resource attributes, OTEL_* exporter configuration from the
+# runtime-provided Secrets, service identity attributes.
+#
+# The container image is the pre-instrumented checkout service
+# (evals/fixtures/k8s/instrumented-go-service): it reads all OpenTelemetry
+# configuration from OTEL_* environment variables, so the pod spec is the
+# only thing the agent has to change.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-service
+  labels:
+    app.kubernetes.io/name: checkout-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: checkout-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: checkout-service
+    spec:
+      containers:
+        - name: checkout-service
+          image: instrumented-go-service-eval:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Harness-owned: carries the per-run test.id resource attribute
+            # the eval sink scopes on. Keep this entry unchanged; it is
+            # separate from OTEL_RESOURCE_ATTRIBUTES on purpose.
+            - name: EVAL_EXTRA_RESOURCE_ATTRIBUTES
+              valueFrom:
+                secretKeyRef:
+                  name: eval-otlp
+                  key: EVAL_EXTRA_RESOURCE_ATTRIBUTES

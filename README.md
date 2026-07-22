@@ -244,3 +244,7 @@ Each skill contains:
 - `SKILL.md` - Instructions for the agent
 - `rules/` - Focused guidance documents
 - `README.md` - Human-readable documentation
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for authoring rules and for running the evals locally to judge whether the skills work.

@@ -1,0 +1,17 @@
+{
+  "name": "nextjs-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eval fixture: deliberately uninstrumented Next.js app-router app (see evals/fixtures/README.md).",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  }
+}

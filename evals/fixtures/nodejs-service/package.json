@@ -1,0 +1,11 @@
+{
+  "name": "nodejs-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eval fixture: deliberately uninstrumented Node.js HTTP service (see evals/fixtures/README.md).",
+  "license": "MIT",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

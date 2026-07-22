@@ -62,6 +62,7 @@ It can retain errors, slow requests, unusual traces, and a configurable baseline
 Tail sampling requires all spans of a trace to converge at a single Collector instance.
 This requires a two-tier architecture:
 
+<!-- eval:skip -->
 ```
 Applications → Agent (DaemonSet) → Gateway (sampling layer) → Backend
                      ↑                        ↑

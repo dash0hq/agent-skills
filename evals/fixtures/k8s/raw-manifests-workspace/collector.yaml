@@ -1,0 +1,8 @@
+# The agent authors the raw Collector manifests (ConfigMap, Deployment,
+# Service, and any RBAC) in this workspace per
+# skills/otel-collector/rules/deployment/raw-manifests.md. The harness
+# applies every YAML file of this workspace into the scenario namespace.
+#
+# Exporter endpoint and bearer token come from the eval-otlp Secret at run
+# time (${env:EVAL_OTLP_ENDPOINT} and ${env:EVAL_OTLP_TOKEN}); they are
+# never written into these manifests.

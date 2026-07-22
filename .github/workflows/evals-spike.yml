@@ -1,0 +1,306 @@
+# THROWAWAY SPIKE — delete after the U6 outcome is recorded in
+# docs/plans/2026-07-17-001-feat-skill-evals-ci-plan.md.
+#
+# Validates the two runtime assumptions behind the Kubernetes eval scenarios
+# before any of them is trusted in CI:
+#
+#   1. kind-bridge: a pod inside a kind cluster on ubuntu-latest can deliver
+#      OTLP through the dual-homed relay container (evals/cmd/relay) attached
+#      to the "kind" Docker network, and the relay can forward to a host
+#      receiver via host.docker.internal (host-gateway). If this route fails,
+#      the fallback is reversing the direction with kind extraPortMappings
+#      plus a NodePort Service (sketch in evals/fixtures/k8s/kind-config.yaml).
+#
+#   2. dash0-operator-placeholder: the Dash0 operator, installed with a
+#      runtime-generated placeholder token and a plaintext (http://) OTLP
+#      endpoint pointing at the relay, still starts its collectors and
+#      attempts export — the behavior the k8s-deploy-dash0-operator scenario
+#      asserts (see evals/scenarios/kubernetes.go).
+name: Evals spike (throwaway)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Keep the KIND_VERSION and KIND_NODE_IMAGE pins below in sync with the
+  # node image pinned in evals/fixtures/k8s/kind-config.yaml
+  # (kind v0.31.0 default node image, digest from the kind release notes).
+  KIND_VERSION: v0.31.0
+  KIND_NODE_IMAGE: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+  CURL_IMAGE: curlimages/curl:8.17.0@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40
+  DASH0_OPERATOR_CHART_VERSION: 0.149.0
+  RECEIVER_PORT: "41833"
+
+jobs:
+  kind-bridge:
+    name: "Spike 1: pod-to-host OTLP through the kind-network relay"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Create kind cluster
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_NODE_IMAGE }}
+          cluster_name: agent-skills-evals
+          config: evals/fixtures/k8s/kind-config.yaml
+
+      - name: Start host OTLP receiver
+        run: |
+          cat > /tmp/receiver.py <<'EOF'
+          import http.server
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get("Content-Length") or 0)
+                  self.rfile.read(length)
+                  with open("/tmp/receiver.log", "a") as f:
+                      f.write("POST %s\n" % self.path)
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.end_headers()
+                  self.wfile.write(b"{}")
+
+              def log_message(self, *args):
+                  pass
+
+          http.server.ThreadingHTTPServer(("0.0.0.0", ${{ env.RECEIVER_PORT }}), Handler).serve_forever()
+          EOF
+          touch /tmp/receiver.log
+          nohup python3 /tmp/receiver.py > /tmp/receiver-stdout.log 2>&1 &
+          sleep 2
+          if ! curl -s -o /dev/null -X POST "http://127.0.0.1:${RECEIVER_PORT}/healthz"; then
+            echo "::error::Host receiver did not start"
+            exit 1
+          fi
+
+      - name: Build relay image and attach it to the kind network
+        run: |
+          # The per-run bearer token exists only in this job; it travels to
+          # the relay via an env file, never via command line.
+          TOKEN="$(openssl rand -hex 24)"
+          echo "::add-mask::$TOKEN"
+          echo "TOKEN=$TOKEN" >> /tmp/spike.env
+
+          docker build -f evals/cmd/relay/Dockerfile -t agent-skills-eval-relay:local evals
+
+          cat > /tmp/relay.env <<EOF
+          RELAY_UPSTREAM=http://host.docker.internal:${RECEIVER_PORT}
+          RELAY_BEARER_TOKEN=$TOKEN
+          EOF
+          docker run -d --name spike-relay \
+            --network kind \
+            --add-host host.docker.internal:host-gateway \
+            --env-file /tmp/relay.env \
+            agent-skills-eval-relay:local
+          rm /tmp/relay.env
+
+          RELAY_IP="$(docker inspect -f '{{with index .NetworkSettings.Networks "kind"}}{{.IPAddress}}{{end}}' spike-relay)"
+          if [ -z "$RELAY_IP" ]; then
+            echo "::error::Relay container has no address on the kind Docker network"
+            exit 1
+          fi
+          echo "RELAY_IP=$RELAY_IP" >> "$GITHUB_ENV"
+
+      - name: Send OTLP from a pod through the relay
+        run: |
+          . /tmp/spike.env
+          # The token reaches the pod as a Secret-backed env var, not as a
+          # command-line literal.
+          kubectl create secret generic spike-otlp --from-file=token=<(printf '%s' "$TOKEN")
+
+          # Positive path: authenticated export must succeed end to end. The
+          # token is read from the mounted Secret inside the pod (the \$ is
+          # escaped so the pod shell, not this step, resolves it).
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: otlp-sender
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: sender
+                image: ${CURL_IMAGE}
+                command: ["sh", "-c"]
+                args:
+                  - >-
+                    curl -sf -X POST "http://${RELAY_IP}:4318/v1/traces"
+                    -H "Content-Type: application/json"
+                    -H "Authorization: Bearer \$(cat /spike/token)"
+                    -d '{"resourceSpans":[]}'
+                volumeMounts:
+                  - name: spike-otlp
+                    mountPath: /spike
+                    readOnly: true
+            volumes:
+              - name: spike-otlp
+                secret:
+                  secretName: spike-otlp
+          EOF
+          if ! kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/otlp-sender --timeout=180s; then
+            echo "::error::The OTLP sender pod did not complete an authenticated export through the relay"
+            exit 1
+          fi
+
+          # Negative path: the relay must reject an export without the token.
+          kubectl run otlp-sender-unauth \
+            --image="${CURL_IMAGE}" \
+            --restart=Never \
+            --command -- sh -c "code=\$(curl -s -o /dev/null -w '%{http_code}' -X POST http://${RELAY_IP}:4318/v1/traces -H 'Content-Type: application/json' -d '{}'); echo \"unauthenticated export got HTTP \$code\"; [ \"\$code\" = '401' ]"
+          if ! kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/otlp-sender-unauth --timeout=120s; then
+            echo "::error::The relay accepted (or mishandled) an unauthenticated export"
+            exit 1
+          fi
+
+      - name: Assert receipt at the host receiver
+        run: |
+          for _ in $(seq 1 30); do
+            if grep -q "POST /v1/traces" /tmp/receiver.log; then
+              echo "Bridge validated: pod -> kind-network relay -> host-gateway -> host receiver."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::No OTLP request reached the host receiver through the relay; the Docker-network route failed. Fall back to kind extraPortMappings + NodePort (see evals/fixtures/k8s/kind-config.yaml) and record the outcome in the plan."
+          exit 1
+
+      - name: Dump diagnostics
+        if: failure()
+        run: |
+          echo "--- receiver log ---"; cat /tmp/receiver.log || true
+          echo "--- receiver stdout ---"; cat /tmp/receiver-stdout.log || true
+          echo "--- relay logs ---"; docker logs spike-relay || true
+          echo "--- kind network ---"; docker network inspect kind || true
+          echo "--- pods ---"; kubectl get pods -A -o wide || true
+          kubectl describe pod otlp-sender || true
+          kubectl logs otlp-sender || true
+          kubectl logs otlp-sender-unauth || true
+
+  dash0-operator-placeholder:
+    name: "Spike 2: Dash0 operator export attempts with a placeholder token"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Create kind cluster
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_NODE_IMAGE }}
+          cluster_name: agent-skills-evals
+          config: evals/fixtures/k8s/kind-config.yaml
+
+      - name: Start host OTLP receiver
+        run: |
+          cat > /tmp/receiver.py <<'EOF'
+          import http.server
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get("Content-Length") or 0)
+                  self.rfile.read(length)
+                  with open("/tmp/receiver.log", "a") as f:
+                      f.write("POST %s\n" % self.path)
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.end_headers()
+                  self.wfile.write(b"{}")
+
+              def log_message(self, *args):
+                  pass
+
+          http.server.ThreadingHTTPServer(("0.0.0.0", ${{ env.RECEIVER_PORT }}), Handler).serve_forever()
+          EOF
+          touch /tmp/receiver.log
+          nohup python3 /tmp/receiver.py > /tmp/receiver-stdout.log 2>&1 &
+          sleep 2
+
+      - name: Build relay image and attach it to the kind network
+        run: |
+          TOKEN="$(openssl rand -hex 24)"
+          echo "::add-mask::$TOKEN"
+          echo "TOKEN=$TOKEN" >> /tmp/spike.env
+
+          docker build -f evals/cmd/relay/Dockerfile -t agent-skills-eval-relay:local evals
+
+          cat > /tmp/relay.env <<EOF
+          RELAY_UPSTREAM=http://host.docker.internal:${RECEIVER_PORT}
+          RELAY_BEARER_TOKEN=$TOKEN
+          EOF
+          docker run -d --name spike-relay \
+            --network kind \
+            --add-host host.docker.internal:host-gateway \
+            --env-file /tmp/relay.env \
+            agent-skills-eval-relay:local
+          rm /tmp/relay.env
+
+          RELAY_IP="$(docker inspect -f '{{with index .NetworkSettings.Networks "kind"}}{{.IPAddress}}{{end}}' spike-relay)"
+          if [ -z "$RELAY_IP" ]; then
+            echo "::error::Relay container has no address on the kind Docker network"
+            exit 1
+          fi
+          echo "RELAY_IP=$RELAY_IP" >> "$GITHUB_ENV"
+
+      - name: Install the Dash0 operator with the placeholder token
+        run: |
+          . /tmp/spike.env
+          helm repo add dash0-operator https://dash0hq.github.io/dash0-operator
+          helm repo update dash0-operator
+
+          kubectl create namespace dash0-system
+          # The placeholder token (the relay's bearer token, so export
+          # attempts authenticate and become observable) is injected at run
+          # time only; it is never committed anywhere.
+          kubectl create secret generic dash0-credentials \
+            --namespace dash0-system \
+            --from-file=auth-token=<(printf '%s' "$TOKEN")
+
+          # Explicit http:// scheme: the relay speaks plaintext gRPC. This
+          # step is exactly the behavior check the k8s-deploy-dash0-operator
+          # scenario depends on.
+          helm install \
+            --wait --timeout 10m \
+            --namespace dash0-system \
+            --version "${DASH0_OPERATOR_CHART_VERSION}" \
+            --set operator.dash0Export.enabled=true \
+            --set "operator.dash0Export.endpoint=http://${RELAY_IP}:4317" \
+            --set operator.dash0Export.secretRef.name=dash0-credentials \
+            --set operator.dash0Export.secretRef.key=auth-token \
+            --set operator.clusterName=agent-skills-evals-spike \
+            dash0-operator \
+            dash0-operator/dash0-operator
+
+      - name: Assert the operator's collectors attempt export at the relay
+        run: |
+          # Kubernetes infrastructure metrics collection is enabled by
+          # default, so export attempts must show up without any workload.
+          for _ in $(seq 1 90); do
+            if grep -q "POST /v1/" /tmp/receiver.log; then
+              echo "Dash0 operator export attempts reached the relay with the placeholder token:"
+              sort -u /tmp/receiver.log
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::No export attempt from the Dash0 operator reached the relay within the timeout; the k8s-deploy-dash0-operator scenario assumptions do not hold. Record the outcome in the plan."
+          exit 1
+
+      - name: Dump diagnostics
+        if: failure()
+        run: |
+          echo "--- receiver log ---"; cat /tmp/receiver.log || true
+          echo "--- receiver stdout ---"; cat /tmp/receiver-stdout.log || true
+          echo "--- relay logs ---"; docker logs spike-relay || true
+          echo "--- kind network ---"; docker network inspect kind || true
+          echo "--- dash0-system pods ---"; kubectl get pods -n dash0-system -o wide || true
+          kubectl logs -n dash0-system -l app.kubernetes.io/part-of=dash0-operator --tail=200 || true
+          kubectl get dash0operatorconfigurations -o yaml || true

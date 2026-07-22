@@ -1,3 +1,16 @@
+# Dependency update policy.
+#
+# Fixture and eval-module updates are grouped into 1 PR per ecosystem on a
+# monthly schedule to bound maintenance load (plan requirement R9). Dependabot
+# PRs run only the deterministic CI layers (example validation, fixture
+# builds) per R14; agent-scenario breakage from a dependency bump is caught by
+# the nightly full-matrix run.
+#
+# The fixture entries use the glob "/evals/fixtures/*" so fixtures added
+# later (U4) are picked up without config changes. Globs that currently match
+# no directory containing a manifest for the ecosystem are a no-op; GitHub
+# does not document this behavior explicitly, so check the Dependabot job
+# logs after adding a new fixture ecosystem.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -6,3 +19,113 @@ updates:
       interval: "monthly"
     cooldown:
       default-days: 7
+
+  # Eval harness module plus the Go fixture.
+  - package-ecosystem: "gomod"
+    directories:
+      - "/evals"
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"
+
+  # Node.js fixture today; the nextjs and browser fixtures when U4 lands.
+  - package-ecosystem: "npm"
+    directories:
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"
+
+  # The entries below activate when the matching U4 fixture directory lands.
+  - package-ecosystem: "pip"
+    directories:
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "maven"
+    directories:
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "bundler"
+    directories:
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "composer"
+    directories:
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "nuget"
+    directories:
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"
+
+  # sbt supports version updates only (no security updates); see the GitHub
+  # changelog entry of 2026-05-26 announcing sbt support.
+  - package-ecosystem: "sbt"
+    directories:
+      - "/evals/fixtures/*"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      fixtures:
+        patterns:
+          - "*"

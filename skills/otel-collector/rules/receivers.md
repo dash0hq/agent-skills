@@ -147,12 +147,12 @@ receivers:
               action: replace
               target_label: __address__
               regex: (.+)
-              replacement: "${1}:${2}"
+              replacement: "$${1}:$${2}"
             - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
               action: replace
               target_label: __address__
               regex: "(.+);(.+)"
-              replacement: "${1}:${2}"
+              replacement: "$${1}:$${2}"
 ```
 
 ### Metric relabeling

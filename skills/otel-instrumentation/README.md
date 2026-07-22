@@ -4,6 +4,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 
 ## Structure
 
+<!-- eval:skip -->
 ```
 otel-instrumentation/
 ├── SKILL.md              # Skill manifest and entry point
@@ -57,6 +58,7 @@ The skill activates automatically when working on observability tasks.
 
 Each rule follows a consistent format:
 
+<!-- eval:skip -->
 ```yaml
 ---
 title: "Rule Title"

@@ -1,0 +1,19 @@
+<!doctype html>
+<!--
+  Eval fixture: deliberately uninstrumented static page (see
+  evals/fixtures/README.md). On load, app.js fetches the synthetic checkout
+  data (order TEST-0001 for user@example.test) from /checkout-data.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>browser-service</title>
+    <script src="/env.js"></script>
+  </head>
+  <body>
+    <h1>Checkout</h1>
+    <p>Order <code>TEST-0001</code> for <code>user@example.test</code>.</p>
+    <pre id="checkout-result">loading…</pre>
+    <script src="/app.js"></script>
+  </body>
+</html>

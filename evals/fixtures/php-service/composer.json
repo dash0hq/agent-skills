@@ -1,0 +1,8 @@
+{
+    "name": "eval/php-service",
+    "description": "Eval fixture: deliberately uninstrumented PHP HTTP service (see evals/fixtures/README.md).",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.3"
+    }
+}

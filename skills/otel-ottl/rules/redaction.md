@@ -39,4 +39,19 @@ processors:
 Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters.
 See [processor ordering](../../otel-collector/rules/processors.md#processor-ordering) for the full ordering guidance.
 
+## Sensitive application-level data
+
 See the [sensitive data](../../otel-instrumentation/rules/sensitive-data.md) rule for application-level sanitization.
+
+## Never redact service identity
+
+Never `delete_key`, `replace_pattern`, `SHA256`, or `set` attributes in the `service.*` namespace, see [service identity](../../otel-instrumentation/rules/resources.md#service-identity).
+
+```
+# BAD — redacts service identity
+delete_key(resource.attributes, "service.instance.id")
+set(resource.attributes["service.name"], "REDACTED")
+set(resource.attributes["service.version"], SHA256(resource.attributes["service.version"]))
+```
+
+If a service identity value is genuinely sensitive (e.g., leaks an internal codename), rename the value at the source — the SDK configuration or deployment manifest — not in the Collector.

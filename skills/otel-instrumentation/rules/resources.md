@@ -16,7 +16,36 @@ Getting them right is the single highest-impact thing you can do for observabili
 
 For guidance on *where* to place attributes across telemetry levels, see [attributes](../../otel-semantic-conventions/rules/attributes.md).
 
-## Required attributes
+## Service identity
+
+Three resource attributes together form the *service identity* of every telemetry record, written `[service.namespace] <service.name> [service.instance.id]` (angle brackets denote always-required attributes, square brackets denote attributes required whenever the deployment target contains their concept — multiple products sharing a backend, or multiple instances of the same service).
+The recommended `service.version` provides important context for troubleshooting.
+
+| Attribute | Value lifecycle | Where to set |
+|-----------|-----------------|--------------|
+| [`service.name`](#servicename) | Same across environments and instances | Application code, shared `.env` file, or deployment descriptor |
+| [`service.namespace`](#servicenamespace) | Same across environments and instances | Application code or shared `.env` file |
+| [`service.version`](#serviceversion) | Changes per release | Build pipeline (git tag, CI build number) |
+| [`service.instance.id`](#serviceinstanceid) | Changes per instance | Generated at process startup or injected from the deployment platform |
+
+Treat the four attributes as a single unit.
+The following rules apply in every skill (instrumentation, Collector, OTTL) and to every configuration surface (SDK, deployment manifests, Collector processors, connectors, and exporters):
+
+1. **Set every applicable identity attribute together.**
+   When configuring instrumentation, resolve and set all four attributes that apply to the deployment target — do not set `service.name` alone.
+   See [resolving configuration values](./resolve-values.md#service-identity) for the ordered lookup strategy per attribute.
+2. **Preserve identity attributes end-to-end.**
+   Do not drop, replace, mask, hash, or redact any identity attribute in Collector processors, OTTL statements, filter rules, sampling policies, or exporter transformations.
+   Even for sensitive-data pipelines, identity attributes stay intact — see [OTTL redaction rules](../../otel-ottl/rules/redaction.md).
+3. **Do not overwrite SDK-set identity in the Collector.**
+   In the `resource` processor, never use `action: upsert` or `action: update` on an identity attribute.
+   Use `action: insert` so SDK-set values win.
+   See [resource processor guidance](../../otel-collector/rules/processors.md#resource-processor).
+4. **Propagate identity to derived telemetry.**
+   When deriving metrics from spans (e.g., `signaltometricsconnector`) or fanning telemetry to secondary pipelines, include every identity attribute in `include_resource_attributes` so downstream users can filter by namespace, version, and instance.
+   See [RED metrics from traces](../../otel-collector/rules/red-metrics.md#resource-attributes).
+5. **Verify all four whenever one changes.**
+   Any edit that touches a service identity attribute (SDK config, `OTEL_RESOURCE_ATTRIBUTES`, Collector processor, OTTL statement) must be checked against the remaining three — they must all still be populated on the resulting telemetry.
 
 ### `service.name`
 
@@ -41,8 +70,6 @@ Choose a name that is:
 
 Pick a naming convention (kebab-case, snake_case, or camelCase) and apply it consistently across the entire service fleet.
 
-## Recommended attributes
-
 ### `service.namespace`
 
 Groups related services within the same application or product.
@@ -56,6 +83,31 @@ Without a namespace, identically named services across different products become
 
 > [!NOTE]
 > The value of `service.namespace` is the same in every environment and instance — set it in application code or a shared `.env` file, like `service.name`.
+
+### `service.version`
+
+Set the service version to enable deployment tracking, regression detection, and version-aware analysis.
+This attribute is invaluable during rollouts to compare how the new version and the old one behave.
+
+```bash
+export OTEL_RESOURCE_ATTRIBUTES="service.version=1.4.2"
+```
+
+See [resolving configuration values](./resolve-values.md#serviceversion) for ordered lookup strategies to find the version value.
+
+### `service.instance.id`
+
+Uniquely identifies a single instance of the service.
+The triplet (`service.namespace`, `service.name`, `service.instance.id`) must be globally unique.
+Without it, instance-level analysis (e.g., identifying a single unhealthy pod) is not possible.
+
+The value must be stable for the lifetime of the process and should be an opaque identifier — do not expose infrastructure details like pod names or container IDs directly.
+See [resolving configuration values](./resolve-values.md#serviceinstanceid) for generation strategies (UUID v4, UUID v5, and common pitfalls).
+
+Setting `service.instance.id` does not replace the need to also set `k8s.pod.uid` in Kubernetes.
+Both attributes serve different purposes: `service.instance.id` is a logical, opaque identifier, while `k8s.pod.uid` is used by the `k8sattributes` processor for Kubernetes metadata enrichment.
+
+## Other recommended resource attributes
 
 ### `deployment.environment.name`
 
@@ -71,34 +123,28 @@ export OTEL_RESOURCE_ATTRIBUTES="deployment.environment.name=production"
 
 See [resolving configuration values](./resolve-values.md#deploymentenvironmentname) for ordered lookup strategies.
 
-### `service.version`
+### `service.criticality`
 
-Set the service version to enable deployment tracking, regression detection, and version-aware analysis.
-This attribute is invaluable during rollouts to compare how the new version and the old one behave.
+Ranks how business-critical the service is, so alert routing, on-call escalation, and dashboards can prioritize incidents by impact.
+
+Set exactly one of the following enumerated values:
+
+| Value | Meaning |
+|-------|---------|
+| `critical` | Outage causes immediate customer-visible impact, revenue loss, or safety concerns (e.g., checkout, payment, auth). |
+| `high` | Outage causes noticeable customer-facing degradation but not full unavailability (e.g., recommendations, search). |
+| `medium` | Internal function or supporting service; outage tolerable for hours (e.g., admin tooling, batch reporting). |
+| `low` | Experimental, sandbox, or non-production functionality; no SLA. |
 
 ```bash
-export OTEL_RESOURCE_ATTRIBUTES="service.version=1.4.2"
+export OTEL_RESOURCE_ATTRIBUTES="service.criticality=critical"
 ```
 
-> [!NOTE]
-> The value of `service.version` changes per release — derive it from the build pipeline (e.g., git tag, CI build number), never hardcode it in application code.
+The value is set by the owning team and does not change across environments — set it in application code or a shared `.env` file.
 
-See [resolving configuration values](./resolve-values.md#serviceversion) for ordered lookup strategies to find the version value.
-
-### `service.instance.id`
-
-Uniquely identifies a single instance of the service.
-The triplet (`service.namespace`, `service.name`, `service.instance.id`) must be globally unique.
-Without it, instance-level analysis (e.g., identifying a single unhealthy pod) is not possible.
-
-> [!NOTE]
-> The value of `service.instance.id` changes per instance — generate it at startup (e.g., UUID v4) or inject it from the deployment platform (e.g., Kubernetes downward API), never hardcode it in application code.
-
-It must be stable for the lifetime of the process and should be an opaque identifier — do not expose infrastructure details like pod names or container IDs directly.
-See [resolving configuration values](./resolve-values.md#serviceinstanceid) for generation strategies (UUID v4, UUID v5, and common pitfalls).
-
-Setting `service.instance.id` does not replace the need to also set `k8s.pod.uid` in Kubernetes.
-Both attributes serve different purposes: `service.instance.id` is a logical, opaque identifier, while `k8s.pod.uid` is used by the `k8sattributes` processor for Kubernetes metadata enrichment.
+**Agents must ask the user for `service.criticality`.**
+Do not infer it from the codebase, service name, or heuristics — misclassification silently distorts alerting and on-call priority.
+See [resolving `service.criticality`](./resolve-values.md#servicecriticality) for the ordered lookup strategy.
 
 ### Kubernetes attributes
 
@@ -128,10 +174,9 @@ export OTEL_RESOURCE_ATTRIBUTES="service.version=1.4.2,deployment.environment.na
 ### Complete `.env.local` example
 
 This example is suitable for local development.
-Application-identity attributes are set directly; deployment-context attributes use placeholder values that the deployment pipeline would replace in production.
+In a production deployment descriptor (e.g., Kubernetes manifest, Docker Compose, or CI/CD pipeline), override `service.version` and `deployment.environment.name` with values derived from the build and deployment pipeline.
 
 ```bash
-# Application-identity attributes (same in every environment)
 OTEL_SERVICE_NAME=order-api
 OTEL_RESOURCE_ATTRIBUTES=service.namespace=acme-webstore,service.version=local-dev,deployment.environment.name=development
 
@@ -143,22 +188,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 NODE_OPTIONS=--import @opentelemetry/auto-instrumentations-node/register
 ```
-
-In a production deployment descriptor (e.g., Kubernetes manifest, Docker Compose, or CI/CD pipeline), override `service.version` and `deployment.environment.name` with values derived from the build and deployment pipeline.
-
-## Anti-patterns
-
-- **Missing `service.name`.**
-  Telemetry appears as `unknown_service` and cannot be attributed in service maps, dashboards, or alerts.
-- **Inconsistent `service.name` casing across environments.**
-  Variations like `checkout` vs `Checkout` create duplicate entries in service maps and break cross-environment queries.
-- **Same `service.instance.id` across multiple pods.**
-  Instance-level queries return aggregated data from all pods instead of a single instance.
-- **Hardcoded `service.version`.**
-  Falls out of sync after the first deployment.
-  Derive it from the build pipeline, git tags, or commit SHAs.
-- **Missing `deployment.environment.name`.**
-  Production and staging telemetry are mixed, making dashboards and alerts unreliable.
 
 ## References
 

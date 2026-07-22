@@ -13,7 +13,8 @@ tags:
 OpenTelemetry-instrumented applications running in Kubernetes need pod metadata injected as resource attributes for proper contextualization of traces, metrics, and logs.
 This file covers the pod-spec changes needed for application containers and the Dash0 Kubernetes Operator approach.
 
-For the full list of required and recommended resource attributes (including `service.name`, `service.version`, and `deployment.environment.name`), see [resource attributes](../resources.md).
+For the full list of required and recommended resource attributes (including `service.name`, `service.namespace`, `service.version`, `service.instance.id`, and `deployment.environment.name`), see [resource attributes](../resources.md).
+In Kubernetes, every application pod has more than one instance in aggregate across replicas — always set `service.instance.id` and the other [service identity](../resources.md#service-identity) attributes so telemetry can be attributed to a specific pod.
 
 ## Pod metadata via downward API
 
@@ -51,6 +52,7 @@ Not needed for AWS EKS on Fargate, where each pod runs on a dedicated virtual no
 
 ### Complete pod spec example
 
+<!-- eval:k8s -->
 ```yaml
 spec:
   containers:
@@ -87,8 +89,12 @@ spec:
         - name: OTEL_LOGS_EXPORTER
           value: otlp
         - name: OTEL_RESOURCE_ATTRIBUTES
-          value: "service.version=<service-version or commit sha>,deployment.environment.name=<dev-env>,k8s.pod.uid=$(K8S_POD_UID),k8s.pod.name=$(K8S_POD_NAME),k8s.node.name=$(K8S_NODE_NAME),k8s.container.name=<container-name>"
+          value: "service.namespace=<service-namespace>,service.version=<service-version or commit sha>,service.instance.id=$(K8S_POD_UID),deployment.environment.name=<dev-env>,k8s.pod.uid=$(K8S_POD_UID),k8s.pod.name=$(K8S_POD_NAME),k8s.node.name=$(K8S_NODE_NAME),k8s.container.name=<container-name>"
 ```
+
+The value of `service.instance.id` is set to the pod UID via the downward API so it is unique across pods and stable for the lifetime of the process.
+This is the deterministic strategy referenced in [resolving `service.instance.id`](../resolve-values.md#serviceinstanceid); when pods run multiple worker processes in one container, generate a UUID v5 seeded on the pod UID and the worker index instead so each worker has its own identifier.
+Setting `service.instance.id` does not remove the need for `k8s.pod.uid` — both must be set (see [`service.instance.id`](../resources.md#serviceinstanceid)).
 
 Set `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, and `OTEL_LOGS_EXPORTER` to `otlp` explicitly.
 Supported values are `otlp`, `console`, and `none`.
@@ -125,6 +131,9 @@ When the Dash0 Kubernetes Operator manages the workload, skip the manual downwar
 - **Missing downward API environment variables.**
   Without `k8s.pod.uid` in `OTEL_RESOURCE_ATTRIBUTES`, the Collector's `k8sattributes` processor falls back to unreliable connection-IP matching.
   Always expose pod metadata via the downward API and pass it to the SDK.
+- **Omitting `service.instance.id` in Kubernetes pods.**
+  Multiple pod replicas share the same `service.name`, `service.namespace`, and `service.version`, so instance-level analysis is impossible without `service.instance.id`.
+  Derive it from the pod UID via the downward API — see the [service identity](../resources.md#service-identity) rule.
 
 ## References
 

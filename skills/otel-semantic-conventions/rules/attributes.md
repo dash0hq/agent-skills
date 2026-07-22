@@ -62,11 +62,14 @@ Wrong attributes — or attributes at the wrong level — make telemetry unquery
 
 ### Must-have resource attributes
 
+See the [service identity](../../otel-instrumentation/rules/resources.md#service-identity) rule for the applicability, preservation, and propagation rules that apply to all `service.*` attributes.
+
 | Attribute | Type | Why |
 |---|---|---|
 | `service.name` | string | **Required.** Identifies the service. Without it, telemetry is unattributable. Falls back to `unknown_service` if not set. |
+| `service.namespace` | string | Scopes services across products, teams, or organizations sharing the backend. Required when identically named services exist in the same backend. |
 | `service.version` | string | Enables version-aware analysis, deployment tracking, and regression detection. |
-| `service.instance.id` | string | Uniquely identifies the service instance (e.g., pod). Must be unique across all instances sharing the same `service.name`. |
+| `service.instance.id` | string | Uniquely identifies the service instance (e.g., pod). Must be unique across all instances sharing the same `service.name`. Required in multi-instance deployments (Kubernetes, autoscaling groups). |
 | `deployment.environment.name` | string | Distinguishes production from staging/dev. Previously `deployment.environment`. |
 | `k8s.pod.uid` | string | **Required for Kubernetes workloads.** Enables telemetry correlation via the `k8sattributes` processor. Prefer over `k8s.pod.ip`, which breaks with service meshes (Istio, and Linkerd). |
 

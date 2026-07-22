@@ -327,6 +327,7 @@ The annotation value follows the same pattern as the sidecar annotation: `"true"
 
 For multi-container pods, use the `instrumentation.opentelemetry.io/container-names` annotation to target specific containers:
 
+<!-- eval:k8s -->
 ```yaml
 annotations:
   instrumentation.opentelemetry.io/inject-java: "true"

@@ -67,6 +67,9 @@ type DockerFixture struct {
 	// evalsDir is the absolute path of the evals/ module root, the build
 	// context for the relay and helper images.
 	evalsDir string
+	// t is used only for diagnostic logging (container logs on a delivery
+	// stall); never for assertions.
+	t testingT
 
 	mu           sync.Mutex
 	currentImage string
@@ -87,7 +90,7 @@ type testingT interface {
 // when the test finishes.
 func NewDockerFixture(t testingT, evalsDir string) *DockerFixture {
 	t.Helper()
-	d := &DockerFixture{evalsDir: evalsDir}
+	d := &DockerFixture{evalsDir: evalsDir, t: t}
 	t.Cleanup(d.Close)
 	return d
 }
@@ -137,6 +140,12 @@ type containerTopology struct {
 	// appName is the fixture container's name, used to attach its logs to a
 	// traffic-driver failure.
 	appName string
+	// relayName is the sink relay container's name, used for delivery
+	// diagnostics.
+	relayName string
+	// sinkDir is the host directory the sink relay writes into (mounted at
+	// /out in the relay), read for the delivery-stall diagnostic.
+	sinkDir string
 }
 
 // buildContainerTopology starts the container topology shared by every
@@ -226,7 +235,7 @@ func (d *DockerFixture) buildContainerTopology(ctx context.Context, image string
 	}
 	d.addCleanup(func() { _, _ = docker(context.Background(), "rm", "-f", appName) })
 
-	return containerTopology{network: network, appName: appName}, nil
+	return containerTopology{network: network, appName: appName, relayName: relayName, sinkDir: sinkDir}, nil
 }
 
 // run starts the container topology for one attempt and drives traffic at the
@@ -256,7 +265,50 @@ func (d *DockerFixture) run(ctx context.Context, _ string, env map[string]string
 		logs, _ := docker(context.Background(), "logs", topo.appName)
 		return fmt.Errorf("traffic driver failed against %s: %w\n%s\nfixture logs:\n%s", checkoutURL, err, out, logs)
 	}
+	d.diagnoseDeliveryStall(ctx, topo)
 	return nil
+}
+
+// diagnoseDeliveryStall gives batched exporters a short window to deliver and,
+// if nothing lands in the sink dir, dumps the fixture and sink-relay container
+// logs plus the relay's state and the sink dir listing. This surfaces why
+// container-to-container OTLP delivery stalled (fixture export error, relay
+// auth rejection, relay write/permission failure) directly in the CI job log,
+// where the containers are otherwise torn down before they can be inspected.
+func (d *DockerFixture) diagnoseDeliveryStall(ctx context.Context, topo containerTopology) {
+	if d.t == nil || topo.sinkDir == "" {
+		return
+	}
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		if entries, _ := filepath.Glob(filepath.Join(topo.sinkDir, "*.jsonl")); len(entries) > 0 {
+			return // telemetry is arriving; no stall to diagnose
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Second):
+		}
+	}
+	var listing strings.Builder
+	if entries, err := os.ReadDir(topo.sinkDir); err != nil {
+		fmt.Fprintf(&listing, "  (read error: %v)", err)
+	} else if len(entries) == 0 {
+		listing.WriteString("  (empty)")
+	} else {
+		for _, e := range entries {
+			if info, ierr := e.Info(); ierr == nil {
+				fmt.Fprintf(&listing, "  %s (%d bytes, mode %s)\n", e.Name(), info.Size(), info.Mode())
+			} else {
+				fmt.Fprintf(&listing, "  %s\n", e.Name())
+			}
+		}
+	}
+	relayLogs, _ := docker(context.Background(), "logs", topo.relayName)
+	appLogs, _ := docker(context.Background(), "logs", topo.appName)
+	state, _ := docker(context.Background(), "inspect", "-f", "{{.State.Status}} exit={{.State.ExitCode}}", topo.relayName)
+	d.t.Logf("delivery-stall diagnostic: no telemetry in the sink dir after traffic.\nrelay state: %s\nhost-side sink dir listing (%s):\n%s\nsink relay logs:\n%s\nfixture logs:\n%s",
+		strings.TrimSpace(state), topo.sinkDir, listing.String(), relayLogs, appLogs)
 }
 
 // ensureInfraImages builds the relay and helper images once per fixture.

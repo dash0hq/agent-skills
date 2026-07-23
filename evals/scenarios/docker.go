@@ -22,6 +22,9 @@ import (
 const (
 	relayImage  = "agent-skills-eval-relay:local"
 	helperImage = "agent-skills-eval-helper:local"
+	// curlImage is used only by the delivery-stall diagnostic to probe the
+	// relay directly from the internal network.
+	curlImage = "curlimages/curl:8.17.0"
 )
 
 // Container topology constants: aliases on the internal fixture network and
@@ -265,7 +268,7 @@ func (d *DockerFixture) run(ctx context.Context, _ string, env map[string]string
 		logs, _ := docker(context.Background(), "logs", topo.appName)
 		return fmt.Errorf("traffic driver failed against %s: %w\n%s\nfixture logs:\n%s", checkoutURL, err, out, logs)
 	}
-	d.diagnoseDeliveryStall(ctx, topo)
+	d.diagnoseDeliveryStall(ctx, topo, env[harness.EnvOTLPToken])
 	return nil
 }
 
@@ -275,7 +278,7 @@ func (d *DockerFixture) run(ctx context.Context, _ string, env map[string]string
 // container-to-container OTLP delivery stalled (fixture export error, relay
 // auth rejection, relay write/permission failure) directly in the CI job log,
 // where the containers are otherwise torn down before they can be inspected.
-func (d *DockerFixture) diagnoseDeliveryStall(ctx context.Context, topo containerTopology) {
+func (d *DockerFixture) diagnoseDeliveryStall(ctx context.Context, topo containerTopology, token string) {
 	if d.t == nil || topo.sinkDir == "" {
 		return
 	}
@@ -307,8 +310,46 @@ func (d *DockerFixture) diagnoseDeliveryStall(ctx context.Context, topo containe
 	relayLogs, _ := docker(context.Background(), "logs", topo.relayName)
 	appLogs, _ := docker(context.Background(), "logs", topo.appName)
 	state, _ := docker(context.Background(), "inspect", "-f", "{{.State.Status}} exit={{.State.ExitCode}}", topo.relayName)
-	d.t.Logf("delivery-stall diagnostic: no telemetry in the sink dir after traffic.\nrelay state: %s\nhost-side sink dir listing (%s):\n%s\nsink relay logs:\n%s\nfixture logs:\n%s",
-		strings.TrimSpace(state), topo.sinkDir, listing.String(), relayLogs, appLogs)
+
+	// The fixture's OTLP env: confirms it is pointed at the relay alias.
+	envOut, _ := docker(context.Background(), "inspect", "-f", "{{range .Config.Env}}{{println .}}{{end}}", topo.appName)
+	var otelEnv strings.Builder
+	for _, line := range strings.Split(envOut, "\n") {
+		if strings.HasPrefix(line, "OTEL_") {
+			otelEnv.WriteString("  " + line + "\n")
+		}
+	}
+
+	// Direct relay probe from inside the internal network: isolates relay
+	// reachability + alias resolution + auth + write from the fixture's own
+	// export. If this lands in the sink dir, the relay path is sound and the
+	// fixture is not exporting; if it does not, the relay/network path itself
+	// is the fault.
+	probeBody := `{"resourceSpans":[{"resource":{"attributes":[{"key":"test.id","value":{"stringValue":"diag-probe"}}]},"scopeSpans":[{"spans":[{"name":"diag-probe"}]}]}]}`
+	probeURL := fmt.Sprintf("http://%s:%s/v1/traces", relayAlias, relayPort)
+	probeOut, probeErr := docker(context.Background(), "run", "--rm", "--network", topo.network, curlImage,
+		"-sS", "-m", "10", "-o", "/dev/null", "-w", "HTTP %{http_code}",
+		"-X", "POST", probeURL,
+		"-H", "Content-Type: application/json",
+		"-H", "Authorization: Bearer "+token,
+		"-d", probeBody)
+	if probeErr != nil {
+		probeOut = fmt.Sprintf("(probe failed: %v) %s", probeErr, probeOut)
+	}
+	probeLanded := false
+	if entries, _ := filepath.Glob(filepath.Join(topo.sinkDir, "*.jsonl")); len(entries) > 0 {
+		probeLanded = true
+	}
+
+	d.t.Logf("delivery-stall diagnostic: no telemetry in the sink dir after traffic.\n"+
+		"relay state: %s\n"+
+		"fixture OTLP env:\n%s\n"+
+		"direct relay probe (%s): %s -> landed in sink: %t\n"+
+		"host-side sink dir listing (%s):\n%s\n"+
+		"sink relay logs:\n%s\n"+
+		"fixture logs:\n%s",
+		strings.TrimSpace(state), otelEnv.String(), probeURL, strings.TrimSpace(probeOut), probeLanded,
+		topo.sinkDir, listing.String(), relayLogs, appLogs)
 }
 
 // ensureInfraImages builds the relay and helper images once per fixture.

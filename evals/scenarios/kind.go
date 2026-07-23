@@ -11,17 +11,14 @@
 // is addressed by its kind-network IP, discovered via docker inspect and
 // injected into the cluster at run time through the eval-otlp Secret.
 //
-// The relay forwards to the host through host.docker.internal
-// (host-gateway) to a host-side TCP proxy in front of the loopback-bound
-// in-process relay, and requires the per-run bearer token on this
-// cluster-facing path (R21: in-cluster workloads can deliver telemetry only
-// to the token-guarded relay, never to real backends).
-//
-// Fallback, should pod-to-relay-container routing prove broken on a GitHub
-// runner (validated by .github/workflows/evals-spike.yml before scenarios
-// are trusted): reverse the direction with kind extraPortMappings plus a
-// NodePort Service backed by the host relay; the sketch lives in
-// evals/fixtures/k8s/kind-config.yaml.
+// The relay runs in sink mode: it writes every received export to a mounted
+// host directory (the otelsink dir) instead of forwarding to the host, so
+// delivery is container-to-container and needs no route back to the host. It
+// still requires the per-run bearer token on this cluster-facing path (R21:
+// in-cluster workloads can deliver telemetry only to the token-guarded relay,
+// never to real backends). Writing to a mounted volume rather than reaching
+// the host through host.docker.internal / host-gateway is what makes the
+// bridge work on Linux CI runners, where that host hop does not.
 //
 // # Runtime credential injection
 //
@@ -35,7 +32,6 @@ package scenarios
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -145,8 +141,10 @@ func (c *KindCluster) Helm(ctx context.Context, args ...string) (string, error) 
 	return runCmd(ctx, []string{"KUBECONFIG=" + c.Kubeconfig}, "helm", args...)
 }
 
-// kindRelay is the running bridge for one attempt: the relay container on
-// the kind Docker network plus the host-side proxy behind it.
+// kindRelay is the running bridge for one attempt: the OTLP sink relay
+// container on the kind Docker network, writing telemetry to a mounted host
+// directory. In-cluster pods reach it at its network IP; delivery is
+// container-to-container, needing no route back to the host.
 type kindRelay struct {
 	// IP is the relay's address on the kind Docker network; in-cluster
 	// exporters use http://IP:4318 (OTLP/HTTP) or IP:4317 (OTLP/gRPC).
@@ -157,36 +155,28 @@ type kindRelay struct {
 	GRPCEndpoint string
 
 	containerName string
-	closeProxy    func()
 }
 
 // startKindRelay builds the relay image (once per process, via the shared
-// Docker layer cache), starts a host-side proxy in front of the in-process
-// relay at hostRelayEndpoint, and runs the relay container attached to the
-// kind Docker network with the per-run bearer token required on every
-// export. The token travels via an env file, never via command line.
-func startKindRelay(ctx context.Context, evalsDir, hostRelayEndpoint, token string) (*kindRelay, error) {
+// Docker layer cache) and runs it in sink mode on the kind Docker network,
+// writing every received export to the mounted host sinkDir. In-cluster pods
+// deliver OTLP to the relay's network IP; delivery is container-to-container,
+// so no route back to the host is needed. The per-run bearer token is required
+// on every export and travels via an env file, never via command line.
+func startKindRelay(ctx context.Context, evalsDir, sinkDir, token string) (*kindRelay, error) {
 	if out, err := docker(ctx, "build", "-f", filepath.Join(evalsDir, "cmd", "relay", "Dockerfile"),
 		"-t", relayImage, evalsDir); err != nil {
 		return nil, fmt.Errorf("docker build %s: %w\n%s", relayImage, err, out)
 	}
-
-	proxyAddr, closeProxy, err := startHostProxy(hostRelayEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("start host proxy: %w", err)
-	}
-	_, proxyPort, err := net.SplitHostPort(proxyAddr)
-	if err != nil {
-		closeProxy()
-		return nil, fmt.Errorf("parse host proxy address %q: %w", proxyAddr, err)
+	if sinkDir == "" {
+		return nil, fmt.Errorf("startKindRelay: sinkDir is required")
 	}
 
 	envFile, err := writeEnvFile(map[string]string{
-		"RELAY_UPSTREAM":     "http://host.docker.internal:" + proxyPort,
+		"RELAY_SINK_DIR":     "/out",
 		"RELAY_BEARER_TOKEN": token,
 	})
 	if err != nil {
-		closeProxy()
 		return nil, err
 	}
 	defer os.Remove(envFile)
@@ -194,17 +184,18 @@ func startKindRelay(ctx context.Context, evalsDir, hostRelayEndpoint, token stri
 	name := "eval-kind-relay-" + randomSuffix()
 	if out, err := docker(ctx, "run", "-d", "--name", name,
 		"--network", kindNetworkName,
-		"--add-host", "host.docker.internal:host-gateway",
+		// Run as the host user so files written to the mounted sink dir are
+		// owned by (and cleanable by) the test process rather than root.
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"-v", sinkDir+":/out",
 		"--env-file", envFile,
 		relayImage); err != nil {
-		closeProxy()
 		return nil, fmt.Errorf("docker run kind relay: %w\n%s", err, out)
 	}
 
 	ip, err := containerNetworkIP(ctx, name, kindNetworkName)
 	if err != nil {
 		_, _ = docker(context.Background(), "rm", "-f", name)
-		closeProxy()
 		return nil, err
 	}
 	return &kindRelay{
@@ -212,14 +203,12 @@ func startKindRelay(ctx context.Context, evalsDir, hostRelayEndpoint, token stri
 		HTTPEndpoint:  fmt.Sprintf("http://%s:%s", ip, relayPort),
 		GRPCEndpoint:  fmt.Sprintf("%s:4317", ip),
 		containerName: name,
-		closeProxy:    closeProxy,
 	}, nil
 }
 
-// Close removes the relay container and the host-side proxy.
+// Close removes the relay container.
 func (r *kindRelay) Close() {
 	_, _ = docker(context.Background(), "rm", "-f", r.containerName)
-	r.closeProxy()
 }
 
 // containerNetworkIP returns the container's IP address on the named Docker

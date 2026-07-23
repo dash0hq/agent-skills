@@ -408,8 +408,10 @@ func TestKindBridge(t *testing.T) {
 	t.Cleanup(hostRelay.Close)
 	env := harness.FixtureEnv(sink, hostRelay, token)
 
-	// Bridge: relay container on the kind Docker network.
-	relay, err := startKindRelay(ctx, evalsDir, env[harness.EnvOTLPEndpoint], token)
+	// Bridge: sink relay container on the kind Docker network, writing every
+	// received export to the host sink dir (container-to-container delivery,
+	// no host.docker.internal hop).
+	relay, err := startKindRelay(ctx, evalsDir, env[harness.EnvSinkDir], token)
 	require.NoError(t, err)
 	t.Cleanup(relay.Close)
 

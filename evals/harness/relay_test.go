@@ -89,6 +89,35 @@ func TestRelayDecompressesGzipHTTP(t *testing.T) {
 	require.Equal(t, 1, sink.Traces(t).WithName("gzipped-span").Len(), "gzip-compressed export decompressed and forwarded to the sink")
 }
 
+// Sink mode: the relay writes received exports to SinkDir in the exact
+// on-disk format the otelsink query API reads, so containerized fixtures can
+// deliver telemetry to a mounted volume without a container-to-host hop.
+// Pointing the relay's SinkDir at an otelsink's own dir proves the format is
+// byte-compatible: the same Sink that would receive over the wire reads the
+// relay's file writes.
+func TestRelaySinkModeIsReadableByOtelsink(t *testing.T) {
+	sink := otelsink.Start(t)
+	token, err := NewToken()
+	require.NoError(t, err)
+	relay, err := StartRelay(RelayConfig{SinkDir: sink.Dir(), BearerToken: token})
+	require.NoError(t, err)
+	t.Cleanup(relay.Close)
+
+	body, err := proto.Marshal(makeTraceRequest(sink.TestID(), "sink-span", nil))
+	require.NoError(t, err)
+	req, err := http.NewRequest(http.MethodPost, relay.HTTPEndpoint()+"/v1/traces", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	require.Equal(t, 1, sink.Traces(t).WithName("sink-span").Len(), "sink-mode write is read back by the otelsink query API")
+}
+
 func TestRelayRejectsWrongOrMissingToken(t *testing.T) {
 	token, err := NewToken()
 	require.NoError(t, err)

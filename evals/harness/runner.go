@@ -60,6 +60,10 @@ func FixtureEnv(sink *otelsink.Sink, relay *Relay, token string) map[string]stri
 		"OTEL_RESOURCE_ATTRIBUTES":   otelsink.TestIDAttribute + "=" + sink.TestID(),
 		EnvOTLPEndpoint:              relay.HTTPEndpoint(),
 		EnvOTLPToken:                 token,
+		// Host directory the otelsink reads; the Docker topology mounts it
+		// into the in-network sink relay so telemetry is delivered container-
+		// to-container (no host.docker.internal hop).
+		EnvSinkDir: sink.Dir(),
 	}
 }
 

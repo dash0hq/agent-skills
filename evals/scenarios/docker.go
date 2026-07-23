@@ -5,9 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,12 +52,13 @@ func DockerAvailable() bool {
 //   - Build produces an image from the (possibly agent-modified) fixture
 //     workspace; build steps may reach package registries (R21).
 //   - Run creates an internal Docker network whose only members are the
-//     fixture, a stub downstream server, and the containerized OTLP relay
-//     (dual-homed: also on the default bridge with host-gateway access), so
+//     fixture, a stub downstream server, and the containerized OTLP relay, so
 //     the running fixture can reach nothing but the relay (R21). The relay
-//     forwards to the host's in-process relay through a host-side TCP proxy,
-//     re-presenting the per-run bearer token. Traffic is driven at
-//     GET /checkout by a helper container on the internal network.
+//     runs in sink mode, requiring the per-run bearer token and writing every
+//     received export to a mounted host directory (the otelsink dir) — so
+//     delivery is container-to-container and needs no route back to the host
+//     (host.docker.internal does not work on Linux CI runners). Traffic is
+//     driven at GET /checkout by a helper container on the internal network.
 //
 // All created resources are removed by Close, which NewDockerFixture wires to
 // t.Cleanup. Resources of failed attempts stay up until then, so their logs
@@ -158,27 +156,19 @@ func (d *DockerFixture) buildContainerTopology(ctx context.Context, image string
 	}
 	d.addCleanup(func() { _, _ = docker(context.Background(), "network", "rm", network) })
 
-	// Host-side TCP proxy: exposes the loopback-bound in-process relay on
-	// all host interfaces so the container relay can reach it via
-	// host-gateway. Only the token-protected relay is exposed, never the
-	// sink.
-	proxyAddr, closeProxy, err := startHostProxy(env[harness.EnvOTLPEndpoint])
-	if err != nil {
-		return containerTopology{}, fmt.Errorf("start host proxy: %w", err)
+	// In-network OTLP sink relay: on the internal network only (alias
+	// otel-relay), writing every received export to the mounted host sink
+	// directory. Delivery is container-to-container, so it needs no route back
+	// to the host — host.docker.internal / host-gateway does not work on Linux
+	// CI runners, which is why the earlier host-proxy design failed there. The
+	// bearer token travels via an env file, never via the command line.
+	sinkDir := env[harness.EnvSinkDir]
+	if sinkDir == "" {
+		return containerTopology{}, fmt.Errorf("fixture environment missing %s", harness.EnvSinkDir)
 	}
-	d.addCleanup(closeProxy)
-	_, proxyPort, err := net.SplitHostPort(proxyAddr)
-	if err != nil {
-		closeProxy()
-		return containerTopology{}, fmt.Errorf("split proxy address: %w", err)
-	}
-
-	// Dual-homed container relay: default bridge (for the host-gateway
-	// route to the proxy) plus the internal network (alias otel-relay).
-	// The bearer token travels via an env file, never via command line.
 	relayName := "eval-relay-" + suffix
 	relayEnvFile, err := writeEnvFile(map[string]string{
-		"RELAY_UPSTREAM":     "http://host.docker.internal:" + proxyPort,
+		"RELAY_SINK_DIR":     "/out",
 		"RELAY_BEARER_TOKEN": env[harness.EnvOTLPToken],
 	})
 	if err != nil {
@@ -186,15 +176,16 @@ func (d *DockerFixture) buildContainerTopology(ctx context.Context, image string
 	}
 	defer os.Remove(relayEnvFile)
 	if out, err := docker(ctx, "run", "-d", "--name", relayName,
-		"--add-host", "host.docker.internal:host-gateway",
+		"--network", network, "--network-alias", relayAlias,
+		// Run as the host user so files written to the mounted sink dir are
+		// owned by (and cleanable by) the test process rather than root.
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+		"-v", sinkDir+":/out",
 		"--env-file", relayEnvFile,
 		relayImage); err != nil {
-		return containerTopology{}, fmt.Errorf("docker run relay: %w\n%s", err, out)
+		return containerTopology{}, fmt.Errorf("docker run sink relay: %w\n%s", err, out)
 	}
 	d.addCleanup(func() { _, _ = docker(context.Background(), "rm", "-f", relayName) })
-	if out, err := docker(ctx, "network", "connect", "--alias", relayAlias, network, relayName); err != nil {
-		return containerTopology{}, fmt.Errorf("connect relay to the internal network: %w\n%s", err, out)
-	}
 
 	// Stub downstream server the fixture's outbound call targets.
 	downstreamName := "eval-downstream-" + suffix
@@ -317,57 +308,6 @@ func writeEnvFile(env map[string]string) (string, error) {
 		return "", fmt.Errorf("close env file: %w", err)
 	}
 	return f.Name(), nil
-}
-
-// startHostProxy listens on all host interfaces and forwards TCP to the
-// host-local upstream URL (the loopback-bound in-process relay). It returns
-// the listen address and a closer.
-func startHostProxy(upstreamURL string) (string, func(), error) {
-	u, err := url.Parse(upstreamURL)
-	if err != nil {
-		return "", nil, fmt.Errorf("parse upstream %q: %w", upstreamURL, err)
-	}
-	target := u.Host
-	ln, err := net.Listen("tcp", "0.0.0.0:0")
-	if err != nil {
-		return "", nil, fmt.Errorf("listen: %w", err)
-	}
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return // listener closed
-			}
-			go proxyConn(conn, target)
-		}
-	}()
-	return ln.Addr().String(), func() { _ = ln.Close() }, nil
-}
-
-// proxyConn pipes one accepted connection to the target and back.
-func proxyConn(client net.Conn, target string) {
-	defer client.Close()
-	upstream, err := net.DialTimeout("tcp", target, 10*time.Second)
-	if err != nil {
-		return
-	}
-	defer upstream.Close()
-	done := make(chan struct{}, 2)
-	go pipe(upstream, client, done)
-	go pipe(client, upstream, done)
-	// Wait for both directions so the second goroutine cannot outlive the
-	// connection and leak; the channel is buffered at 2 so neither blocks.
-	<-done
-	<-done
-}
-
-// pipe copies src to dst and half-closes the write side when possible.
-func pipe(dst, src net.Conn, done chan<- struct{}) {
-	_, _ = io.Copy(dst, src)
-	if cw, ok := dst.(interface{ CloseWrite() error }); ok {
-		_ = cw.CloseWrite()
-	}
-	done <- struct{}{}
 }
 
 // randomSuffix returns a short random hex string for container, image, and

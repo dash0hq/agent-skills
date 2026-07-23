@@ -11,7 +11,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -22,6 +25,7 @@ import (
 	_ "google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -55,14 +59,25 @@ type RelayConfig struct {
 	GRPCListen string
 	// HTTPListen is the HTTP listen address; empty means "127.0.0.1:0".
 	HTTPListen string
+	// SinkDir, when non-empty, switches the relay into sink mode: instead of
+	// forwarding to Upstream, it appends each received export to
+	// SinkDir/{traces,metrics,logs}.jsonl as one protojson object per line —
+	// the exact on-disk format the otelsink query API reads. This lets the
+	// relay act as an in-network OTLP sink writing to a mounted volume, so
+	// containerized fixtures and kind pods deliver telemetry container-to-
+	// container without a container-to-host hop (host.docker.internal does not
+	// work on Linux CI runners). When set, Upstream is ignored.
+	SinkDir string
 }
 
-// Relay is a dual-homed OTLP receiver-forwarder: it accepts OTLP over gRPC
-// and HTTP/protobuf and forwards the raw export requests to a configurable
-// upstream (the loopback otelsink). Run in-process for host-local scenarios,
-// or as a container (see evals/cmd/relay) attached to both an internal
-// fixture network and a bridge network so restricted fixtures and kind pods
-// can reach the host sink.
+// Relay accepts OTLP over gRPC and HTTP/protobuf, enforces the per-run bearer
+// token, and either forwards each export to a configurable upstream (the
+// loopback otelsink, for host-local scenarios) or, in sink mode (SinkDir set),
+// writes each export to disk in the otelsink JSONL format. Run as a container
+// (see evals/cmd/relay) in sink mode on a fixture or kind Docker network, it
+// receives telemetry from egress-restricted fixtures and kind pods and
+// persists it to a mounted volume the harness reads — container-to-container
+// delivery that needs no route back to the host.
 type Relay struct {
 	cfg        RelayConfig
 	grpcAddr   string
@@ -70,13 +85,19 @@ type Relay struct {
 	grpcServer *grpc.Server
 	httpServer *http.Server
 	client     *http.Client
+	sinkMu     sync.Mutex // serializes sink-mode appends across signals
 }
 
 // StartRelay launches the relay listeners and returns once both accept
 // connections. Call Close to shut it down.
 func StartRelay(cfg RelayConfig) (*Relay, error) {
-	if cfg.Upstream == "" {
-		return nil, fmt.Errorf("relay: Upstream is required")
+	if cfg.Upstream == "" && cfg.SinkDir == "" {
+		return nil, fmt.Errorf("relay: Upstream or SinkDir is required")
+	}
+	if cfg.SinkDir != "" {
+		if err := os.MkdirAll(cfg.SinkDir, 0o755); err != nil {
+			return nil, fmt.Errorf("relay: create sink dir: %w", err)
+		}
 	}
 	if cfg.GRPCListen == "" {
 		cfg.GRPCListen = "127.0.0.1:0"
@@ -215,17 +236,105 @@ func (r *Relay) httpHandler(path string) http.HandlerFunc {
 				return
 			}
 		}
-		code, respBody, contentType, err := r.forward(req.Context(), path, req.Header.Get("Content-Type"), body)
+		contentType := req.Header.Get("Content-Type")
+		if r.cfg.SinkDir != "" {
+			r.httpSink(w, path, contentType, body)
+			return
+		}
+		code, respBody, respContentType, err := r.forward(req.Context(), path, contentType, body)
 		if err != nil {
 			http.Error(w, "upstream unavailable", http.StatusBadGateway)
 			return
 		}
-		if contentType != "" {
-			w.Header().Set("Content-Type", contentType)
+		if respContentType != "" {
+			w.Header().Set("Content-Type", respContentType)
 		}
 		w.WriteHeader(code)
 		_, _ = w.Write(respBody)
 	}
+}
+
+// httpSink decodes an OTLP/HTTP export, appends it to the signal's sink file,
+// and replies with an empty success response in the client's content type
+// (protobuf unless the request was JSON).
+func (r *Relay) httpSink(w http.ResponseWriter, path, contentType string, body []byte) {
+	isJSON := strings.HasPrefix(contentType, "application/json")
+	reqMsg := newSignalRequest(path)
+	var err error
+	if isJSON {
+		err = protojson.Unmarshal(body, reqMsg)
+	} else {
+		err = proto.Unmarshal(body, reqMsg)
+	}
+	if err != nil {
+		http.Error(w, "malformed export request", http.StatusBadRequest)
+		return
+	}
+	if err := r.writeSignal(signalFile[path], reqMsg); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp := newSignalResponse(path)
+	if isJSON {
+		out, _ := protojson.Marshal(resp)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(out)
+		return
+	}
+	out, _ := proto.Marshal(resp)
+	w.Header().Set("Content-Type", "application/x-protobuf")
+	_, _ = w.Write(out)
+}
+
+// --- sink mode ---
+
+// signalFile maps an OTLP/HTTP signal path to its otelsink JSONL file name.
+var signalFile = map[string]string{
+	"/v1/traces":  "traces.jsonl",
+	"/v1/metrics": "metrics.jsonl",
+	"/v1/logs":    "logs.jsonl",
+}
+
+// newSignalRequest returns an empty Export request for a signal path.
+func newSignalRequest(path string) proto.Message {
+	switch path {
+	case "/v1/traces":
+		return &coltracepb.ExportTraceServiceRequest{}
+	case "/v1/metrics":
+		return &colmetricspb.ExportMetricsServiceRequest{}
+	default:
+		return &collogspb.ExportLogsServiceRequest{}
+	}
+}
+
+// newSignalResponse returns an empty Export response for a signal path.
+func newSignalResponse(path string) proto.Message {
+	switch path {
+	case "/v1/traces":
+		return &coltracepb.ExportTraceServiceResponse{}
+	case "/v1/metrics":
+		return &colmetricspb.ExportMetricsServiceResponse{}
+	default:
+		return &collogspb.ExportLogsServiceResponse{}
+	}
+}
+
+// writeSignal appends one export request to its sink file as a single
+// protojson line, matching the otelsink on-disk format its query API reads.
+func (r *Relay) writeSignal(file string, msg proto.Message) error {
+	line, err := protojson.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	r.sinkMu.Lock()
+	defer r.sinkMu.Unlock()
+	f, err := os.OpenFile(filepath.Join(r.cfg.SinkDir, file), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write(append(line, '\n'))
+	return err
 }
 
 // setCORSHeaders answers CORS permissively: any origin may export OTLP/HTTP
@@ -281,6 +390,12 @@ type relayTraceService struct {
 }
 
 func (s *relayTraceService) Export(ctx context.Context, req *coltracepb.ExportTraceServiceRequest) (*coltracepb.ExportTraceServiceResponse, error) {
+	if s.relay.cfg.SinkDir != "" {
+		if err := s.relay.writeSignal("traces.jsonl", req); err != nil {
+			return nil, status.Errorf(codes.Internal, "relay: write: %v", err)
+		}
+		return &coltracepb.ExportTraceServiceResponse{}, nil
+	}
 	if err := s.relay.forwardProto(ctx, "/v1/traces", req); err != nil {
 		return nil, err
 	}
@@ -293,6 +408,12 @@ type relayMetricsService struct {
 }
 
 func (s *relayMetricsService) Export(ctx context.Context, req *colmetricspb.ExportMetricsServiceRequest) (*colmetricspb.ExportMetricsServiceResponse, error) {
+	if s.relay.cfg.SinkDir != "" {
+		if err := s.relay.writeSignal("metrics.jsonl", req); err != nil {
+			return nil, status.Errorf(codes.Internal, "relay: write: %v", err)
+		}
+		return &colmetricspb.ExportMetricsServiceResponse{}, nil
+	}
 	if err := s.relay.forwardProto(ctx, "/v1/metrics", req); err != nil {
 		return nil, err
 	}
@@ -305,6 +426,12 @@ type relayLogsService struct {
 }
 
 func (s *relayLogsService) Export(ctx context.Context, req *collogspb.ExportLogsServiceRequest) (*collogspb.ExportLogsServiceResponse, error) {
+	if s.relay.cfg.SinkDir != "" {
+		if err := s.relay.writeSignal("logs.jsonl", req); err != nil {
+			return nil, status.Errorf(codes.Internal, "relay: write: %v", err)
+		}
+		return &collogspb.ExportLogsServiceResponse{}, nil
+	}
 	if err := s.relay.forwardProto(ctx, "/v1/logs", req); err != nil {
 		return nil, err
 	}

@@ -6,7 +6,10 @@
 //
 // Configuration is environment-driven:
 //
-//	RELAY_UPSTREAM      required; OTLP/HTTP base URL to forward to
+//	RELAY_UPSTREAM      OTLP/HTTP base URL to forward to; required unless
+//	                    RELAY_SINK_DIR is set
+//	RELAY_SINK_DIR      when set, sink mode: write received OTLP to
+//	                    {dir}/{traces,metrics,logs}.jsonl instead of forwarding
 //	RELAY_GRPC_LISTEN   optional; gRPC listen address (default ":4317")
 //	RELAY_HTTP_LISTEN   optional; HTTP listen address (default ":4318")
 //	RELAY_BEARER_TOKEN  optional; when set, required on every export request
@@ -25,12 +28,14 @@ import (
 
 func main() {
 	upstream := os.Getenv("RELAY_UPSTREAM")
-	if upstream == "" {
-		log.Fatal("relay: RELAY_UPSTREAM is required")
+	sinkDir := os.Getenv("RELAY_SINK_DIR")
+	if upstream == "" && sinkDir == "" {
+		log.Fatal("relay: RELAY_UPSTREAM or RELAY_SINK_DIR is required")
 	}
 
 	relay, err := harness.StartRelay(harness.RelayConfig{
 		Upstream:    upstream,
+		SinkDir:     sinkDir,
 		BearerToken: os.Getenv("RELAY_BEARER_TOKEN"), // value must never be logged
 		GRPCListen:  envOr("RELAY_GRPC_LISTEN", ":4317"),
 		HTTPListen:  envOr("RELAY_HTTP_LISTEN", ":4318"),
@@ -40,8 +45,12 @@ func main() {
 	}
 	defer relay.Close()
 
-	log.Printf("relay: forwarding to %s (gRPC %s, HTTP %s, auth %s)",
-		upstream, relay.GRPCEndpoint(), relay.HTTPEndpoint(), authMode())
+	dest := "upstream " + upstream
+	if sinkDir != "" {
+		dest = "sink " + sinkDir
+	}
+	log.Printf("relay: %s (gRPC %s, HTTP %s, auth %s)",
+		dest, relay.GRPCEndpoint(), relay.HTTPEndpoint(), authMode())
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

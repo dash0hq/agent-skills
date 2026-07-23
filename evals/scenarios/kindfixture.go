@@ -167,7 +167,7 @@ func (f *KindFixture) build(ctx context.Context, _ string, _ map[string]string) 
 // run starts the telemetry bridge for the attempt, creates the namespace and
 // runtime Secrets, and dispatches to the scenario-specific deployment.
 func (f *KindFixture) run(ctx context.Context, workdir string, env map[string]string) error {
-	relay, err := startKindRelay(ctx, f.evalsDir, env[harness.EnvOTLPEndpoint], env[harness.EnvOTLPToken])
+	relay, err := startKindRelay(ctx, f.evalsDir, env[harness.EnvSinkDir], env[harness.EnvOTLPToken])
 	if err != nil {
 		return err
 	}

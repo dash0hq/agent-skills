@@ -59,6 +59,12 @@ const (
 	// ${env:EVAL_OTLP_TOKEN}. The value is generated per run and must never
 	// be logged.
 	EnvOTLPToken = "EVAL_OTLP_TOKEN"
+	// EnvSinkDir carries the host directory the otelsink reads, for fixture
+	// hooks that run an in-network sink relay writing telemetry to it (the
+	// Docker topology mounts it into the sink relay container). It is internal
+	// plumbing between the runner and the fixture hooks, never exposed to the
+	// fixture workload itself.
+	EnvSinkDir = "EVAL_SINK_DIR"
 )
 
 // Assertion decides whether the telemetry received by the sink satisfies a

@@ -127,6 +127,15 @@ func (a *Agent) Invoke(ctx context.Context, inv Invocation) (*AgentResult, error
 		// -p (print mode) with --output-format stream-json; without it
 		// the CLI rejects the flag combination.
 		"--verbose",
+		// The agent must edit files and run build tooling autonomously. In
+		// headless -p mode there is no interactive prompt, so without this the
+		// CLI denies Edit/Write/Bash on a clean install and the agent makes no
+		// changes at all — every scenario then fails with no telemetry. (It
+		// only "worked" on a developer machine whose ~/.claude/settings.json
+		// already allowed those tools.) The agent runs against a throwaway
+		// workspace copy with egress restricted to the relay (R21), so
+		// bypassing the prompt here is safe and required for reproducibility.
+		"--dangerously-skip-permissions",
 		"--max-turns", strconv.Itoa(maxTurns),
 		"--model", a.Model,
 	}

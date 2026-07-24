@@ -61,7 +61,7 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: evals/custom/go.mod
           cache-dependency-path: evals/custom/go.sum
@@ -113,7 +113,7 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: evals/custom/go.mod
           cache-dependency-path: evals/custom/go.sum
@@ -192,7 +192,7 @@ jobs:
           ref: ${{ inputs.ref }}
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: evals/custom/go.mod
           cache-dependency-path: evals/custom/go.sum

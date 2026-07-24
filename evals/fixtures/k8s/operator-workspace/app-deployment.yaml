@@ -1,0 +1,48 @@
+# Seed workspace for the k8s-deploy-otel-operator scenario.
+#
+# The agent authors OpenTelemetryCollector and Instrumentation custom
+# resources in this workspace per
+# skills/otel-collector/rules/deployment/opentelemetry-operator.md and
+# annotates this pod template for Node.js auto-instrumentation.
+#
+# The image is the deliberately uninstrumented Node.js checkout service
+# (evals/fixtures/nodejs-service): telemetry appears only when the
+# operator's auto-instrumentation injection works.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-service
+  labels:
+    app.kubernetes.io/name: checkout-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: checkout-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: checkout-service
+    spec:
+      containers:
+        - name: checkout-service
+          image: nodejs-service-eval:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DOWNSTREAM_URL
+              value: http://downstream:9090/inventory
+            # Harness-owned: carries the per-run test.id resource attribute
+            # the eval sink scopes on. This must be a plain value, not a
+            # valueFrom, so the operator's auto-instrumentation webhook can
+            # merge its own k8s.* resource attributes into it; merging a value
+            # into a valueFrom entry produces an env var with both value and
+            # valueFrom, which is an invalid pod spec that the fail-closed
+            # injection webhook rejects. The harness substitutes the per-run
+            # value (carrying test.id) for the placeholder token at apply time.
+            # Keep this entry and the "__EVAL_RESOURCE_ATTRIBUTES__" placeholder
+            # unchanged.
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "__EVAL_RESOURCE_ATTRIBUTES__"

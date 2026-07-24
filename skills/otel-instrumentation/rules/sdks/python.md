@@ -184,6 +184,7 @@ This prints spans, metrics, and logs directly to stdout—useful for verifying i
 
 If you use the default `otlp` exporter but have no collector running, you'll see connection errors. This is expected behavior:
 
+<!-- eval:skip -->
 ```
 Failed to export batch. UNAVAILABLE: failed to connect to all addresses
 ```
@@ -452,6 +453,7 @@ Ensure you are running your application with the `opentelemetry-instrument` comm
 
 ### Connection errors
 
+<!-- eval:skip -->
 ```
 Failed to export batch. UNAVAILABLE: failed to connect to all addresses
 ```

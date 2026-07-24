@@ -1,0 +1,24 @@
+# Quarantined eval scenarios (R16).
+#
+# Scenario IDs listed under `quarantine` are skipped by the PR gate: they do
+# not run and cannot block merges. Nightly runs still execute and report them,
+# so recovery is observable. Add an entry with the scenario ID, the date, and
+# a link to the tracking issue; remove the entry once the scenario is stable
+# again.
+#
+# Example:
+#   quarantine:
+#     - id: browser-http-basic
+#       since: 2026-07-17
+#       issue: https://github.com/dash0hq/agent-skills/issues/123
+#
+# History:
+#   - instr-go-logs was un-quarantined on 2026-07-21: real runs show it passes
+#     (the agent wires the slog->OTLP bridge itself).
+#   - instr-dotnet-nuget was un-quarantined on 2026-07-22: three consecutive
+#     real runs pass cleanly with no flake (the agent installs the NuGet
+#     packages and wires the instrumentation itself). Any remaining skill-doc
+#     gap for the .NET NuGet install path is tracked in TODO.md separately.
+#
+# No scenarios are currently quarantined.
+quarantine: []

@@ -283,6 +283,7 @@ This prints spans and metrics directly to stdout—useful for verifying instrume
 If you configure the gRPC exporter but have no collector running, you will see connection errors.
 This is expected behavior:
 
+<!-- eval:skip -->
 ```
 rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:4317: connect: connection refused"
 ```
@@ -770,6 +771,7 @@ Use Go's standard `log` package to verify that spans are created and exported.
 
 ### Connection refused errors
 
+<!-- eval:skip -->
 ```
 rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:4317: connect: connection refused"
 ```

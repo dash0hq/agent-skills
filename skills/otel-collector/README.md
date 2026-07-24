@@ -4,6 +4,7 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 
 ## Structure
 
+<!-- eval:skip -->
 ```
 otel-collector/
 ├── SKILL.md              # Skill manifest and entry point

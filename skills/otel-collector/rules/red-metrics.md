@@ -230,6 +230,7 @@ connectors:
 Use explicit-bucket histograms only when the backend does not support exponential histograms (e.g., when exporting to Prometheus via `prometheusremotewrite`).
 Replace the `exponential_histogram` block with a `histogram` block using the bucket boundaries from the semantic conventions:
 
+<!-- eval:skip -->
 ```yaml
         histogram:
           buckets: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10]

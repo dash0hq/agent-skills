@@ -1,7 +1,23 @@
 .claude
 
+# Slash-less patterns match at any depth, so these also cover fixture
+# directories under evals/fixtures/.
 node_modules
 dist
 
 .env*
+# Keep the committed template that documents the local .env format.
+!.env.example
 .next
+
+# Go test and coverage artifacts of the evals module.
+evals/**/*.test
+evals/**/coverage.out
+evals/**/*.coverprofile
+evals/**/bin/
+
+# Fixture build artifacts by ecosystem: .NET (bin/ is covered above, obj/
+# here), Java and Scala (target/), and PHP Composer (vendor/).
+evals/fixtures/*/obj/
+evals/fixtures/*/target/
+evals/fixtures/*/vendor/

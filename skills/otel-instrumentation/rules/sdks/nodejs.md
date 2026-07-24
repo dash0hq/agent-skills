@@ -206,6 +206,7 @@ This prints spans, metrics, and logs directly to stdout—useful for verifying i
 
 If you set `OTEL_TRACES_EXPORTER=otlp` but have no collector running, you'll see connection errors. This is expected behavior:
 
+<!-- eval:skip -->
 ```
 Error: 14 UNAVAILABLE: No connection established. Last error: connect ECONNREFUSED 127.0.0.1:4317
 ```
@@ -500,6 +501,7 @@ echo $NODE_OPTIONS  # Should contain --import or --require
 
 ### ECONNREFUSED errors
 
+<!-- eval:skip -->
 ```
 Error: 14 UNAVAILABLE: connect ECONNREFUSED 127.0.0.1:4317
 ```

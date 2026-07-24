@@ -1,0 +1,6 @@
+# Files excluded from the published Tessl tile (gitignore-style patterns).
+# The eval harness and the repository docs are maintainer-facing, not skill
+# content, and must not ship in published artifacts (plan requirement R20).
+# Older tessl CLI versions read .tileignore instead; keep both files in sync.
+evals/
+docs/

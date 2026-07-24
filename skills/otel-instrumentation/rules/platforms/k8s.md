@@ -52,6 +52,7 @@ Not needed for AWS EKS on Fargate, where each pod runs on a dedicated virtual no
 
 ### Complete pod spec example
 
+<!-- eval:k8s -->
 ```yaml
 spec:
   containers:

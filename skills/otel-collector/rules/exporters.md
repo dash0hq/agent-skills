@@ -159,6 +159,7 @@ exporters:
 
 Set the environment variable in your deployment manifest:
 
+<!-- eval:k8s -->
 ```yaml
 env:
   - name: DASH0_AUTH_TOKEN

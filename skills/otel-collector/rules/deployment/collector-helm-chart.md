@@ -37,6 +37,7 @@ The `mode` value is required and determines the Kubernetes workload type.
 
 Deploy as an agent to collect node-level telemetry and receive OTLP from local applications.
 
+<!-- eval:skip -->
 ```yaml
 # values-agent.yaml
 mode: daemonset
@@ -138,6 +139,7 @@ You cannot remove preset-injected config via `.Values.config` — if you need to
 
 Deploy as a gateway for centralized processing, enrichment, and export.
 
+<!-- eval:skip -->
 ```yaml
 # values-gateway.yaml
 mode: deployment
@@ -251,6 +253,7 @@ Set `memory_limiter.limit_mib` to 80 percent of the container memory limit in th
 
 Add the `debug` exporter to the Helm values to verify that the pipeline processes telemetry correctly before sending it to a production backend.
 
+<!-- eval:skip -->
 ```yaml
 # values-debug.yaml (merge with your agent or gateway values)
 config:
@@ -318,6 +321,7 @@ See [debug exporter](../exporters.md#debug-exporter) for verbosity levels and co
 
 If the Dash0 organization uses multiple [datasets](https://www.dash0.com/documentation/dash0/key-concepts/datasets), add the `Dash0-Dataset` header to the OTLP exporter to route telemetry to the correct dataset.
 
+<!-- eval:skip -->
 ```yaml
 config:
   exporters:

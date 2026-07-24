@@ -99,6 +99,7 @@ Use the `AlwaysOn` sampler (the default) in every SDK.
 Do not configure SDK-side samplers — they make irreversible decisions before the outcome of a request is known.
 Defer all sampling to the [Collector](../otel-collector/rules/sampling.md), where policies can be changed centrally without redeploying applications.
 
+<!-- eval:skip -->
 ```
 SDK (AlwaysOn)  →  Collector (sampling)  →  Backend (retention)
      ↓                    ↓                       ↓

@@ -1,0 +1,4 @@
+# Legacy spelling of .tesslignore, read by tessl CLI versions before the
+# tile-to-plugin rename; keep both files in sync.
+evals/
+docs/

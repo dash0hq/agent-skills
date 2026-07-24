@@ -16,9 +16,28 @@ permissions:
   contents: write
 
 jobs:
+  # The release SHA is resolved once at dispatch: the eval matrix and the
+  # publish both run against it, so the workflow's own version-bump commits
+  # (which never touch skills/) stay outside the evaluated range.
+  resolve:
+    name: Pin release SHA
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+    steps:
+      - name: Resolve the dispatched HEAD SHA
+        id: pin
+        run: |
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Release pinned to ${GITHUB_SHA}."
+
   validate:
     name: Validate skills
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -35,9 +54,22 @@ jobs:
           done
           exit $exit_code
 
+  # Release gate (R12): the full scenario matrix runs against the pinned SHA
+  # the same way the nightly run does (see evals-matrix.yml).
+  evals:
+    name: Eval full matrix
+    needs: resolve
+    uses: ./.github/workflows/evals-matrix.yml
+    with:
+      ref: ${{ needs.resolve.outputs.sha }}
+    secrets: inherit
+
   release:
     name: Create GitHub release
-    needs: validate
+    needs:
+      - resolve
+      - validate
+      - evals
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -46,6 +78,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          # The SHA the eval matrix validated; bump commits are created on
+          # top of it and pushed to the dispatched branch explicitly.
+          ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
 
       - uses: tesslio/setup-tessl@v2
@@ -94,7 +129,9 @@ jobs:
             echo "plugin manifests unchanged, skipping commit."
           else
             git commit -m "chore: update plugin manifests for ${TAG}"
-            git push origin HEAD
+            # HEAD is detached at the pinned SHA; push to the dispatched
+            # branch explicitly.
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
       - name: Update CHANGELOG.md
@@ -169,8 +206,26 @@ jobs:
             echo "CHANGELOG.md unchanged, skipping commit."
           else
             git commit -m "chore: update changelog for ${TAG}"
-            git push origin HEAD
+            # HEAD is detached at the pinned SHA; push to the dispatched
+            # branch explicitly.
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
+
+      - name: Verify publish exclusions
+        run: |
+          # R20: published artifacts must exclude the eval harness and docs
+          # (enforced by the repository-root .tesslignore; see RELEASE.md).
+          if ! output=$(tessl tile publish . --dry-run --verbose 2>&1); then
+            echo "$output"
+            echo "::error::tessl tile publish --dry-run failed"
+            exit 1
+          fi
+          echo "$output"
+          if echo "$output" | grep -E '(^|[[:space:]"'"'"'])(\./)?(evals|docs)/' ; then
+            echo "::error::tessl tile publish would include evals/ or docs/ paths; fix .tesslignore before releasing"
+            exit 1
+          fi
+          echo "Publish exclusions verified: no evals/ or docs/ paths in the dry-run output."
 
       - name: Publish to Tessl
         run: |

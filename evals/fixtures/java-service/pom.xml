@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Eval fixture: deliberately uninstrumented Java HTTP service (see
+  evals/fixtures/README.md for the contract). It is a Spring Boot Web
+  application: embedded Tomcat plus Spring WebMVC, both of which the
+  scenario's zero-code Java agent reliably auto-instruments so a SERVER
+  span is produced for GET /checkout. The outbound call uses
+  java.net.http.HttpClient, which the agent covers with a CLIENT span.
+  This fixture carries no instrumentation dependencies of its own: the
+  scenario attaches the agent at run time.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>test.checkout</groupId>
+  <artifactId>java-service</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <!--
+    Spring Boot 3.3.x supports Java 21 and pins compatible versions for the
+    embedded Tomcat and Spring WebMVC dependencies through its parent BOM.
+  -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.5</version>
+    <relativePath/>
+  </parent>
+
+  <properties>
+    <java.version>21</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <!--
+      finalName stays java-service so the repackaged fat jar remains at
+      target/java-service.jar and the Dockerfile can copy it unchanged.
+    -->
+    <finalName>java-service</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

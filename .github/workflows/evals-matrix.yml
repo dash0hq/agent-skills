@@ -1,0 +1,242 @@
+# Reusable full-matrix eval run, called by evals-nightly.yml (on the default
+# branch) and by release.yml (against the SHA pinned at dispatch). It runs
+# select-scenarios in nightly gate mode, so the matrix includes quarantined
+# scenarios, any FullMatrixOnly scenarios, and every RequiresKind scenario.
+#
+# Secrets policy (R14): agent jobs bind the "evals" GitHub Actions
+# environment, which holds the environment-scoped ANTHROPIC_API_KEY.
+# Repository-level secrets must NOT be used; callers pass `secrets: inherit`
+# so the environment binding resolves in this workflow.
+name: Evals matrix
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref (SHA) to check out; empty means the default for the caller's event"
+        required: false
+        type: string
+        default: ""
+    outputs:
+      count:
+        description: "Number of non-kind scenarios in the matrix"
+        value: ${{ jobs.select.outputs.count }}
+      kind-count:
+        description: "Number of RequiresKind scenarios in the matrix"
+        value: ${{ jobs.select.outputs.kind-count }}
+      matrix:
+        description: "JSON array of non-kind scenario IDs"
+        value: ${{ jobs.select.outputs.matrix }}
+      kind-matrix:
+        description: "JSON array of RequiresKind scenario IDs"
+        value: ${{ jobs.select.outputs.kind-matrix }}
+      quarantined:
+        description: "JSON array of quarantined scenario IDs included in the matrix"
+        value: ${{ jobs.select.outputs.quarantined }}
+
+permissions:
+  contents: read
+
+env:
+  # Keep the KIND_VERSION and KIND_NODE_IMAGE pins below in sync with the
+  # node image pinned in evals/fixtures/k8s/kind-config.yaml
+  # (kind v0.31.0 default node image, digest from the kind release notes).
+  KIND_VERSION: v0.31.0
+  KIND_NODE_IMAGE: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+
+jobs:
+  select:
+    name: Select the full matrix
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.select.outputs.count }}
+      kind-count: ${{ steps.select.outputs.kind-count }}
+      matrix: ${{ steps.select.outputs.matrix }}
+      kind-matrix: ${{ steps.select.outputs.kind-matrix }}
+      quarantined: ${{ steps.select.outputs.quarantined }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Select every scenario (nightly gate)
+        id: select
+        run: |
+          cd evals
+          go run ./cmd/select-scenarios --gate nightly > /tmp/selection.json
+          cat /tmp/selection.json
+          {
+            echo "count=$(jq '.count' /tmp/selection.json)"
+            echo "kind-count=$(jq '.kindCount' /tmp/selection.json)"
+            echo "matrix=$(jq -c '[.scenarios[] | select(.requiresKind | not) | .id]' /tmp/selection.json)"
+            echo "kind-matrix=$(jq -c '[.scenarios[] | select(.requiresKind) | .id]' /tmp/selection.json)"
+            echo "quarantined=$(jq -c '.quarantined' /tmp/selection.json)"
+          } >> "$GITHUB_OUTPUT"
+
+  agent-scenarios:
+    name: Scenario ${{ matrix.scenario }}
+    needs: select
+    if: needs.select.outputs.count > 0
+    runs-on: ubuntu-latest
+    # 25m internal go-test timeout plus setup, CLI install, and artifact upload
+    # headroom.
+    timeout-minutes: 40
+    # ANTHROPIC_API_KEY is environment-scoped (R14); repository-level secrets
+    # must NOT be used.
+    environment: evals
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJSON(needs.select.outputs.matrix) }}
+    steps:
+      - name: Require the environment-scoped API key
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          # Fail closed: TestScenarios skips (exit 0) without the key, so a
+          # missing secret would otherwise turn into a vacuous green run.
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Install the pinned Claude Code CLI
+        run: |
+          source evals/versions.env
+          curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the scenario
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVAL_SCENARIOS: ${{ matrix.scenario }}
+          EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+        run: |
+          # The per-run relay bearer token is generated in-process by the
+          # harness and never logged, so there is no token value to
+          # ::add-mask:: here; ANTHROPIC_API_KEY is masked by Actions itself.
+          mkdir -p evidence
+          cd evals
+          set +e
+          go test ./scenarios -run TestScenarios -v -timeout 25m 2>&1 | tee ../evidence/test-output.log
+          status=${PIPESTATUS[0]}
+          set -e
+          # Fail closed on a vacuous green: the harness writes a verdict file
+          # for every scenario it actually runs, so a clean exit with no
+          # verdict means the scenario skipped (infra silently unavailable)
+          # rather than passed.
+          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+            echo "::error::Scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check Docker/binary availability)"
+            status=1
+          fi
+          passed=false
+          [ "$status" -eq 0 ] && passed=true
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          exit "$status"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: evidence-${{ matrix.scenario }}
+          path: evidence
+          retention-days: 7
+
+  kind-scenarios:
+    name: Kind scenario ${{ matrix.scenario }}
+    needs: select
+    if: needs.select.outputs.kind-count > 0
+    runs-on: ubuntu-latest
+    # 40m internal go-test timeout plus cluster provisioning, CLI install, and
+    # artifact upload headroom.
+    timeout-minutes: 55
+    environment: evals
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJSON(needs.select.outputs.kind-matrix) }}
+    steps:
+      - name: Require the environment-scoped API key
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          # Fail closed: TestKubernetesScenarios skips (exit 0) without the
+          # key, so a missing secret would otherwise turn into a vacuous
+          # green run.
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Create kind cluster
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_NODE_IMAGE }}
+          cluster_name: agent-skills-evals
+          config: evals/fixtures/k8s/kind-config.yaml
+
+      - name: Install the pinned Claude Code CLI
+        run: |
+          source evals/versions.env
+          curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the kind scenario
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVAL_SCENARIOS: ${{ matrix.scenario }}
+          EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+        run: |
+          mkdir -p evidence
+          cd evals
+          set +e
+          go test ./scenarios -run TestKubernetesScenarios -v -timeout 40m 2>&1 | tee ../evidence/test-output.log
+          status=${PIPESTATUS[0]}
+          set -e
+          # Fail closed on a vacuous green (see the agent-scenarios job).
+          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+            echo "::error::Kind scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check kind/Docker availability)"
+            status=1
+          fi
+          passed=false
+          [ "$status" -eq 0 ] && passed=true
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          exit "$status"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: evidence-${{ matrix.scenario }}
+          path: evidence
+          retention-days: 7

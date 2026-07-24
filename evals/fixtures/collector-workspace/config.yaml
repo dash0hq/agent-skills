@@ -1,0 +1,28 @@
+# Seed OpenTelemetry Collector configuration for the collector and OTTL eval
+# scenarios. The eval agent edits this file; the harness then validates it
+# with `otelcol-contrib validate` and runs it verbatim as a local process.
+# The ${env:...} placeholders are supplied by the harness at run time (see
+# README.md) and must never be replaced with hardcoded values.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:${env:EVAL_OTLP_RECEIVER_PORT}
+
+exporters:
+  otlphttp:
+    endpoint: ${env:EVAL_OTLP_ENDPOINT}
+    # The export endpoint does not accept compressed payloads; keep
+    # compression disabled.
+    compression: none
+    headers:
+      Authorization: "Bearer ${env:EVAL_OTLP_TOKEN}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp]
+  telemetry:
+    metrics:
+      level: none

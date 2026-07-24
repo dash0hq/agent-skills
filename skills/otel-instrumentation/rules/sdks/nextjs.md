@@ -493,6 +493,7 @@ export async function GET(request: NextRequest) {
 
 On startup, you should see:
 
+<!-- eval:skip -->
 ```
 [OTel] Endpoint: https://<OTLP_ENDPOINT>
 [OTel] Auth: configured

@@ -600,6 +600,7 @@ java -Dotel.javaagent.debug=true -javaagent:path/to/opentelemetry-javaagent.jar 
 
 ### Connection errors
 
+<!-- eval:skip -->
 ```
 WARN io.opentelemetry.exporter.internal.http.HttpExporter - Failed to export spans.
 ```

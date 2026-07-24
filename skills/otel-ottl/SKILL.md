@@ -66,6 +66,7 @@ See [function-reference](./rules/function-reference.md) for the full list of edi
 
 Use `where` to apply transformations conditionally:
 
+<!-- eval:skip -->
 ```
 span.attributes["db.statement"] = "REDACTED" where resource.attributes["service.name"] == "accounting"
 ```

@@ -39,6 +39,7 @@ The [Attribute Registry](https://opentelemetry.io/docs/specs/semconv/registry/at
 
 ### Example: correct vs incorrect attribute selection
 
+<!-- eval:skip -->
 ```
 # Correct — uses registry attribute for HTTP method
 span.set_attribute("http.request.method", "GET")
@@ -49,6 +50,7 @@ span.set_attribute("custom.http.verb", "GET")
 
 ### Example: resource vs span attribute placement
 
+<!-- eval:skip -->
 ```
 # Correct — service identity is a resource attribute
 resource = Resource({"service.name": "checkout-service", "service.version": "2.1.0"})
@@ -63,6 +65,7 @@ span.set_attribute("service.name", "checkout-service")  # belongs on the resourc
 
 ### Example: cardinality violation in metric attributes
 
+<!-- eval:skip -->
 ```
 # Correct — metric attribute uses a bounded, low-cardinality value
 histogram.record(duration_ms, {"http.request.method": "GET", "http.response.status_code": 200})

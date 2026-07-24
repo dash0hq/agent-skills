@@ -38,6 +38,24 @@ Cross-reference the other skill for context, but do not duplicate Collector conf
 Some `SKILL.md` files contain a bullet list that mirrors the `##` headings in a referenced rule file (marked with a `<!-- keep-in-sync -->` comment).
 When adding, removing, or renaming a `##` heading in the rule file, update the corresponding list in `SKILL.md` so the entries match one-to-one.
 
+## Eval rules
+
+The eval harness in `evals/` runs an agent against the skills and validates every fenced example; the operator manual is [evals/README.md](evals/README.md).
+Follow these rules when changing skill content:
+
+- **Register every added or renamed rule file in the eval registry.**
+  Classify it as `dedicated`, `shared`, or `exempt` in `evals/harness/registry.go`, and for `dedicated` files declare a scenario in `evals/scenarios/` or a `pendingScenarios` entry.
+  The registry completeness test fails CI on unclassified files, stale entries, and uncovered dedicated files.
+- **Every fenced example must validate or carry an `eval:` annotation.**
+  Unclassifiable blocks fail CI; use `<!-- eval:skip -->`, `<!-- eval:fragment -->`, `<!-- eval:k8s -->`, or `<!-- eval:collector-config -->` per the annotation table in [evals/README.md](evals/README.md).
+  `<!-- eval:fragment -->` is context-aware: on a `yaml` or untagged block it marks a service-less Collector fragment, and on an SDK-code block it marks a code fragment that is reported but not compiled — use it on a genuinely-complete Go block only when the block is deliberately uncompilable, never to hide a real compile failure.
+- **Mark deliberately wrong examples.**
+  Use a `// BAD`-style line comment or `<!-- eval:bad -->` so the validator exempts them.
+- **Keep fixture data synthetic.**
+  Only reserved example domains and `TEST-`-prefixed identifiers, for example `user@example.test` and `TEST-0001`; see [evals/fixtures/README.md](evals/fixtures/README.md).
+- **Expect code-owner review on prompt-bearing paths.**
+  Changes under `skills/**` and `evals/scenarios/` require approval from the owners in `.github/CODEOWNERS` before eval workflows run them.
+
 ## Prose rules
 
 Follow these rules when writing or editing prose in this project.

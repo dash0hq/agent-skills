@@ -1,0 +1,445 @@
+# Eval gate for pull requests (U7 of the skill-evals plan).
+#
+# Secrets policy (R14): the Anthropic API key exists ONLY as an
+# environment-scoped secret (ANTHROPIC_API_KEY) on the "evals" and
+# "fork-evals" GitHub Actions environments. Repository-level secrets must NOT
+# be used for it. Same-repo PRs bind the "evals" environment; fork PRs bind
+# "fork-evals", whose required reviewers hold the agent jobs until a
+# maintainer approves the run. The deterministic jobs (unit tests, example
+# validation, fixture builds, selection) never reference the key and run on
+# every PR, including forks and Dependabot.
+#
+# Gating (R11-R13, R16): there is deliberately NO path filter on the trigger.
+# Selection happens inside the workflow via evals/cmd/select-scenarios, and
+# branch protection targets exactly one job name: "evals-gate". That job runs
+# with if: always() and fails closed — a skipped scenario job satisfies it
+# only when the select job succeeded with the corresponding count of 0, so a
+# skipped required check can never pass vacuously.
+name: Evals PR gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  issues: read
+
+concurrency:
+  group: evals-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  # Keep the KIND_VERSION and KIND_NODE_IMAGE pins below in sync with the
+  # node image pinned in evals/fixtures/k8s/kind-config.yaml
+  # (kind v0.31.0 default node image, digest from the kind release notes).
+  KIND_VERSION: v0.31.0
+  KIND_NODE_IMAGE: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Build, vet, and test the evals module
+        run: |
+          cd evals
+          go build ./...
+          go vet ./...
+          # -short keeps this job to fast unit tests. The heavy, kind- and
+          # Docker-backed integration tests (TestKindBridge,
+          # TestRelayDockerImageBuilds, TestScenarios, TestKubernetesScenarios)
+          # gate on -short and run in the dedicated fixture-build, agent-scenario,
+          # and kind-scenario jobs instead.
+          go test ./... -short
+
+  validate-examples:
+    name: Validate examples
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Compute the otelcol-contrib cache key
+        id: otelcol
+        run: |
+          source evals/versions.env
+          echo "key=otelcol-contrib-${OTELCOL_CONTRIB_VERSION}-${OTELCOL_CONTRIB_SHA256_LINUX_AMD64}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the otelcol-contrib binary
+        uses: actions/cache@v5
+        with:
+          # evals/examples/otelcolbin caches the verified binary under the
+          # user cache directory; the key carries the pinned version and
+          # checksum, so pin bumps invalidate it.
+          path: ~/.cache/agent-skills-evals
+          key: ${{ steps.otelcol.outputs.key }}
+
+      - name: Validate every fenced example in skills/
+        run: |
+          cd evals
+          go run ./cmd/validate-examples
+
+  list-fixtures:
+    name: List fixture services
+    runs-on: ubuntu-latest
+    outputs:
+      fixtures: ${{ steps.list.outputs.fixtures }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: List the fixture service directories
+        id: list
+        run: |
+          fixtures=$(ls -d evals/fixtures/*-service | jq -R . | jq -cs .)
+          if [ "$(echo "$fixtures" | jq 'length')" -eq 0 ]; then
+            echo "::error::No fixture service directories found under evals/fixtures/"
+            exit 1
+          fi
+          echo "fixtures=$fixtures" >> "$GITHUB_OUTPUT"
+
+  fixture-builds:
+    name: Fixture build (${{ matrix.fixture }})
+    needs: list-fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: ${{ fromJSON(needs.list-fixtures.outputs.fixtures) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build the fixture image (build-only proof, no secrets)
+        env:
+          FIXTURE: ${{ matrix.fixture }}
+        run: |
+          # Validate the fixture path before use — it comes from a directory
+          # listing a fork PR can influence, so it must never be interpolated
+          # straight into the shell.
+          case "$FIXTURE" in
+            evals/fixtures/*-service) ;;
+            *) echo "::error::Unexpected fixture path: $FIXTURE"; exit 1 ;;
+          esac
+          docker build "$FIXTURE"
+
+  select:
+    name: Select scenarios
+    runs-on: ubuntu-latest
+    outputs:
+      count: ${{ steps.select.outputs.count }}
+      kind-count: ${{ steps.select.outputs.kind-count }}
+      matrix: ${{ steps.select.outputs.matrix }}
+      kind-matrix: ${{ steps.select.outputs.kind-matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Map the PR diff to scenarios
+        id: select
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          cd evals
+          go run ./cmd/select-scenarios --gate pr --changed-from-git "origin/${BASE_REF}" > /tmp/selection.json
+          cat /tmp/selection.json
+          {
+            echo "count=$(jq '.count' /tmp/selection.json)"
+            echo "kind-count=$(jq '.kindCount' /tmp/selection.json)"
+            echo "matrix=$(jq -c '[.scenarios[] | select(.requiresKind | not) | .id]' /tmp/selection.json)"
+            echo "kind-matrix=$(jq -c '[.scenarios[] | select(.requiresKind) | .id]' /tmp/selection.json)"
+          } >> "$GITHUB_OUTPUT"
+          quarantined=$(jq -r '.quarantined | join(", ")' /tmp/selection.json)
+          if [ -n "$quarantined" ]; then
+            echo "::notice::Quarantined scenarios excluded from the PR gate (nightly still runs them): ${quarantined}"
+          fi
+
+  heartbeat-check:
+    name: Nightly heartbeat freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warn when the nightly heartbeat is stale
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Never fails the job: it warns when the pinned heartbeat issue
+          # (updated by evals-nightly.yml on every run) is older than 48
+          # hours — GitHub disables cron schedules after 60 days of
+          # repository inactivity — and stays silent during bootstrap while
+          # the issue does not exist yet.
+          issues=$(gh api "repos/${GITHUB_REPOSITORY}/issues?labels=eval-heartbeat&state=open&per_page=1" 2>/dev/null || echo '[]')
+          if [ "$(echo "$issues" | jq 'length')" -eq 0 ]; then
+            echo "No nightly heartbeat issue found yet (bootstrap); skipping the freshness check."
+            exit 0
+          fi
+          last=$(echo "$issues" | jq -r '.[0].body' | sed -n 's/^Last nightly run: //p' | head -1)
+          if [ -z "$last" ]; then
+            last=$(echo "$issues" | jq -r '.[0].updated_at')
+          fi
+          last_epoch=$(date -d "$last" +%s 2>/dev/null || echo 0)
+          age_hours=$(( ($(date +%s) - last_epoch) / 3600 ))
+          if [ "$last_epoch" -eq 0 ] || [ "$age_hours" -gt 48 ]; then
+            echo "::warning::The nightly eval heartbeat is stale (last update: ${last:-unknown}, ${age_hours}h ago); check the evals-nightly.yml schedule."
+          else
+            echo "Nightly heartbeat is fresh (${age_hours}h old)."
+          fi
+
+  agent-scenarios:
+    name: Scenario ${{ matrix.scenario }}
+    needs: select
+    if: needs.select.outputs.count > 0
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # ANTHROPIC_API_KEY is environment-scoped (R14); repository-level secrets
+    # must NOT be used. Fork and Dependabot PRs bind "fork-evals", whose
+    # required reviewers make the run wait for maintainer approval before any
+    # agent scenario executes fork-authored content.
+    environment: ${{ (github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') && 'fork-evals' || 'evals' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJSON(needs.select.outputs.matrix) }}
+    steps:
+      - name: Require the environment-scoped API key
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          # Fail closed: TestScenarios skips (exit 0) without the key, so a
+          # missing secret would otherwise turn into a vacuous green check.
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Install the pinned Claude Code CLI
+        run: |
+          source evals/versions.env
+          curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the scenario
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVAL_SCENARIOS: ${{ matrix.scenario }}
+          EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+        run: |
+          # Defensive secret hygiene: the per-run relay bearer token is
+          # generated in-process by the harness and never written to stdout,
+          # stderr, transcripts, or verdicts, so there is no token value to
+          # ::add-mask:: here; if the harness ever started printing one, mask
+          # it in this step before any other output. ANTHROPIC_API_KEY is
+          # masked by Actions itself as a secret.
+          mkdir -p evidence
+          cd evals
+          set +e
+          # Target the specific scenario subtest so Go's own -run filter runs
+          # only it; the EVAL_SCENARIOS env still scopes the harness and names
+          # the scenario in the fail-closed messages below.
+          go test ./scenarios -run "^TestScenarios$/^${EVAL_SCENARIOS}$" -v -timeout 35m 2>&1 | tee ../evidence/test-output.log
+          status=${PIPESTATUS[0]}
+          set -e
+          # Fail closed on a vacuous green: the harness writes a verdict file
+          # for every scenario it runs, so a clean exit with no verdict means
+          # the scenario skipped (infra silently unavailable) rather than
+          # passed.
+          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+            echo "::error::Scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check Docker/binary availability)"
+            status=1
+          fi
+          passed=false
+          [ "$status" -eq 0 ] && passed=true
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          exit "$status"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: evidence-pr-${{ matrix.scenario }}
+          path: evidence
+          retention-days: 7
+
+  kind-scenarios:
+    name: Kind scenario ${{ matrix.scenario }}
+    needs: select
+    if: needs.select.outputs.kind-count > 0
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Same environment gating as agent-scenarios: the API key is
+    # environment-scoped and fork runs wait for maintainer approval.
+    environment: ${{ (github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') && 'fork-evals' || 'evals' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJSON(needs.select.outputs.kind-matrix) }}
+    steps:
+      - name: Require the environment-scoped API key
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          # Fail closed: TestKubernetesScenarios skips (exit 0) without the
+          # key, so a missing secret would otherwise turn into a vacuous
+          # green check.
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: evals/go.mod
+          cache-dependency-path: evals/go.sum
+
+      - name: Create kind cluster
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          version: ${{ env.KIND_VERSION }}
+          node_image: ${{ env.KIND_NODE_IMAGE }}
+          cluster_name: agent-skills-evals
+          config: evals/fixtures/k8s/kind-config.yaml
+
+      - name: Install the pinned Claude Code CLI
+        run: |
+          source evals/versions.env
+          curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the kind scenario
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVAL_SCENARIOS: ${{ matrix.scenario }}
+          EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+        run: |
+          mkdir -p evidence
+          cd evals
+          set +e
+          # Target the specific scenario subtest (see the agent-scenarios job).
+          go test ./scenarios -run "^TestKubernetesScenarios$/^${EVAL_SCENARIOS}$" -v -timeout 40m 2>&1 | tee ../evidence/test-output.log
+          status=${PIPESTATUS[0]}
+          set -e
+          # Fail closed on a vacuous green (see the agent-scenarios job).
+          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+            echo "::error::Kind scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check kind/Docker availability)"
+            status=1
+          fi
+          passed=false
+          [ "$status" -eq 0 ] && passed=true
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          exit "$status"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: evidence-pr-${{ matrix.scenario }}
+          path: evidence
+          retention-days: 7
+
+  evals-gate:
+    # The single branch-protection check. Everything above feeds it; it fails
+    # closed on any result that is not an explicit success or a deliberate
+    # count-0 deselection.
+    name: evals-gate
+    needs:
+      - unit-tests
+      - validate-examples
+      - list-fixtures
+      - fixture-builds
+      - select
+      - heartbeat-check
+      - agent-scenarios
+      - kind-scenarios
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate job results (fail closed)
+        env:
+          RESULT_UNIT_TESTS: ${{ needs.unit-tests.result }}
+          RESULT_VALIDATE_EXAMPLES: ${{ needs.validate-examples.result }}
+          RESULT_LIST_FIXTURES: ${{ needs.list-fixtures.result }}
+          RESULT_FIXTURE_BUILDS: ${{ needs.fixture-builds.result }}
+          RESULT_SELECT: ${{ needs.select.result }}
+          RESULT_HEARTBEAT: ${{ needs.heartbeat-check.result }}
+          RESULT_AGENT: ${{ needs.agent-scenarios.result }}
+          RESULT_KIND: ${{ needs.kind-scenarios.result }}
+          COUNT: ${{ needs.select.outputs.count }}
+          KIND_COUNT: ${{ needs.select.outputs.kind-count }}
+        run: |
+          exit_code=0
+
+          require_success() {
+            local job="$1" result="$2"
+            if [ "$result" != "success" ]; then
+              echo "::error::Required job '$job' did not succeed (result: $result)"
+              exit_code=1
+            fi
+          }
+
+          # A scenario matrix job may be skipped only when the select job
+          # succeeded and deliberately deselected it (count 0). Any other
+          # skipped, cancelled, or failed result fails the gate, so a skipped
+          # required check can never satisfy branch protection.
+          require_success_or_deselected() {
+            local job="$1" result="$2" count="$3"
+            if [ "$result" = "success" ]; then
+              return
+            fi
+            if [ "$result" = "skipped" ] && [ "$RESULT_SELECT" = "success" ] && [ "$count" = "0" ]; then
+              echo "Job '$job' was deliberately deselected (0 scenarios selected)."
+              return
+            fi
+            echo "::error::Required job '$job' did not succeed (result: $result, selected scenarios: ${count:-unknown})"
+            exit_code=1
+          }
+
+          require_success "unit-tests" "$RESULT_UNIT_TESTS"
+          require_success "validate-examples" "$RESULT_VALIDATE_EXAMPLES"
+          require_success "list-fixtures" "$RESULT_LIST_FIXTURES"
+          require_success "fixture-builds" "$RESULT_FIXTURE_BUILDS"
+          require_success "select" "$RESULT_SELECT"
+          require_success "heartbeat-check" "$RESULT_HEARTBEAT"
+          require_success_or_deselected "agent-scenarios" "$RESULT_AGENT" "$COUNT"
+          require_success_or_deselected "kind-scenarios" "$RESULT_KIND" "$KIND_COUNT"
+
+          if [ $exit_code -eq 0 ]; then
+            echo "All eval jobs succeeded or were deliberately deselected."
+          fi
+          exit $exit_code

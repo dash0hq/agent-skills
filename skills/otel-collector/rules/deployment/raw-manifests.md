@@ -31,6 +31,7 @@ For most Kubernetes deployments, prefer the [Collector Helm chart](./collector-h
 Deploy an agent DaemonSet for local collection (host metrics, pod logs) and a gateway Deployment for centralized processing and export.
 The agent forwards to the gateway via OTLP.
 
+<!-- eval:skip -->
 ```
 Applications → Agent (DaemonSet) → Gateway (Deployment) → Dash0
                  ↑                       ↑

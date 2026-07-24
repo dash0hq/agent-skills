@@ -1,0 +1,30 @@
+# kind cluster configuration for the Kubernetes eval scenarios (U6).
+#
+# Telemetry bridge (primary route, validated by the evals-spike workflow):
+# kind nodes are Docker containers on the Docker bridge network named "kind".
+# The harness attaches the relay container (evals/cmd/relay) to that network
+# and in-cluster Collectors export to the relay's kind-network IP address
+# (discovered via docker inspect; Docker network aliases are not resolvable
+# from pods, so the IP is used directly). The relay forwards to the host
+# through host.docker.internal (host-gateway) and enforces the per-run
+# bearer token on this hop.
+#
+# Fallback (if pod-to-relay-container routing fails on a runner): reverse
+# the direction with a NodePort Service backed by an external endpoint plus
+# extraPortMappings on the node, keeping the relay on the host:
+#
+#   nodes:
+#     - role: control-plane
+#       extraPortMappings:
+#         - containerPort: 30318   # NodePort forwarded to the host relay
+#           hostPort: 4318
+#
+# The node image is pinned by digest (kind v0.31.0 default); keep it in sync
+# with the KIND_NODE_IMAGE / KIND_VERSION env pins in
+# .github/workflows/evals-pr.yml, evals-matrix.yml, and evals-spike.yml.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: agent-skills-evals
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f

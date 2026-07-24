@@ -1,7 +1,7 @@
 .claude
 
 # Slash-less patterns match at any depth, so these also cover fixture
-# directories under evals/fixtures/.
+# directories under evals/custom/fixtures/.
 node_modules
 dist
 
@@ -18,6 +18,6 @@ evals/**/bin/
 
 # Fixture build artifacts by ecosystem: .NET (bin/ is covered above, obj/
 # here), Java and Scala (target/), and PHP Composer (vendor/).
-evals/fixtures/*/obj/
-evals/fixtures/*/target/
-evals/fixtures/*/vendor/
+evals/custom/fixtures/*/obj/
+evals/custom/fixtures/*/target/
+evals/custom/fixtures/*/vendor/

@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent uses OTTL to filter stale telemetry with time comparisons using UnixNano(Now()), backfills missing log timestamps using the correct two-step pattern, uses int64 enum constants for span status/kind comparisons, uses IsMatch() with regex for pattern-based dropping, and uses nil as the absence keyword throughout.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "UnixNano(Now()) for stale drop",
+      "description": "Uses `time_unix_nano < UnixNano(Now()) - <offset>` (or equivalent) to drop data older than a defined threshold, using the UnixNano() and Now() functions",
+      "max_score": 12
+    },
+    {
+      "name": "Stale drop uses filter processor",
+      "description": "Stale data is dropped using the filter processor (not the transform processor)",
+      "max_score": 8
+    },
+    {
+      "name": "Timestamp backfill observed_time",
+      "description": "Uses `set(log.observed_time, Now()) where log.observed_time_unix_nano == 0` (or functionally equivalent) to backfill missing observed time",
+      "max_score": 10
+    },
+    {
+      "name": "Timestamp backfill log.time",
+      "description": "Uses `set(log.time, log.observed_time) where log.time_unix_nano == 0` (or functionally equivalent) to backfill missing log time from observed time",
+      "max_score": 10
+    },
+    {
+      "name": "Enum constant STATUS_CODE_ERROR",
+      "description": "Uses the int64 constant `STATUS_CODE_ERROR` (not an integer literal like `2` or a string) when comparing or setting span status code",
+      "max_score": 12
+    },
+    {
+      "name": "IsMatch() for pattern filtering",
+      "description": "Uses IsMatch() with a regex pattern to filter out (drop or flag) metrics or spans matching a name pattern",
+      "max_score": 10
+    },
+    {
+      "name": "filter processor for metric drops",
+      "description": "Metrics dropped by pattern use the filter processor (not transform with a delete operation)",
+      "max_score": 8
+    },
+    {
+      "name": "nil for absence checks",
+      "description": "All where-clause absence checks use `!= nil` (not `!= null`)",
+      "max_score": 8
+    },
+    {
+      "name": "error_mode set explicitly",
+      "description": "Every processor that uses OTTL includes an explicit `error_mode:` key",
+      "max_score": 8
+    },
+    {
+      "name": "error_mode ignore in production",
+      "description": "All OTTL processors use `error_mode: ignore`",
+      "max_score": 8
+    },
+    {
+      "name": "where clause nil guards on attrs",
+      "description": "Statements that operate on span or log attributes include `where <attr> != nil` guards before acting on those attributes",
+      "max_score": 6
+    }
+  ]
+}

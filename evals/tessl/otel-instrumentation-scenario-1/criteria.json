@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether an agent correctly configures OpenTelemetry for a Node.js CommonJS Express service, covering SDK activation, exporter configuration, correct HTTP span status mapping, sensitive data handling, exception recording, and trace-log correlation.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Correct SDK activation flag",
+      "description": "Uses --require (not --import) in NODE_OPTIONS to activate auto-instrumentation, matching CommonJS module system",
+      "max_score": 8
+    },
+    {
+      "name": "OTEL_TRACES_EXPORTER set",
+      "description": "Sets OTEL_TRACES_EXPORTER=otlp explicitly (does not rely on default, which silently discards telemetry)",
+      "max_score": 8
+    },
+    {
+      "name": "gRPC protocol configured",
+      "description": "Sets OTEL_EXPORTER_OTLP_PROTOCOL=grpc when the collector endpoint uses port 4317",
+      "max_score": 8
+    },
+    {
+      "name": "4xx SERVER span status",
+      "description": "HTTP 4xx responses on SERVER spans are documented or coded as status UNSET, not ERROR",
+      "max_score": 10
+    },
+    {
+      "name": "5xx SERVER span status",
+      "description": "HTTP 5xx responses on SERVER spans result in status ERROR with a descriptive message containing error class and context",
+      "max_score": 8
+    },
+    {
+      "name": "No span.recordException",
+      "description": "Does NOT call span.recordException(error) for exception recording — uses a structured log record instead",
+      "max_score": 10
+    },
+    {
+      "name": "Exception log trace context",
+      "description": "Exception log records include both trace_id and span_id extracted from the active span context, AND include exception.type, exception.message, exception.stacktrace as structured attributes",
+      "max_score": 8
+    },
+    {
+      "name": "URL query param redaction",
+      "description": "URL attributes (url.full or similar) have query parameters stripped or redacted before being attached to spans",
+      "max_score": 8
+    },
+    {
+      "name": "No PII or credentials in telemetry",
+      "description": "Does NOT attach raw auth headers, passwords, or email addresses directly as span or log attribute values",
+      "max_score": 8
+    },
+    {
+      "name": "Structured logging only",
+      "description": "All log statements use structured key-value pairs; no template-literal string interpolation used as the primary log message",
+      "max_score": 8
+    },
+    {
+      "name": "Trace-log correlation in handlers",
+      "description": "A helper or inline extraction of trace_id and span_id is used to inject trace context into log records emitted inside request handlers",
+      "max_score": 8
+    },
+    {
+      "name": "forceFlush on crash handlers",
+      "description": "Registers uncaughtException and/or unhandledRejection process handlers that flush the tracer provider before calling process.exit",
+      "max_score": 8
+    }
+  ]
+}

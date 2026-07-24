@@ -39,7 +39,7 @@ permissions:
 
 env:
   # Keep the KIND_VERSION and KIND_NODE_IMAGE pins below in sync with the
-  # node image pinned in evals/fixtures/k8s/kind-config.yaml
+  # node image pinned in evals/custom/fixtures/k8s/kind-config.yaml
   # (kind v0.31.0 default node image, digest from the kind release notes).
   KIND_VERSION: v0.31.0
   KIND_NODE_IMAGE: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
@@ -63,13 +63,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Select every scenario (nightly gate)
         id: select
         run: |
-          cd evals
+          cd evals/custom
           go run ./cmd/select-scenarios --gate nightly > /tmp/selection.json
           cat /tmp/selection.json
           {
@@ -103,7 +103,7 @@ jobs:
           # Fail closed: TestScenarios skips (exit 0) without the key, so a
           # missing secret would otherwise turn into a vacuous green run.
           if [ "$HAS_KEY" != "true" ]; then
-            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/custom/README.md)"
             exit 1
           fi
 
@@ -115,12 +115,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Install the pinned Claude Code CLI
         run: |
-          source evals/versions.env
+          source evals/custom/versions.env
           curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
@@ -134,7 +134,7 @@ jobs:
           # harness and never logged, so there is no token value to
           # ::add-mask:: here; ANTHROPIC_API_KEY is masked by Actions itself.
           mkdir -p evidence
-          cd evals
+          cd evals/custom
           set +e
           go test ./scenarios -run TestScenarios -v -timeout 25m 2>&1 | tee ../evidence/test-output.log
           status=${PIPESTATUS[0]}
@@ -182,7 +182,7 @@ jobs:
           # key, so a missing secret would otherwise turn into a vacuous
           # green run.
           if [ "$HAS_KEY" != "true" ]; then
-            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/custom/README.md)"
             exit 1
           fi
 
@@ -194,8 +194,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Create kind cluster
         uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
@@ -203,11 +203,11 @@ jobs:
           version: ${{ env.KIND_VERSION }}
           node_image: ${{ env.KIND_NODE_IMAGE }}
           cluster_name: agent-skills-evals
-          config: evals/fixtures/k8s/kind-config.yaml
+          config: evals/custom/fixtures/k8s/kind-config.yaml
 
       - name: Install the pinned Claude Code CLI
         run: |
-          source evals/versions.env
+          source evals/custom/versions.env
           curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
@@ -218,7 +218,7 @@ jobs:
           EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
         run: |
           mkdir -p evidence
-          cd evals
+          cd evals/custom
           set +e
           go test ./scenarios -run TestKubernetesScenarios -v -timeout 40m 2>&1 | tee ../evidence/test-output.log
           status=${PIPESTATUS[0]}

@@ -229,7 +229,13 @@ jobs:
 
       - name: Publish to Tessl
         run: |
-          tessl tile publish .
+          # Score the authored Tessl scenarios at publish time. --eval-scenarios
+          # points the publisher at evals/tessl/ in the working tree; the packaged
+          # tile still excludes all of evals/ (R20, verified above). See RELEASE.md.
+          # NOTE: --eval-scenarios is documented on the modern `tessl skill publish`.
+          # If the pinned CLI's `tile publish` rejects it, migrate the manifest with
+          # `tessl plugin migrate` and switch to `tessl skill/plugin publish`.
+          tessl tile publish . --eval-scenarios evals/tessl
 
       - name: Create tag
         env:

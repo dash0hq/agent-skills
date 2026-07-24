@@ -151,6 +151,30 @@ exit 1
 	require.Equal(t, MaxInfraAttempts, strings.Count(string(invocations), "x"), "stub invoked exactly MaxInfraAttempts times")
 }
 
+// preserveAgentWorkspace must copy human-authored source into the evidence
+// dir with the per-run token scrubbed, and must skip binary files and
+// dependency trees, so the uploaded CI artifact never carries the secret.
+func TestPreserveAgentWorkspaceScrubsToken(t *testing.T) {
+	workdir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(workdir, "otel.go"), []byte("Authorization=Bearer SEKRET-TOKEN-42"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(workdir, "app"), []byte{0x00, 0x01, 0xff, 0xfe, 0x00}, 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(workdir, "node_modules", "x"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(workdir, "node_modules", "x", "y.js"), []byte("SEKRET-TOKEN-42"), 0o644))
+
+	verdictDir := t.TempDir()
+	t.Setenv("EVAL_VERDICT_DIR", verdictDir)
+	preserveAgentWorkspace("scn", workdir, "SEKRET-TOKEN-42")
+
+	got, err := os.ReadFile(filepath.Join(verdictDir, "agent-workspace", "scn", "otel.go"))
+	require.NoError(t, err)
+	require.Equal(t, "Authorization=Bearer ***", string(got))
+
+	_, err = os.Stat(filepath.Join(verdictDir, "agent-workspace", "scn", "app"))
+	require.True(t, os.IsNotExist(err), "binary file must be skipped")
+	_, err = os.Stat(filepath.Join(verdictDir, "agent-workspace", "scn", "node_modules"))
+	require.True(t, os.IsNotExist(err), "node_modules must be skipped")
+}
+
 // Covers harness-level AE4: telemetry arrives without the expected attribute;
 // the verdict fails with class agent-assert and attaches evidence.
 func TestRunnerAssertFailureAttachesEvidence(t *testing.T) {

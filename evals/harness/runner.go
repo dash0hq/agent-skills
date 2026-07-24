@@ -1,14 +1,17 @@
 package harness
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/open-telemetry/opentelemetry-packaging/testutil/otelsink"
 )
@@ -181,6 +184,12 @@ func (r *Runner) attempt(t *testing.T, sc Scenario, attemptDir string) attemptOu
 
 	env := FixtureEnv(sink, relay, token)
 	finish := func(class FailureClass, detail string, cost float64, transcript string) attemptOutcome {
+		if class != ClassNone {
+			// On any failure, preserve the agent-authored source (scrubbed of
+			// the per-run token) for post-mortem, since the containers and the
+			// workspace temp dir are torn down before they can be inspected.
+			preserveAgentWorkspace(sc.ID, workdir, token)
+		}
 		return attemptOutcome{
 			class:          class,
 			detail:         detail,
@@ -276,6 +285,63 @@ func awaitTelemetry(t *testing.T, ctx context.Context, sink *otelsink.Sink, asse
 		}
 		time.Sleep(telemetryPollInterval)
 	}
+}
+
+// preserveAgentWorkspace copies the agent-authored source files into
+// $EVAL_VERDICT_DIR/agent-workspace/<scenarioID>/ so a failing run's exact
+// edits survive in the uploaded CI evidence (the workspace temp dir is
+// otherwise removed at test end). It is deliberately conservative about what
+// it captures:
+//
+//   - the per-run bearer token is scrubbed from every file, so no secret
+//     reaches the artifact even if an agent wrongly hardcoded it;
+//   - build output and dependency trees (node_modules, target, vendor, …) and
+//     non-UTF-8 or large (>256 KiB) files are skipped, keeping the artifact to
+//     the human-authored source that explains the outcome.
+//
+// It is best-effort: any error is ignored, since this is diagnostics only.
+func preserveAgentWorkspace(scenarioID, workdir, token string) {
+	dir := strings.TrimSpace(os.Getenv("EVAL_VERDICT_DIR"))
+	if dir == "" || workdir == "" {
+		return
+	}
+	dest := filepath.Join(dir, "agent-workspace", scenarioID)
+	skipDir := map[string]bool{
+		".git": true, "node_modules": true, "target": true, "vendor": true,
+		"dist": true, "bin": true, "obj": true, ".next": true, ".gradle": true,
+	}
+	_ = filepath.WalkDir(workdir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if skipDir[d.Name()] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil || !info.Mode().IsRegular() || info.Size() > 256*1024 {
+			return nil
+		}
+		content, err := os.ReadFile(p)
+		if err != nil || !utf8.Valid(content) {
+			return nil // skip unreadable and binary files
+		}
+		if token != "" {
+			content = bytes.ReplaceAll(content, []byte(token), []byte("***"))
+		}
+		rel, err := filepath.Rel(workdir, p)
+		if err != nil {
+			return nil
+		}
+		out := filepath.Join(dest, rel)
+		if os.MkdirAll(filepath.Dir(out), 0o755) != nil {
+			return nil
+		}
+		_ = os.WriteFile(out, content, 0o644)
+		return nil
+	})
 }
 
 // telemetryFiles lists the signal JSONL files that exist under the sink

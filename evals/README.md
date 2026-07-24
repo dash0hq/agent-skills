@@ -117,9 +117,10 @@ When bumping `OTELCOL_CONTRIB_VERSION`, update all 3 checksum keys from the new 
 
 ## Fork PRs and secrets
 
-The deterministic layers — `go test ./evals/...`, example validation, and fixture builds — need no secrets and run on every PR, including forks and Dependabot.
-Agent scenarios need the Anthropic API key, which exists only as an environment-scoped secret on the `evals` and `fork-evals` GitHub Actions environments, never as a repository-level secret (requirement R14).
-Fork and Dependabot PRs bind `fork-evals` and therefore wait for a maintainer to approve the environment before any agent scenario runs.
+The deterministic layers — `go test ./evals/...`, example validation, and fixture builds — need no secrets and run on every PR, including forks and Dependabot, so those PRs still smoke the eval harness itself.
+Agent scenarios need the Anthropic API key, which exists only as an environment-scoped secret on the `evals` GitHub Actions environment, never as a repository-level secret (requirement R14).
+Fork and Dependabot PRs never run agent scenarios: the agent executes PR-authored content, so binding the key to it — even behind an approval prompt — would let that content exfiltrate the secret.
+The scenario jobs therefore skip on fork and Dependabot PRs (an `if:` guard on `github.event.pull_request.head.repo.fork` and `github.actor`), and the `evals-gate` accepts that skip; their agent-scenario coverage comes from the post-merge and nightly runs on the trusted `evals` environment.
 
 Changes to `skills/**` and `evals/scenarios/` are prompt-bearing and require review by the code owners in [`.github/CODEOWNERS`](../.github/CODEOWNERS); the `@dash0hq/agent-skills-maintainers` team must exist in the `dash0hq` organization with write access for that gate to take effect.
 
@@ -131,17 +132,16 @@ Changes to `skills/**` and `evals/scenarios/` are prompt-bearing and require rev
 - [`evals-nightly.yml`](../.github/workflows/evals-nightly.yml) runs the full matrix every night at 03:17 UTC via the reusable [`evals-matrix.yml`](../.github/workflows/evals-matrix.yml), including quarantined scenarios and the Kubernetes scenarios; a report job maintains 1 rolling issue per failing scenario (label `eval-failure`, closed on recovery), updates the pinned heartbeat issue (label `eval-heartbeat`), and records the total run cost.
 - [`release.yml`](../.github/workflows/release.yml) resolves the HEAD SHA once at dispatch, runs the full matrix against that SHA through `evals-matrix.yml`, verifies with a `tessl tile publish` dry run that no `evals/` or `docs/` path would be published, and only then publishes and tags.
 
-2 GitHub Actions environments must exist, each holding the environment-scoped `ANTHROPIC_API_KEY` secret (never a repository-level secret):
+1 GitHub Actions environment must exist, holding the environment-scoped `ANTHROPIC_API_KEY` secret (never a repository-level secret):
 
-- `evals` — used by same-repo PR runs, nightly runs, and release runs; no required reviewers.
-- `fork-evals` — used by fork and Dependabot PRs; configure required reviewers so agent scenarios wait for maintainer approval.
+- `evals` — used by same-repo PR runs, nightly runs, and release runs. Fork and Dependabot PRs never reach it (their scenario jobs skip), so the key is never exposed to PR-authored content; do not create a fork-facing environment that holds the key.
 
 Branch protection requires exactly 1 check: `evals-gate`.
 It runs with `if: always()` and fails unless every needed job succeeded or was deliberately deselected (the select job succeeded with a scenario count of 0), so a skipped check can never pass vacuously.
 
 Bootstrap in this order:
 
-1. Create the `evals` and `fork-evals` environments with the `ANTHROPIC_API_KEY` secret, and add required reviewers on `fork-evals`.
+1. Create the `evals` environment with the `ANTHROPIC_API_KEY` secret (no fork-facing environment holds the key).
 2. Land the CI pull request while `evals-gate` is not yet a required check.
 3. Dispatch the spike workflow (and a manual `evals-nightly.yml` run) to prove the runner topology end to end.
 4. Flip `evals-gate` to required in branch protection.

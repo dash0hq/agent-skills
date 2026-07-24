@@ -82,7 +82,7 @@ jobs:
           echo "key=otelcol-contrib-${OTELCOL_CONTRIB_VERSION}-${OTELCOL_CONTRIB_SHA256_LINUX_AMD64}" >> "$GITHUB_OUTPUT"
 
       - name: Cache the otelcol-contrib binary
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           # evals/examples/otelcolbin caches the verified binary under the
           # user cache directory; the key carries the pinned version and

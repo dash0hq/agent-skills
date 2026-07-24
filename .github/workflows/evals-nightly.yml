@@ -33,7 +33,7 @@ jobs:
       issues: write
     steps:
       - name: Download evidence
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: evidence-*
           path: evidence

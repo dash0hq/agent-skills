@@ -1,11 +1,11 @@
 # Quarantined eval scenarios (R16).
 #
 # Scenario IDs listed under `quarantine` never block a gate. The PR gate skips
-# them entirely. The nightly and release matrices still run them for
-# observability, but as `continue-on-error` legs, so a failure is neutral and
-# does not gate the release (see .github/workflows/evals-matrix.yml). Add an
-# entry with the scenario ID, the date, and a link to the tracking issue;
-# remove the entry once the scenario is stable again.
+# them entirely. The release matrix still runs them for observability, but as
+# `continue-on-error` legs, so a failure is neutral and does not gate the
+# release (see .github/workflows/evals-matrix.yml). Add an entry with the
+# scenario ID, the date, and a link to the tracking issue; remove the entry
+# once the scenario is stable again.
 #
 # Example:
 #   quarantine:

@@ -98,7 +98,7 @@ The full fixture contract, including the synthetic-data rules, lives in [`fixtur
 ## Quarantine
 
 Scenario IDs listed in [`quarantine.yaml`](./quarantine.yaml) never block a gate.
-The PR gate skips them entirely (they do not run on PRs and cannot block merges), and the nightly and release matrices still run them for observability but as `continue-on-error` legs, so a failure is neutral and cannot block a release.
+The PR gate skips them entirely (they do not run on PRs and cannot block merges), and the release matrix still runs them for observability but as `continue-on-error` legs, so a failure is neutral and cannot block a release.
 Add an entry with the scenario ID, the date, and a link to the tracking issue; remove the entry once the scenario is stable again.
 
 ## Bumping pinned versions
@@ -118,37 +118,38 @@ When bumping `OTELCOL_CONTRIB_VERSION`, update all 3 checksum keys from the new 
 ## Fork PRs and secrets
 
 The deterministic layers — `go test ./evals/custom/...`, example validation, and fixture builds — need no secrets and run on every PR, including forks and Dependabot, so those PRs still smoke the eval harness itself.
-Agent scenarios need the Anthropic API key, which exists only as an environment-scoped secret on the `evals` GitHub Actions environment, never as a repository-level secret (requirement R14).
+Agent scenarios on pull requests need the Anthropic API key, which exists only as an environment-scoped secret on the `evals` GitHub Actions environment, never as a repository-level secret, for that workflow (requirement R14).
 Fork and Dependabot PRs never run agent scenarios: the agent executes PR-authored content, so binding the key to it — even behind an approval prompt — would let that content exfiltrate the secret.
-The scenario jobs therefore skip on fork and Dependabot PRs (an `if:` guard on `github.event.pull_request.head.repo.fork` and `github.actor`), and the `evals-gate` accepts that skip; their agent-scenario coverage comes from the post-merge and nightly runs on the trusted `evals` environment.
+The scenario jobs therefore skip on fork and Dependabot PRs (an `if:` guard on `github.event.pull_request.head.repo.fork` and `github.actor`), and the `evals-gate` accepts that skip; their agent-scenario coverage comes from the release run instead, which re-runs the full matrix against the merged commit each time a release is cut.
 
 Changes to `skills/**` and `evals/custom/scenarios/` are prompt-bearing and require review by the code owners in [`.github/CODEOWNERS`](../../.github/CODEOWNERS); the `@dash0hq/agent-skills-maintainers` team must exist in the `dash0hq` organization with write access for that gate to take effect.
 
 ## CI
 
-3 workflows wire the harness into GitHub Actions; scenario IDs are never hardcoded in workflow YAML — every matrix comes from [`cmd/select-scenarios`](./cmd/select-scenarios).
+2 workflows wire the harness into GitHub Actions; scenario IDs are never hardcoded in workflow YAML — every matrix comes from [`cmd/select-scenarios`](./cmd/select-scenarios).
 
 - [`evals-pr.yml`](../../.github/workflows/evals-pr.yml) runs on every pull request with no path filter: unit tests, example validation, and fixture image builds run unconditionally without secrets, `select-scenarios --gate pr` maps the diff to scenarios (quarantined IDs excluded), per-scenario matrix jobs run the agent, kind scenarios run in a dedicated job that provisions the cluster, and the single `evals-gate` job aggregates everything fail-closed.
-- [`evals-nightly.yml`](../../.github/workflows/evals-nightly.yml) runs the full matrix every night at 03:17 UTC via the reusable [`evals-matrix.yml`](../../.github/workflows/evals-matrix.yml), including quarantined scenarios and the Kubernetes scenarios; a report job maintains 1 rolling issue per failing scenario (label `eval-failure`, closed on recovery), updates the pinned heartbeat issue (label `eval-heartbeat`), and records the total run cost.
-- [`release.yml`](../../.github/workflows/release.yml) resolves the HEAD SHA once at dispatch, runs the full matrix against that SHA through `evals-matrix.yml`, verifies with a `tessl tile publish` dry run that no `evals/` or `docs/` path would be published, and only then publishes and tags.
+- [`release.yml`](../../.github/workflows/release.yml) resolves the HEAD SHA once at dispatch, runs the full matrix (including quarantined and Kubernetes scenarios) against that SHA through the reusable [`evals-matrix.yml`](../../.github/workflows/evals-matrix.yml), verifies with a `tessl tile publish` dry run that no `evals/` or `docs/` path would be published, and only then publishes and tags.
 
-1 GitHub Actions environment must exist, holding the environment-scoped `ANTHROPIC_API_KEY` secret (never a repository-level secret):
+There is no nightly full-matrix run.
+There used to be one (`evals-nightly.yml`, on a 03:17 UTC cron); it was removed because its jobs bound the `evals` environment, and a required-reviewer protection rule on that environment left every unattended scheduled run stuck in `waiting` forever — nobody was present at 03:17 UTC to approve it — and turned every release dispatch into a manual approval click as well.
+The release workflow is now the sole full-matrix run, and it does not depend on the `evals` environment or its protection rules at all: `evals-matrix.yml`'s jobs read `ANTHROPIC_API_KEY` as a plain repository secret instead.
+That is safe specifically because `evals-matrix.yml` only ever runs as a `workflow_call` from `release.yml`, which is `workflow_dispatch`-only — no fork PR, Dependabot PR, or other PR-authored content can ever trigger it, so there is no untrusted path to the secret.
+Do not wire `evals-matrix.yml` into anything that runs on `pull_request`; that path must keep the key environment-scoped, as `evals-pr.yml` does.
 
-- `evals` — used by same-repo PR runs, nightly runs, and release runs. Fork and Dependabot PRs never reach it (their scenario jobs skip), so the key is never exposed to PR-authored content; do not create a fork-facing environment that holds the key.
+2 secrets must exist, both named `ANTHROPIC_API_KEY`:
 
-The `evals` environment must carry no protection rules: no required reviewers, no wait timer.
-Nightly and release runs are unattended — a required reviewer leaves every scheduled nightly run stuck in `waiting` forever, since nobody is present to approve a 03:17 UTC cron firing, and it turns each release dispatch into a manual approval click.
-Fork and Dependabot protection already comes entirely from the workflow-level `if:` guards on the scenario jobs (evaluated before the environment is ever bound), so environment-level approval adds no additional protection for the API key and only blocks legitimate automation.
-If nightly runs are found stuck in `waiting`, this protection rule is the first thing to check.
+- An environment-scoped secret on the `evals` GitHub Actions environment, used only by `evals-pr.yml` for same-repo PR runs. Fork and Dependabot PRs never reach it (their scenario jobs skip), so the key is never exposed to PR-authored content; do not create a fork-facing environment that holds it.
+- A repository-level secret, used only by `evals-matrix.yml` when called from `release.yml`, per the reasoning above.
 
 Branch protection requires exactly 1 check: `evals-gate`.
 It runs with `if: always()` and fails unless every needed job succeeded or was deliberately deselected (the select job succeeded with a scenario count of 0), so a skipped check can never pass vacuously.
 
 Bootstrap in this order:
 
-1. Create the `evals` environment with the `ANTHROPIC_API_KEY` secret and no protection rules (no required reviewers, no wait timer; no fork-facing environment holds the key).
+1. Create the `evals` environment with its `ANTHROPIC_API_KEY` secret (no fork-facing environment holds it), and add the separate repository-level `ANTHROPIC_API_KEY` secret used by `release.yml`.
 2. Land the CI pull request while `evals-gate` is not yet a required check.
-3. Dispatch the spike workflow (and a manual `evals-nightly.yml` run) to prove the runner topology end to end.
+3. Dispatch the spike workflow, then a manual `release.yml` run, to prove the runner topology end to end.
 4. Flip `evals-gate` to required in branch protection.
 
 ## Packaging

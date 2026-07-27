@@ -108,7 +108,7 @@ Set `EVAL_VERDICT_DIR=/tmp/verdicts` to write each verdict as JSON alongside the
 
 ## Quarantined scenarios
 
-`evals/custom/quarantine.yaml` lists scenarios the pull-request gate skips, so a known-red scenario cannot block unrelated work; the nightly run still executes and reports them, so recovery stays observable.
+`evals/custom/quarantine.yaml` lists scenarios the pull-request gate skips, so a known-red scenario cannot block unrelated work; the release run still executes and reports them, so recovery stays observable.
 To watch a quarantined scenario locally, name it explicitly in `EVAL_SCENARIOS`.
 
 No scenarios are currently quarantined.

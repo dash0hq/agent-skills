@@ -16,11 +16,11 @@ Follow semantic versioning (`MAJOR.MINOR.PATCH`):
 The eval harness (`evals/custom/`), the Tessl eval scenarios (`evals/tessl/`), and the repository docs (`docs/`) are maintainer-facing and must not ship in published artifacts.
 The whole `evals/` tree and `docs/` are therefore excluded.
 
-The Tessl tile excludes them through [`.tesslignore`](./.tesslignore) at the repository root, which `tessl tile publish` reads with gitignore-style patterns; [`.tileignore`](./.tileignore) carries the same patterns for tessl CLI versions that predate the tile-to-plugin rename.
+The Tessl tile excludes them through [`.tesslignore`](./.tesslignore) at the repository root, which `tessl plugin publish` reads with gitignore-style patterns; [`.tileignore`](./.tileignore) carries the same patterns for tessl CLI versions that predate the tile-to-plugin rename.
 Verify the exclusion before releasing:
 
 ```bash
-tessl tile publish . --dry-run --verbose
+tessl plugin publish . --dry-run --verbose
 ```
 
 The `--verbose` file listing must contain no paths under `evals/` or `docs/`; if it does, fix the ignore files before running the release workflow.
@@ -45,7 +45,7 @@ The flag reads the scenarios from the working tree, which carries them regardles
 
 3. Verify that `README.md` reflects the current set of skills and their descriptions.
 4. Confirm that every skill directory contains a valid `SKILL.md`.
-5. Verify the Tessl tile contents with `tessl tile publish . --dry-run --verbose` and confirm the listing contains no `evals/` or `docs/` paths.
+5. Verify the Tessl tile contents with `tessl plugin publish . --dry-run --verbose` and confirm the listing contains no `evals/` or `docs/` paths.
 
 ## Creating the release
 

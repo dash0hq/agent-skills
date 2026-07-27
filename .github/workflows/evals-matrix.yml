@@ -4,11 +4,13 @@
 # every RequiresKind scenario.
 #
 # Secrets policy (R14 amended): agent jobs read ANTHROPIC_API_KEY as a plain
-# repository secret, not an environment-scoped one. That is safe here and
-# nowhere else: this workflow only ever runs as a workflow_call from
-# release.yml, which is workflow_dispatch-only — it can never be triggered by
-# a fork PR, a Dependabot PR, or any other PR-authored content, so there is no
-# untrusted trigger that could reach this secret. Do not reuse this workflow
+# repository secret, not an environment-scoped one, so no environment
+# protection rule (e.g. required reviewers) can gate them on manual approval.
+# In place of that gate, agent-scenarios and kind-scenarios each carry an
+# `if: github.event_name == 'workflow_dispatch'` guard: this workflow only
+# ever runs as a workflow_call from release.yml, which is workflow_dispatch-
+# only, so the guard fails closed against a fork PR, a Dependabot PR, or any
+# other PR-authored trigger reaching the secret. Do not reuse this workflow
 # from anything that runs on `pull_request`; that path (evals-pr.yml) must
 # keep the key environment-scoped, per the secrets policy comment there.
 name: Evals matrix
@@ -87,14 +89,17 @@ jobs:
   agent-scenarios:
     name: Scenario ${{ matrix.scenario }}
     needs: select
-    if: needs.select.outputs.count > 0
+    # No environment binds this job (see the secrets policy comment at the
+    # top of this file), so this if: is the only thing standing between the
+    # repository-secret API key and an untrusted trigger. Fail closed on
+    # event type: only run for the workflow_dispatch caller (release.yml).
+    # If this workflow is ever wired into anything else, a job here must
+    # never run for a pull_request-triggered call.
+    if: needs.select.outputs.count > 0 && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 25m internal go-test timeout plus setup, CLI install, and artifact upload
     # headroom.
     timeout-minutes: 40
-    # ANTHROPIC_API_KEY is a plain repository secret here (see the secrets
-    # policy comment at the top of this file) — no environment, so no
-    # environment protection rule can ever gate this job on manual approval.
     # Quarantined scenarios (quarantine.yaml) still run for observability but
     # never block: a failing quarantined leg is neutral (continue-on-error),
     # so a release is not gated by known-red scenarios.
@@ -171,14 +176,14 @@ jobs:
   kind-scenarios:
     name: Kind scenario ${{ matrix.scenario }}
     needs: select
-    if: needs.select.outputs.kind-count > 0
+    # See the same-named guard on agent-scenarios above: no environment binds
+    # this job, so this if: is the only thing standing between the
+    # repository-secret API key and an untrusted trigger.
+    if: needs.select.outputs.kind-count > 0 && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 40m internal go-test timeout plus cluster provisioning, CLI install, and
     # artifact upload headroom.
     timeout-minutes: 55
-    # ANTHROPIC_API_KEY is a plain repository secret here (see the secrets
-    # policy comment at the top of this file) — no environment, so no
-    # environment protection rule can ever gate this job on manual approval.
     # Quarantined kind scenarios still run for observability but never block:
     # a failing quarantined leg is neutral (continue-on-error), so a release
     # is not gated by known-red scenarios.

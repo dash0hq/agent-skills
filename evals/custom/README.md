@@ -134,7 +134,7 @@ Changes to `skills/**` and `evals/custom/scenarios/` are prompt-bearing and requ
 There is no nightly full-matrix run.
 There used to be one (`evals-nightly.yml`, on a 03:17 UTC cron); it was removed because its jobs bound the `evals` environment, and a required-reviewer protection rule on that environment left every unattended scheduled run stuck in `waiting` forever — nobody was present at 03:17 UTC to approve it — and turned every release dispatch into a manual approval click as well.
 The release workflow is now the sole full-matrix run, and it does not depend on the `evals` environment or its protection rules at all: `evals-matrix.yml`'s jobs read `ANTHROPIC_API_KEY` as a plain repository secret instead.
-That is safe specifically because `evals-matrix.yml` only ever runs as a `workflow_call` from `release.yml`, which is `workflow_dispatch`-only — no fork PR, Dependabot PR, or other PR-authored content can ever trigger it, so there is no untrusted path to the secret.
+In place of the environment gate, `agent-scenarios` and `kind-scenarios` each carry an `if: github.event_name == 'workflow_dispatch'` guard, so they fail closed if this reusable workflow is ever called from anything other than `release.yml`'s `workflow_dispatch` trigger — no fork PR, Dependabot PR, or other PR-authored content can reach the secret through it.
 Do not wire `evals-matrix.yml` into anything that runs on `pull_request`; that path must keep the key environment-scoped, as `evals-pr.yml` does.
 
 2 secrets must exist, both named `ANTHROPIC_API_KEY`:

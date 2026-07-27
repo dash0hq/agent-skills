@@ -13,13 +13,14 @@ Follow semantic versioning (`MAJOR.MINOR.PATCH`):
 
 ## Published artifact contents
 
-The eval harness and the repository docs (`evals/` and `docs/`) are maintainer-facing and must not ship in published artifacts.
+The eval harness (`evals/custom/`), the Tessl eval scenarios (`evals/tessl/`), and the repository docs (`docs/`) are maintainer-facing and must not ship in published artifacts.
+The whole `evals/` tree and `docs/` are therefore excluded.
 
-The Tessl tile excludes them through [`.tesslignore`](./.tesslignore) at the repository root, which `tessl tile publish` reads with gitignore-style patterns; [`.tileignore`](./.tileignore) carries the same patterns for tessl CLI versions that predate the tile-to-plugin rename.
+The Tessl tile excludes them through [`.tesslignore`](./.tesslignore) at the repository root, which `tessl plugin publish` reads with gitignore-style patterns; [`.tileignore`](./.tileignore) carries the same patterns for tessl CLI versions that predate the tile-to-plugin rename.
 Verify the exclusion before releasing:
 
 ```bash
-tessl tile publish . --dry-run --verbose
+tessl plugin publish . --dry-run --verbose
 ```
 
 The `--verbose` file listing must contain no paths under `evals/` or `docs/`; if it does, fix the ignore files before running the release workflow.
@@ -27,6 +28,11 @@ The `--verbose` file listing must contain no paths under `evals/` or `docs/`; if
 The Claude Code plugin, the Cursor plugin, and the Gemini CLI extension install by cloning this repository.
 Neither `plugin.json` nor `gemini-extension.json` supports an include or exclude field, and no ignore-file mechanism exists for those installers (verified against the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference) and the [Gemini CLI extension reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md) as of 2026-07).
 Those installs therefore contain `evals/` and `docs/`; the content is inert for consumers, and removing it would require a separate distribution repository or release archives instead of git clones.
+
+### Scoring the Tessl scenarios at publish
+
+The release workflow passes `--eval-scenarios evals/tessl` to the publish command, so the authored scenarios in `evals/tessl/` are scored on the registry at publish time.
+The flag reads the scenarios from the working tree, which carries them regardless of the `.tesslignore` exclusion, so they contribute to the registry score without shipping inside the packaged tile.
 
 ## Pre-release checklist
 
@@ -39,7 +45,7 @@ Those installs therefore contain `evals/` and `docs/`; the content is inert for 
 
 3. Verify that `README.md` reflects the current set of skills and their descriptions.
 4. Confirm that every skill directory contains a valid `SKILL.md`.
-5. Verify the Tessl tile contents with `tessl tile publish . --dry-run --verbose` and confirm the listing contains no `evals/` or `docs/` paths.
+5. Verify the Tessl tile contents with `tessl plugin publish . --dry-run --verbose` and confirm the listing contains no `evals/` or `docs/` paths.
 
 ## Creating the release
 

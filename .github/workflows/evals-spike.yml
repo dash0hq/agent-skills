@@ -5,17 +5,17 @@
 # before any of them is trusted in CI:
 #
 #   1. kind-bridge: a pod inside a kind cluster on ubuntu-latest can deliver
-#      OTLP through the dual-homed relay container (evals/cmd/relay) attached
+#      OTLP through the dual-homed relay container (evals/custom/cmd/relay) attached
 #      to the "kind" Docker network, and the relay can forward to a host
 #      receiver via host.docker.internal (host-gateway). If this route fails,
 #      the fallback is reversing the direction with kind extraPortMappings
-#      plus a NodePort Service (sketch in evals/fixtures/k8s/kind-config.yaml).
+#      plus a NodePort Service (sketch in evals/custom/fixtures/k8s/kind-config.yaml).
 #
 #   2. dash0-operator-placeholder: the Dash0 operator, installed with a
 #      runtime-generated placeholder token and a plaintext (http://) OTLP
 #      endpoint pointing at the relay, still starts its collectors and
 #      attempts export — the behavior the k8s-deploy-dash0-operator scenario
-#      asserts (see evals/scenarios/kubernetes.go).
+#      asserts (see evals/custom/scenarios/kubernetes.go).
 name: Evals spike (throwaway)
 
 on:
@@ -26,7 +26,7 @@ permissions:
 
 env:
   # Keep the KIND_VERSION and KIND_NODE_IMAGE pins below in sync with the
-  # node image pinned in evals/fixtures/k8s/kind-config.yaml
+  # node image pinned in evals/custom/fixtures/k8s/kind-config.yaml
   # (kind v0.31.0 default node image, digest from the kind release notes).
   KIND_VERSION: v0.31.0
   KIND_NODE_IMAGE: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
@@ -49,7 +49,7 @@ jobs:
           version: ${{ env.KIND_VERSION }}
           node_image: ${{ env.KIND_NODE_IMAGE }}
           cluster_name: agent-skills-evals
-          config: evals/fixtures/k8s/kind-config.yaml
+          config: evals/custom/fixtures/k8s/kind-config.yaml
 
       - name: Start host OTLP receiver
         run: |
@@ -88,7 +88,7 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "TOKEN=$TOKEN" >> /tmp/spike.env
 
-          docker build -f evals/cmd/relay/Dockerfile -t agent-skills-eval-relay:local evals
+          docker build -f evals/custom/cmd/relay/Dockerfile -t agent-skills-eval-relay:local evals/custom
 
           cat > /tmp/relay.env <<EOF
           RELAY_UPSTREAM=http://host.docker.internal:${RECEIVER_PORT}
@@ -168,7 +168,7 @@ jobs:
             fi
             sleep 2
           done
-          echo "::error::No OTLP request reached the host receiver through the relay; the Docker-network route failed. Fall back to kind extraPortMappings + NodePort (see evals/fixtures/k8s/kind-config.yaml) and record the outcome in the plan."
+          echo "::error::No OTLP request reached the host receiver through the relay; the Docker-network route failed. Fall back to kind extraPortMappings + NodePort (see evals/custom/fixtures/k8s/kind-config.yaml) and record the outcome in the plan."
           exit 1
 
       - name: Dump diagnostics
@@ -197,7 +197,7 @@ jobs:
           version: ${{ env.KIND_VERSION }}
           node_image: ${{ env.KIND_NODE_IMAGE }}
           cluster_name: agent-skills-evals
-          config: evals/fixtures/k8s/kind-config.yaml
+          config: evals/custom/fixtures/k8s/kind-config.yaml
 
       - name: Start host OTLP receiver
         run: |
@@ -230,7 +230,7 @@ jobs:
           echo "::add-mask::$TOKEN"
           echo "TOKEN=$TOKEN" >> /tmp/spike.env
 
-          docker build -f evals/cmd/relay/Dockerfile -t agent-skills-eval-relay:local evals
+          docker build -f evals/custom/cmd/relay/Dockerfile -t agent-skills-eval-relay:local evals/custom
 
           cat > /tmp/relay.env <<EOF
           RELAY_UPSTREAM=http://host.docker.internal:${RECEIVER_PORT}

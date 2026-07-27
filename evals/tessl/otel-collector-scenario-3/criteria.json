@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent correctly sets up RED metric materialization from traces using the signaltometricsconnector with tail-based sampling, ensuring metrics accuracy by deriving them from all spans before sampling, and using the correct histogram type and connector wiring.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "signaltometrics not spanmetrics",
+      "description": "Uses the signaltometricsconnector (signaltometrics connector type), NOT the spanmetricsconnector (span_metrics or spanmetrics connector type)",
+      "max_score": 12
+    },
+    {
+      "name": "exponential_histogram used",
+      "description": "The signaltometrics connector defines metrics using exponential_histogram (not a histogram with explicit bucket boundaries)",
+      "max_score": 10
+    },
+    {
+      "name": "Connector before sampling in pipeline",
+      "description": "In the traces pipeline, signaltometrics appears in the exporters list BEFORE or alongside the backend OTLP exporter — and the tail_sampling processor runs on the traces pipeline where the connector also exports (not after a separate sampling-only fork)",
+      "max_score": 12
+    },
+    {
+      "name": "Metrics pipeline uses connector as receiver",
+      "description": "A separate metrics pipeline exists with signaltometrics as a receiver (e.g., metrics/red or metrics pipeline with receivers: [signaltometrics])",
+      "max_score": 10
+    },
+    {
+      "name": "Semconv metric names",
+      "description": "At least one of the following metric names appears in the connector definition: http.server.request.duration, http.client.request.duration, rpc.server.call.duration, or rpc.client.call.duration",
+      "max_score": 8
+    },
+    {
+      "name": "Semconv conditions used",
+      "description": "The connector span conditions use SPAN_KIND_SERVER or SPAN_KIND_CLIENT (not simple status-code conditions), matching the semantic convention filter patterns",
+      "max_score": 8
+    },
+    {
+      "name": "service.name in resource attributes",
+      "description": "The connector includes service.name in include_resource_attributes (so generated metrics carry the service identifier)",
+      "max_score": 8
+    },
+    {
+      "name": "AlwaysOn sampler recommendation",
+      "description": "The configuration or accompanying notes.md recommend (or assumes) that application SDKs use AlwaysOn sampling and that sampling only happens in the Collector",
+      "max_score": 6
+    },
+    {
+      "name": "Tail sampling policies include errors and latency",
+      "description": "The tailsamplingprocessor defines at least an error policy (type: status_code with ERROR) AND a latency policy (type: latency), not just probabilistic sampling",
+      "max_score": 8
+    },
+    {
+      "name": "memory_limiter first",
+      "description": "memory_limiter appears as the first processor in every pipeline (traces and metrics pipelines)",
+      "max_score": 9
+    },
+    {
+      "name": "No batch processor",
+      "description": "No batch processor is present in any pipeline",
+      "max_score": 9
+    }
+  ]
+}

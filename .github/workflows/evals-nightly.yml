@@ -97,7 +97,7 @@ jobs:
             else
               quarantined_note="no"
               if [ "$(echo "$QUARANTINED" | jq --arg id "$id" 'index($id) != null')" = "true" ]; then
-                quarantined_note="yes (does not block PRs; see evals/quarantine.yaml)"
+                quarantined_note="yes (does not block PRs; see evals/custom/quarantine.yaml)"
               fi
               body="The nightly eval run failed for scenario \`${id}\`.
 

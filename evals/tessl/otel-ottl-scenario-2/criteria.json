@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent normalizes high-cardinality URL path attributes using replace_pattern with UUID and numeric ID patterns, applies attribute count and length limits, uses the resource processor for static attributes, uses transform to copy resource attributes to span level, and adds nil guards on all where clauses.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "UUID pattern normalization",
+      "description": "Uses replace_pattern() with a UUID regex (matching 8-4-4-4-12 hex groups) to replace UUID path segments in url.path and/or http.route with a fixed placeholder (e.g., `/{uuid}`)",
+      "max_score": 10
+    },
+    {
+      "name": "Numeric ID normalization",
+      "description": "Uses replace_pattern() with a numeric regex (e.g., `/\\d+`) to replace numeric path segments in url.path and/or http.route with a fixed placeholder (e.g., `/{id}`)",
+      "max_score": 10
+    },
+    {
+      "name": "nil guard on url.path",
+      "description": "All replace_pattern statements on url.path include a `where span.attributes[\"url.path\"] != nil` guard",
+      "max_score": 8
+    },
+    {
+      "name": "nil guard on http.route",
+      "description": "All replace_pattern statements on http.route include a `where span.attributes[\"http.route\"] != nil` guard",
+      "max_score": 8
+    },
+    {
+      "name": "limit() for attribute count",
+      "description": "Uses limit() to cap the number of attributes on spans (and/or logs) to prevent attribute-count cardinality explosion",
+      "max_score": 10
+    },
+    {
+      "name": "truncate_all() for value length",
+      "description": "Uses truncate_all() to cap the length of string attribute values on spans (and/or logs)",
+      "max_score": 10
+    },
+    {
+      "name": "resource processor for static attrs",
+      "description": "Uses the `resource` processor (not `transform`) to add static resource-level attributes such as environment name or cluster name",
+      "max_score": 12
+    },
+    {
+      "name": "transform to copy resource to span",
+      "description": "Uses the `transform` processor with set() to copy a resource attribute down to the span or log level (not the resource processor for this operation)",
+      "max_score": 10
+    },
+    {
+      "name": "error_mode set explicitly",
+      "description": "Every transform processor block includes an explicit `error_mode:` key",
+      "max_score": 8
+    },
+    {
+      "name": "error_mode ignore production",
+      "description": "All processor configs use `error_mode: ignore`",
+      "max_score": 6
+    },
+    {
+      "name": "nil keyword not null",
+      "description": "All absence checks use `nil` (not `null`) in OTTL conditions",
+      "max_score": 8
+    }
+  ]
+}

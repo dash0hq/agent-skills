@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent correctly updates deprecated OpenTelemetry HTTP attribute names to their current equivalents, applies the correct URL attributes for client vs server spans, renames HTTP duration metrics and their units, and handles non-standard HTTP method values using the _OTHER pattern.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "http.request.method used",
+      "description": "Uses `http.request.method` instead of the deprecated `http.method` for HTTP method attribute",
+      "max_score": 10
+    },
+    {
+      "name": "http.response.status_code used",
+      "description": "Uses `http.response.status_code` instead of the deprecated `http.status_code`",
+      "max_score": 10
+    },
+    {
+      "name": "url.full on client spans",
+      "description": "Uses `url.full` on CLIENT (outbound) HTTP spans instead of deprecated `http.url`",
+      "max_score": 10
+    },
+    {
+      "name": "url.path on server spans",
+      "description": "Uses `url.path` (and `url.query` where applicable) on SERVER (inbound) spans instead of `http.target`",
+      "max_score": 8
+    },
+    {
+      "name": "url.full NOT on server spans",
+      "description": "Does NOT use `url.full` on SERVER spans — only `url.path`, `url.query`, `url.scheme`",
+      "max_score": 8
+    },
+    {
+      "name": "server.address used",
+      "description": "Uses `server.address` instead of deprecated `net.peer.name` or `net.host.name`",
+      "max_score": 8
+    },
+    {
+      "name": "url.scheme used",
+      "description": "Uses `url.scheme` instead of deprecated `http.scheme`",
+      "max_score": 6
+    },
+    {
+      "name": "user_agent.original used",
+      "description": "Uses `user_agent.original` instead of deprecated `http.user_agent`",
+      "max_score": 6
+    },
+    {
+      "name": "Metric name updated",
+      "description": "Uses `http.server.request.duration` (and/or `http.client.request.duration`) instead of deprecated `http.server.duration` / `http.client.duration`",
+      "max_score": 10
+    },
+    {
+      "name": "Duration unit seconds",
+      "description": "HTTP duration metric is recorded in seconds (e.g., `0.245`), NOT milliseconds (e.g., `245`)",
+      "max_score": 10
+    },
+    {
+      "name": "_OTHER normalization",
+      "description": "Non-standard HTTP method values are set to `_OTHER` in `http.request.method`, with the original value stored in `http.request.method_original`",
+      "max_score": 14
+    }
+  ]
+}

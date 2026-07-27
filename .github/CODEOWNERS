@@ -5,4 +5,5 @@
 # The @dash0hq/oss team must have write access to this repository, and branch
 # protection must require code-owner review, for these rules to take effect.
 /skills/ @dash0hq/oss
-/evals/scenarios/ @dash0hq/oss
+/evals/custom/scenarios/ @dash0hq/oss
+/evals/tessl/ @dash0hq/oss

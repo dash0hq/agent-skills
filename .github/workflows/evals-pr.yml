@@ -14,7 +14,7 @@
 # the post-merge and nightly runs on the trusted "evals" environment.
 #
 # Gating (R11-R13, R16): there is deliberately NO path filter on the trigger.
-# Selection happens inside the workflow via evals/cmd/select-scenarios, and
+# Selection happens inside the workflow via evals/custom/cmd/select-scenarios, and
 # branch protection targets exactly one job name: "evals-gate". That job runs
 # with if: always() and fails closed — a skipped scenario job satisfies it
 # only when the select job succeeded with the corresponding count of 0, so a
@@ -35,7 +35,7 @@ concurrency:
 
 env:
   # Keep the KIND_VERSION and KIND_NODE_IMAGE pins below in sync with the
-  # node image pinned in evals/fixtures/k8s/kind-config.yaml
+  # node image pinned in evals/custom/fixtures/k8s/kind-config.yaml
   # (kind v0.31.0 default node image, digest from the kind release notes).
   KIND_VERSION: v0.31.0
   KIND_NODE_IMAGE: kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f
@@ -51,12 +51,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Build, vet, and test the evals module
         run: |
-          cd evals
+          cd evals/custom
           go build ./...
           go vet ./...
           # -short keeps this job to fast unit tests. The heavy, kind- and
@@ -76,19 +76,19 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Compute the otelcol-contrib cache key
         id: otelcol
         run: |
-          source evals/versions.env
+          source evals/custom/versions.env
           echo "key=otelcol-contrib-${OTELCOL_CONTRIB_VERSION}-${OTELCOL_CONTRIB_SHA256_LINUX_AMD64}" >> "$GITHUB_OUTPUT"
 
       - name: Cache the otelcol-contrib binary
         uses: actions/cache@v5
         with:
-          # evals/examples/otelcolbin caches the verified binary under the
+          # evals/custom/examples/otelcolbin caches the verified binary under the
           # user cache directory; the key carries the pinned version and
           # checksum, so pin bumps invalidate it.
           path: ~/.cache/agent-skills-evals
@@ -96,7 +96,7 @@ jobs:
 
       - name: Validate every fenced example in skills/
         run: |
-          cd evals
+          cd evals/custom
           go run ./cmd/validate-examples
 
   list-fixtures:
@@ -111,9 +111,9 @@ jobs:
       - name: List the fixture service directories
         id: list
         run: |
-          fixtures=$(ls -d evals/fixtures/*-service | jq -R . | jq -cs .)
+          fixtures=$(ls -d evals/custom/fixtures/*-service | jq -R . | jq -cs .)
           if [ "$(echo "$fixtures" | jq 'length')" -eq 0 ]; then
-            echo "::error::No fixture service directories found under evals/fixtures/"
+            echo "::error::No fixture service directories found under evals/custom/fixtures/"
             exit 1
           fi
           echo "fixtures=$fixtures" >> "$GITHUB_OUTPUT"
@@ -139,7 +139,7 @@ jobs:
           # listing a fork PR can influence, so it must never be interpolated
           # straight into the shell.
           case "$FIXTURE" in
-            evals/fixtures/*-service) ;;
+            evals/custom/fixtures/*-service) ;;
             *) echo "::error::Unexpected fixture path: $FIXTURE"; exit 1 ;;
           esac
           docker build "$FIXTURE"
@@ -161,15 +161,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Map the PR diff to scenarios
         id: select
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          cd evals
+          cd evals/custom
           go run ./cmd/select-scenarios --gate pr --changed-from-git "origin/${BASE_REF}" > /tmp/selection.json
           cat /tmp/selection.json
           {
@@ -243,7 +243,7 @@ jobs:
           # Fail closed: TestScenarios skips (exit 0) without the key, so a
           # missing secret would otherwise turn into a vacuous green check.
           if [ "$HAS_KEY" != "true" ]; then
-            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/custom/README.md)"
             exit 1
           fi
 
@@ -253,12 +253,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Install the pinned Claude Code CLI
         run: |
-          source evals/versions.env
+          source evals/custom/versions.env
           curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
@@ -275,25 +275,25 @@ jobs:
           # it in this step before any other output. ANTHROPIC_API_KEY is
           # masked by Actions itself as a secret.
           mkdir -p evidence
-          cd evals
+          cd evals/custom
           set +e
           # Target the specific scenario subtest so Go's own -run filter runs
           # only it; the EVAL_SCENARIOS env still scopes the harness and names
           # the scenario in the fail-closed messages below.
-          go test ./scenarios -run "^TestScenarios$/^${EVAL_SCENARIOS}$" -v -timeout 35m 2>&1 | tee ../evidence/test-output.log
+          go test ./scenarios -run "^TestScenarios$/^${EVAL_SCENARIOS}$" -v -timeout 35m 2>&1 | tee ../../evidence/test-output.log
           status=${PIPESTATUS[0]}
           set -e
           # Fail closed on a vacuous green: the harness writes a verdict file
           # for every scenario it runs, so a clean exit with no verdict means
           # the scenario skipped (infra silently unavailable) rather than
           # passed.
-          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+          if [ "$status" -eq 0 ] && ! ls ../../evidence/verdict-*.json >/dev/null 2>&1; then
             echo "::error::Scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check Docker/binary availability)"
             status=1
           fi
           passed=false
           [ "$status" -eq 0 ] && passed=true
-          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../../evidence/result.json
           exit "$status"
 
       - name: Upload evidence
@@ -331,7 +331,7 @@ jobs:
           # key, so a missing secret would otherwise turn into a vacuous
           # green check.
           if [ "$HAS_KEY" != "true" ]; then
-            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/README.md)"
+            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/custom/README.md)"
             exit 1
           fi
 
@@ -341,8 +341,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: evals/go.mod
-          cache-dependency-path: evals/go.sum
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
 
       - name: Create kind cluster
         uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
@@ -350,11 +350,11 @@ jobs:
           version: ${{ env.KIND_VERSION }}
           node_image: ${{ env.KIND_NODE_IMAGE }}
           cluster_name: agent-skills-evals
-          config: evals/fixtures/k8s/kind-config.yaml
+          config: evals/custom/fixtures/k8s/kind-config.yaml
 
       - name: Install the pinned Claude Code CLI
         run: |
-          source evals/versions.env
+          source evals/custom/versions.env
           curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
@@ -365,20 +365,20 @@ jobs:
           EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
         run: |
           mkdir -p evidence
-          cd evals
+          cd evals/custom
           set +e
           # Target the specific scenario subtest (see the agent-scenarios job).
-          go test ./scenarios -run "^TestKubernetesScenarios$/^${EVAL_SCENARIOS}$" -v -timeout 40m 2>&1 | tee ../evidence/test-output.log
+          go test ./scenarios -run "^TestKubernetesScenarios$/^${EVAL_SCENARIOS}$" -v -timeout 40m 2>&1 | tee ../../evidence/test-output.log
           status=${PIPESTATUS[0]}
           set -e
           # Fail closed on a vacuous green (see the agent-scenarios job).
-          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+          if [ "$status" -eq 0 ] && ! ls ../../evidence/verdict-*.json >/dev/null 2>&1; then
             echo "::error::Kind scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check kind/Docker availability)"
             status=1
           fi
           passed=false
           [ "$status" -eq 0 ] && passed=true
-          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../../evidence/result.json
           exit "$status"
 
       - name: Upload evidence

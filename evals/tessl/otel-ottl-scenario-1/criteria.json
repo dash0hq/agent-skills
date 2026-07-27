@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent correctly configures a PII redaction pipeline: guards with nil checks, applies appropriate redaction strategies per data type, uses the filter processor for dropping entire records, sets error_mode in production, and orders processors correctly relative to enrichment.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "nil guard on redacted attrs",
+      "description": "Each redaction statement (set, replace_pattern, SHA256, delete_key on sensitive attributes) includes a `where <attribute> != nil` guard — NOT `where <attribute> != null`",
+      "max_score": 12
+    },
+    {
+      "name": "nil keyword not null",
+      "description": "Absence checks use `nil` (not `null`) throughout all OTTL statements",
+      "max_score": 8
+    },
+    {
+      "name": "error_mode set explicitly",
+      "description": "Every transform and filter processor block has an explicit `error_mode:` key set",
+      "max_score": 8
+    },
+    {
+      "name": "error_mode ignore in production",
+      "description": "All production processor configs use `error_mode: ignore` (not `propagate` or `silent`)",
+      "max_score": 8
+    },
+    {
+      "name": "SHA256 hash for emails/IDs",
+      "description": "Uses SHA256() to hash PII that should remain correlatable (e.g., user email or user ID), rather than replacing with a static placeholder",
+      "max_score": 10
+    },
+    {
+      "name": "replace_pattern for partial masking",
+      "description": "Uses replace_pattern() with a regex to partially mask structured values (e.g., credit card numbers) rather than replacing the entire value",
+      "max_score": 10
+    },
+    {
+      "name": "filter processor for full drops",
+      "description": "Uses the filter processor (not the transform processor) to drop entire log or span records that are entirely sensitive",
+      "max_score": 10
+    },
+    {
+      "name": "redaction after enrichment",
+      "description": "In the service pipeline, redaction/filter processors appear AFTER enrichment processors (e.g., resourcedetection, k8sattributes, resource) and BEFORE exporters",
+      "max_score": 10
+    },
+    {
+      "name": "delete_key for never-export attrs",
+      "description": "Uses delete_key() for attributes that must never be exported (not set to 'REDACTED' placeholder)",
+      "max_score": 10
+    },
+    {
+      "name": "set REDACTED for auth headers",
+      "description": "Uses set(<attr>, \"REDACTED\") for known sensitive headers (e.g., authorization, cookie) rather than hashing or masking",
+      "max_score": 8
+    },
+    {
+      "name": "debug exporter for validation",
+      "description": "Config includes or references a debug exporter (verbosity: detailed) as part of validation workflow, OR a comment explains the validation step",
+      "max_score": 6
+    }
+  ]
+}

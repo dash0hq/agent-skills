@@ -117,7 +117,7 @@ jobs:
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          for manifest in ".claude-plugin/plugin.json" ".cursor-plugin/plugin.json" "gemini-extension.json" "tile.json"; do
+          for manifest in ".claude-plugin/plugin.json" ".cursor-plugin/plugin.json" "gemini-extension.json" ".tessl-plugin/plugin.json"; do
             jq ".version = \"${TAG}\"" "${manifest}" > "${manifest}.tmp"
             mv "${manifest}.tmp" "${manifest}"
             git add "${manifest}"
@@ -215,21 +215,24 @@ jobs:
         run: |
           # R20: published artifacts must exclude the eval harness and docs
           # (enforced by the repository-root .tesslignore; see RELEASE.md).
-          if ! output=$(tessl tile publish . --dry-run --verbose 2>&1); then
+          if ! output=$(tessl plugin publish . --dry-run --verbose 2>&1); then
             echo "$output"
-            echo "::error::tessl tile publish --dry-run failed"
+            echo "::error::tessl plugin publish --dry-run failed"
             exit 1
           fi
           echo "$output"
           if echo "$output" | grep -E '(^|[[:space:]"'"'"'])(\./)?(evals|docs)/' ; then
-            echo "::error::tessl tile publish would include evals/ or docs/ paths; fix .tesslignore before releasing"
+            echo "::error::tessl plugin publish would include evals/ or docs/ paths; fix .tesslignore before releasing"
             exit 1
           fi
           echo "Publish exclusions verified: no evals/ or docs/ paths in the dry-run output."
 
       - name: Publish to Tessl
         run: |
-          tessl tile publish .
+          # Score the authored Tessl scenarios at publish time. --eval-scenarios
+          # points the publisher at evals/tessl/ in the working tree; the packaged
+          # plugin still excludes all of evals/ (R20, verified above). See RELEASE.md.
+          tessl plugin publish . --eval-scenarios evals/tessl
 
       - name: Create tag
         env:

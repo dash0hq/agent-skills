@@ -8,20 +8,20 @@ This guide covers one thing those rules point at but do not walk through: how to
 
 ## What the evals measure
 
-The eval harness in `evals/` runs a coding agent, headless, against fixture applications with a skill loaded, then asserts on the telemetry that actually reaches an OpenTelemetry Collector sink.
+The eval harness in `evals/custom/` runs a coding agent, headless, against fixture applications with a skill loaded, then asserts on the telemetry that actually reaches an OpenTelemetry Collector sink.
 A passing scenario means an agent following the skill produced working telemetry.
 A failing scenario names where it broke, which is the signal you use to judge skill effectiveness.
 
-The full operator manual — CI workflows, the quarantine process, and the pinned-version bump process — is [evals/README.md](evals/README.md).
+The full operator manual — CI workflows, the quarantine process, and the pinned-version bump process — is [evals/custom/README.md](evals/custom/README.md).
 This section is the local quick start.
 
 ## Prerequisites
 
-- Go at the version pinned in `evals/go.mod` (1.26.3 or newer).
+- Go at the version pinned in `evals/custom/go.mod` (1.26.3 or newer).
 - An `ANTHROPIC_API_KEY` for the scenarios that invoke the agent.
   The hermetic tests and example validation need no key.
   Keep it in a local `.env` file rather than the command line — see "Configuring the API key" below.
-- The `claude` CLI at the version pinned in `evals/versions.env`, on `PATH`.
+- The `claude` CLI at the version pinned in `evals/custom/versions.env`, on `PATH`.
   Override the binary with `EVAL_AGENT_BINARY` if it is installed under another name.
 - Docker, running, for the instrumentation, browser, and Kubernetes scenarios.
   The Collector, OTTL, and semantic-convention scenarios run `otelcol-contrib` as a host process and need no Docker.
@@ -108,7 +108,7 @@ Set `EVAL_VERDICT_DIR=/tmp/verdicts` to write each verdict as JSON alongside the
 
 ## Quarantined scenarios
 
-`evals/quarantine.yaml` lists scenarios the pull-request gate skips, so a known-red scenario cannot block unrelated work; the nightly run still executes and reports them, so recovery stays observable.
+`evals/custom/quarantine.yaml` lists scenarios the pull-request gate skips, so a known-red scenario cannot block unrelated work; the nightly run still executes and reports them, so recovery stays observable.
 To watch a quarantined scenario locally, name it explicitly in `EVAL_SCENARIOS`.
 
 No scenarios are currently quarantined.
@@ -116,5 +116,5 @@ No scenarios are currently quarantined.
 
 ## Adding a scenario
 
-When you add or rename a rule file under `skills/`, register it in the eval registry, as described in [AGENTS.md](AGENTS.md) under "Eval rules" and in [evals/README.md](evals/README.md).
+When you add or rename a rule file under `skills/`, register it in the eval registry, as described in [AGENTS.md](AGENTS.md) under "Eval rules" and in [evals/custom/README.md](evals/custom/README.md).
 The registry completeness test fails CI on unclassified files, so this is enforced rather than optional.

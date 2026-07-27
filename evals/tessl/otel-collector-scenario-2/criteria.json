@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent correctly configures Kubernetes metadata enrichment for an OpenTelemetry Collector, including proper k8sattributes pod association order, extraction of both workload name and UID, consistent enrichment across all signal pipelines, correct processor ordering, and cluster-level static attributes via the resource processor.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Enrichment on all pipelines",
+      "description": "Both k8sattributes (or resourcedetection) AND resource processors appear in the processors list of ALL three pipelines: traces, metrics, AND logs — not just one or two",
+      "max_score": 12
+    },
+    {
+      "name": "k8s.pod.uid first in pod_association",
+      "description": "In the k8sattributes pod_association, the entry using 'from: resource_attribute' with name 'k8s.pod.uid' appears BEFORE the 'from: connection' entry",
+      "max_score": 12
+    },
+    {
+      "name": "Workload name and UID extracted",
+      "description": "The k8sattributes extract.metadata list includes BOTH k8s.deployment.name AND k8s.deployment.uid (both name and UID, not just one)",
+      "max_score": 10
+    },
+    {
+      "name": "resourcedetection override false",
+      "description": "The resourcedetection processor has override: false configured (not override: true or missing)",
+      "max_score": 9
+    },
+    {
+      "name": "resource processor for cluster attributes",
+      "description": "A resource processor is configured and sets at least one cluster-level attribute (e.g., k8s.cluster.name) using action: upsert or action: insert",
+      "max_score": 9
+    },
+    {
+      "name": "Processor ordering: enrichment after memory_limiter",
+      "description": "In each pipeline, memory_limiter appears before resourcedetection and/or k8sattributes (enrichment processors come after memory_limiter)",
+      "max_score": 9
+    },
+    {
+      "name": "Processor ordering: resource after enrichment",
+      "description": "In each pipeline, the resource processor (static attributes) appears AFTER resourcedetection and k8sattributes (not before them)",
+      "max_score": 8
+    },
+    {
+      "name": "k8sattributes passthrough: false",
+      "description": "The k8sattributes processor has passthrough: false (appropriate for a Collector that performs the Kubernetes API lookup itself)",
+      "max_score": 7
+    },
+    {
+      "name": "memory_limiter first",
+      "description": "memory_limiter is the first processor in every pipeline's processor list",
+      "max_score": 7
+    },
+    {
+      "name": "k8s.cluster.uid kube-system reference",
+      "description": "The configuration or accompanying documentation/comments references retrieving k8s.cluster.uid from the kube-system namespace (e.g., via kubectl get namespace kube-system -o jsonpath='{.metadata.uid}' or a placeholder comment explaining how to set it)",
+      "max_score": 8
+    },
+    {
+      "name": "No batch processor",
+      "description": "The configuration does NOT include a batch processor in any pipeline",
+      "max_score": 9
+    }
+  ]
+}

@@ -136,12 +136,17 @@ Changes to `skills/**` and `evals/custom/scenarios/` are prompt-bearing and requ
 
 - `evals` — used by same-repo PR runs, nightly runs, and release runs. Fork and Dependabot PRs never reach it (their scenario jobs skip), so the key is never exposed to PR-authored content; do not create a fork-facing environment that holds the key.
 
+The `evals` environment must carry no protection rules: no required reviewers, no wait timer.
+Nightly and release runs are unattended — a required reviewer leaves every scheduled nightly run stuck in `waiting` forever, since nobody is present to approve a 03:17 UTC cron firing, and it turns each release dispatch into a manual approval click.
+Fork and Dependabot protection already comes entirely from the workflow-level `if:` guards on the scenario jobs (evaluated before the environment is ever bound), so environment-level approval adds no additional protection for the API key and only blocks legitimate automation.
+If nightly runs are found stuck in `waiting`, this protection rule is the first thing to check.
+
 Branch protection requires exactly 1 check: `evals-gate`.
 It runs with `if: always()` and fails unless every needed job succeeded or was deliberately deselected (the select job succeeded with a scenario count of 0), so a skipped check can never pass vacuously.
 
 Bootstrap in this order:
 
-1. Create the `evals` environment with the `ANTHROPIC_API_KEY` secret (no fork-facing environment holds the key).
+1. Create the `evals` environment with the `ANTHROPIC_API_KEY` secret and no protection rules (no required reviewers, no wait timer; no fork-facing environment holds the key).
 2. Land the CI pull request while `evals-gate` is not yet a required check.
 3. Dispatch the spike workflow (and a manual `evals-nightly.yml` run) to prove the runner topology end to end.
 4. Flip `evals-gate` to required in branch protection.

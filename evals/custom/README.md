@@ -97,8 +97,8 @@ The full fixture contract, including the synthetic-data rules, lives in [`fixtur
 
 ## Quarantine
 
-Scenario IDs listed in [`quarantine.yaml`](./quarantine.yaml) are skipped by the PR gate: they do not run on PRs and cannot block merges.
-Nightly runs still execute and report them, so recovery stays observable.
+Scenario IDs listed in [`quarantine.yaml`](./quarantine.yaml) never block a gate.
+The PR gate skips them entirely (they do not run on PRs and cannot block merges), and the nightly and release matrices still run them for observability but as `continue-on-error` legs, so a failure is neutral and cannot block a release.
 Add an entry with the scenario ID, the date, and a link to the tracking issue; remove the entry once the scenario is stable again.
 
 ## Bumping pinned versions

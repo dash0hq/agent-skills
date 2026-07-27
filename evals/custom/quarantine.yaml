@@ -1,10 +1,11 @@
 # Quarantined eval scenarios (R16).
 #
-# Scenario IDs listed under `quarantine` are skipped by the PR gate: they do
-# not run and cannot block merges. Nightly runs still execute and report them,
-# so recovery is observable. Add an entry with the scenario ID, the date, and
-# a link to the tracking issue; remove the entry once the scenario is stable
-# again.
+# Scenario IDs listed under `quarantine` never block a gate. The PR gate skips
+# them entirely. The nightly and release matrices still run them for
+# observability, but as `continue-on-error` legs, so a failure is neutral and
+# does not gate the release (see .github/workflows/evals-matrix.yml). Add an
+# entry with the scenario ID, the date, and a link to the tracking issue;
+# remove the entry once the scenario is stable again.
 #
 # Example:
 #   quarantine:
@@ -20,5 +21,13 @@
 #     packages and wires the instrumentation itself). Any remaining skill-doc
 #     gap for the .NET NuGet install path is tracked in TODO.md separately.
 #
-# No scenarios are currently quarantined.
-quarantine: []
+#   - k8s-deploy-otel-operator and k8s-deploy-dash0-operator were quarantined
+#     on 2026-07-27: flaky telemetry delivery through operator injection in CI
+#     (the agent config is correct; not reproducible locally). See the issue.
+quarantine:
+  - id: k8s-deploy-otel-operator
+    since: 2026-07-27
+    issue: https://github.com/dash0hq/agent-skills/issues/41
+  - id: k8s-deploy-dash0-operator
+    since: 2026-07-27
+    issue: https://github.com/dash0hq/agent-skills/issues/41

@@ -91,6 +91,10 @@ jobs:
     # ANTHROPIC_API_KEY is environment-scoped (R14); repository-level secrets
     # must NOT be used.
     environment: evals
+    # Quarantined scenarios (quarantine.yaml) still run for observability but
+    # never block: a failing quarantined leg is neutral (continue-on-error), so
+    # nightly and release are not gated by known-red scenarios.
+    continue-on-error: ${{ contains(fromJSON(needs.select.outputs.quarantined), matrix.scenario) }}
     strategy:
       fail-fast: false
       matrix:
@@ -169,6 +173,10 @@ jobs:
     # artifact upload headroom.
     timeout-minutes: 55
     environment: evals
+    # Quarantined kind scenarios still run for observability but never block:
+    # a failing quarantined leg is neutral (continue-on-error), so nightly and
+    # release are not gated by known-red scenarios.
+    continue-on-error: ${{ contains(fromJSON(needs.select.outputs.quarantined), matrix.scenario) }}
     strategy:
       fail-fast: false
       matrix:

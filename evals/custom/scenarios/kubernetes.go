@@ -70,8 +70,13 @@ const (
 // operator reconciliation take longer than the plain-Docker scenarios, and
 // Collector batch processors delay the first export.
 const (
-	kindScenarioTimeout  = 25 * time.Minute
-	kindTelemetryTimeout = 120 * time.Second
+	kindScenarioTimeout = 25 * time.Minute
+	// Operator scenarios inject instrumentation through a mutating webhook,
+	// which adds pod recreation and reconciliation latency before the first
+	// export; 120s was too tight for the operator path in CI, so allow 300s.
+	// awaitTelemetry returns as soon as telemetry arrives, so this only
+	// extends the wait for the slow (operator) path, not the fast scenarios.
+	kindTelemetryTimeout = 300 * time.Second
 )
 
 // KindScenarioSpec describes how the KindFixture exercises one kind scenario:

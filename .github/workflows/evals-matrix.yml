@@ -136,20 +136,20 @@ jobs:
           mkdir -p evidence
           cd evals/custom
           set +e
-          go test ./scenarios -run TestScenarios -v -timeout 25m 2>&1 | tee ../evidence/test-output.log
+          go test ./scenarios -run TestScenarios -v -timeout 25m 2>&1 | tee ../../evidence/test-output.log
           status=${PIPESTATUS[0]}
           set -e
           # Fail closed on a vacuous green: the harness writes a verdict file
           # for every scenario it actually runs, so a clean exit with no
           # verdict means the scenario skipped (infra silently unavailable)
           # rather than passed.
-          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+          if [ "$status" -eq 0 ] && ! ls ../../evidence/verdict-*.json >/dev/null 2>&1; then
             echo "::error::Scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check Docker/binary availability)"
             status=1
           fi
           passed=false
           [ "$status" -eq 0 ] && passed=true
-          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../../evidence/result.json
           exit "$status"
 
       - name: Upload evidence
@@ -220,17 +220,17 @@ jobs:
           mkdir -p evidence
           cd evals/custom
           set +e
-          go test ./scenarios -run TestKubernetesScenarios -v -timeout 40m 2>&1 | tee ../evidence/test-output.log
+          go test ./scenarios -run TestKubernetesScenarios -v -timeout 40m 2>&1 | tee ../../evidence/test-output.log
           status=${PIPESTATUS[0]}
           set -e
           # Fail closed on a vacuous green (see the agent-scenarios job).
-          if [ "$status" -eq 0 ] && ! ls ../evidence/verdict-*.json >/dev/null 2>&1; then
+          if [ "$status" -eq 0 ] && ! ls ../../evidence/verdict-*.json >/dev/null 2>&1; then
             echo "::error::Kind scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check kind/Docker availability)"
             status=1
           fi
           passed=false
           [ "$status" -eq 0 ] && passed=true
-          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../evidence/result.json
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../../evidence/result.json
           exit "$status"
 
       - name: Upload evidence

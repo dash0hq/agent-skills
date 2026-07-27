@@ -74,6 +74,40 @@ export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/registe
 
 **Note**: Tools like npm, pnpm, and yarn are Node.js applications, so you may observe instrumentation data from package managers when running commands.
 
+#### Module system in code snippets
+
+Before writing or copying any Node.js snippet from this file into an application, determine the target file's module system and translate the snippet if needed.
+Mixing `import` and `require` in the same file causes `SyntaxError: Cannot use import statement outside a module` (ESM syntax in a CJS file) or `ReferenceError: require is not defined in ES module scope` (CJS syntax in an ESM file).
+
+**Detection rules**, in order:
+
+1. If the file extension is `.mjs`, treat as ESM.
+   If `.cjs`, treat as CommonJS.
+2. Otherwise, read the nearest `package.json` walking up from the file.
+   `"type": "module"` means ESM; `"type": "commonjs"` or a missing `"type"` field means CommonJS.
+3. If the surrounding file already uses `import ... from` or `export`, match ESM.
+   If it uses `require(...)` or `module.exports`, match CommonJS.
+4. For a new file with no other signals, default to CommonJS unless the project's `package.json` sets `"type": "module"`.
+
+**Snippet default**: every JavaScript snippet in this file below uses ESM `import` syntax.
+If the target file is CommonJS, translate before pasting.
+
+**Translation table**:
+
+| ESM `import` | CommonJS `require` |
+|--------------|--------------------|
+| `import { trace, SpanStatusCode } from '@opentelemetry/api';` | `const { trace, SpanStatusCode } = require('@opentelemetry/api');` |
+| `import pino from 'pino';` | `const pino = require('pino');` |
+| `import * as api from '@opentelemetry/api';` | `const api = require('@opentelemetry/api');` |
+| `import { X, Y as Z } from 'pkg';` | `const { X, Y: Z } = require('pkg');` |
+| `export function foo() {}` | `module.exports.foo = function foo() {};` |
+| `export default foo;` | `module.exports = foo;` |
+
+For default imports from CommonJS packages (e.g., `import pino from 'pino'`), the runtime resolves this to the package's `module.exports`.
+Named imports from CommonJS packages work when the package publishes an ESM entry point; if not, use the namespace form (`import * as pkg from 'pkg'`) and then destructure.
+
+TypeScript source files always use `import` regardless of the compiled output — the emit target (`"module"` in `tsconfig.json`) determines the runtime module system, so no translation is needed at the source level.
+
 ### 2. Set service name
 
 ```bash
@@ -252,7 +286,7 @@ Use the `requestHook` (or `responseHook`) configuration point to emit `db.query.
 ### `pg` (PostgreSQL)
 
 ```javascript
-const { PgInstrumentation } = require('@opentelemetry/instrumentation-pg');
+import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 
 new PgInstrumentation({
   requestHook: (span, requestInfo) => {

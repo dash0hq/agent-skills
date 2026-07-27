@@ -59,7 +59,7 @@ Follow these steps when instrumenting an application from scratch:
 The snippet below shows a complete span with attributes and status for Node.js — see [nodejs](./rules/sdks/nodejs.md) for full setup including SDK initialisation, exporter configuration, and auto-instrumentation:
 
 ```js
-const { trace, SpanStatusCode } = require('@opentelemetry/api');
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 const tracer = trace.getTracer('my-service', '1.0.0');
 
 tracer.startActiveSpan('operation-name', async (span) => {

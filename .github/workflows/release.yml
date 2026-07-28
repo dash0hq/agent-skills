@@ -76,7 +76,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-      contents: read
+      # write (not read): this job pushes the version-bump and changelog
+      # commits and the release tag back to the branch (main is unprotected),
+      # so github-actions[bot] needs contents write or the push 403s.
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7

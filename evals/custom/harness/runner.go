@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/open-telemetry/opentelemetry-packaging/testutil/otelsink"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
 // telemetryPollInterval is how often the runner re-reads the sink while
@@ -253,15 +254,63 @@ func (r *Runner) attempt(t *testing.T, sc Scenario, attemptDir string) attemptOu
 	}
 
 	class, detail := awaitTelemetry(t, ctx, sink, sc.Assert, telemetryTimeout)
-	if class != ClassNone && r.Hooks.Diagnose != nil {
-		// Best-effort delivery-path dump while the fixture is still up. Run on
-		// a fresh bounded context so it works even when the scenario ctx is at
-		// its deadline (the common trigger for a telemetry stall).
-		dctx, cancel := context.WithTimeout(context.Background(), diagnoseTimeout)
-		r.Hooks.Diagnose(dctx, class, detail)
-		cancel()
+	if class != ClassNone {
+		// Show what actually reached the sink (or that nothing did), then let
+		// the fixture dump the delivery-path infrastructure. Together they say
+		// both "which telemetry arrived and what shape" and "why".
+		summarizeSink(t, sink)
+		if r.Hooks.Diagnose != nil {
+			// Best-effort infra dump while the fixture is still up. Run on a
+			// fresh bounded context so it works even when the scenario ctx is
+			// at its deadline (the common trigger for a telemetry stall).
+			dctx, cancel := context.WithTimeout(context.Background(), diagnoseTimeout)
+			r.Hooks.Diagnose(dctx, class, detail)
+			cancel()
+		}
 	}
 	return finish(class, detail, res.CostUSD, transcript)
+}
+
+// summarizeSink logs a compact inventory of everything scoped to the sink's
+// test.id: per span its kind, name, HTTP method, path, and service.name, plus
+// metric-point and log-record counts. It turns an opaque assertion failure
+// ("no SERVER span for GET /checkout … names: [GET GET]") into the actual
+// evidence — the spans' kinds and path attributes — so it is clear whether the
+// span is misnamed, mis-kinded, missing its route attribute, or absent. It is
+// the companion to FixtureHooks.Diagnose: the hook explains the infrastructure,
+// this explains the telemetry.
+func summarizeSink(t *testing.T, sink *otelsink.Sink) {
+	t.Helper()
+	traces := sink.Traces(t)
+	t.Logf("sink telemetry for test.id=%s: %d spans, %d metric points, %d log records",
+		sink.TestID(), traces.Len(), sink.Metrics(t).Len(), sink.Logs(t).Len())
+	const maxSpans = 50
+	spans := traces.Spans()
+	for i, sv := range spans {
+		if i >= maxSpans {
+			t.Logf("  … and %d more spans", len(spans)-maxSpans)
+			break
+		}
+		t.Logf("  span kind=%s name=%q service.name=%q method=%q path=%q",
+			strings.TrimPrefix(sv.Span.GetKind().String(), "SPAN_KIND_"),
+			sv.Span.GetName(),
+			firstAttr(sv.Resource.GetAttributes(), "service.name"),
+			firstAttr(sv.Span.GetAttributes(), "http.request.method", "http.method"),
+			firstAttr(sv.Span.GetAttributes(), "url.path", "http.route", "http.target", "url.full", "http.url"),
+		)
+	}
+}
+
+// firstAttr renders the first present attribute among keys, or "" if none.
+func firstAttr(attrs []*commonpb.KeyValue, keys ...string) string {
+	for _, key := range keys {
+		for _, kv := range attrs {
+			if kv.GetKey() == key {
+				return otelsink.AttrString(kv.GetValue())
+			}
+		}
+	}
+	return ""
 }
 
 // awaitTelemetry polls the sink until the scenario's assertion passes, the

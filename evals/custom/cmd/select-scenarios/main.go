@@ -76,16 +76,17 @@ func main() {
 	changedFile := flag.String("changed", "", "path to a newline-delimited file of changed repository-relative paths (pr gate only)")
 	baseRef := flag.String("changed-from-git", "", "base ref; changed paths come from git diff --name-only <base>...HEAD (pr gate only)")
 	repoRootFlag := flag.String("repo-root", "", "repository root (default: git rev-parse --show-toplevel)")
+	scenariosFlag := flag.String("scenarios", "", "comma-separated scenario IDs to run (nightly gate only; default: the full matrix)")
 	flag.Parse()
 
-	if err := run(os.Stdout, os.Stderr, *gate, *changedFile, *baseRef, *repoRootFlag); err != nil {
+	if err := run(os.Stdout, os.Stderr, *gate, *changedFile, *baseRef, *repoRootFlag, *scenariosFlag); err != nil {
 		fmt.Fprintf(os.Stderr, "select-scenarios: %v\n", err)
 		os.Exit(1)
 	}
 }
 
 // run resolves the inputs, builds the selection, and writes the JSON output.
-func run(stdout, stderr io.Writer, gate, changedFile, baseRef, root string) error {
+func run(stdout, stderr io.Writer, gate, changedFile, baseRef, root, scenariosCSV string) error {
 	if root == "" {
 		detected, err := repoRoot()
 		if err != nil {
@@ -137,6 +138,14 @@ func run(stdout, stderr io.Writer, gate, changedFile, baseRef, root string) erro
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(scenariosCSV) != "" {
+		if gate != gateNightly {
+			return fmt.Errorf("--scenarios is only valid with --gate nightly")
+		}
+		if err := filterToScenarios(out, scenariosCSV); err != nil {
+			return err
+		}
+	}
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(out)
@@ -186,6 +195,53 @@ func buildSelection(reg *harness.Registry, gate string, changed, quarantined []s
 		}
 	}
 	return out, nil
+}
+
+// filterToScenarios narrows a nightly selection to the comma-separated IDs in
+// csv, preserving each kept scenario's quarantined flag, and recomputes the
+// counts. An ID that is not in the selection is an error, so a typo fails
+// loudly rather than silently running nothing.
+func filterToScenarios(out *output, csv string) error {
+	want := map[string]bool{}
+	for _, id := range strings.Split(csv, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			want[id] = true
+		}
+	}
+	if len(want) == 0 {
+		return nil
+	}
+	have := map[string]bool{}
+	for _, sc := range out.Scenarios {
+		have[sc.ID] = true
+	}
+	for id := range want {
+		if !have[id] {
+			return fmt.Errorf("--scenarios: unknown scenario %q (not in the full matrix)", id)
+		}
+	}
+	kept := make([]scenarioOutput, 0, len(want))
+	out.Count, out.KindCount = 0, 0
+	for _, sc := range out.Scenarios {
+		if !want[sc.ID] {
+			continue
+		}
+		kept = append(kept, sc)
+		if sc.RequiresKind {
+			out.KindCount++
+		} else {
+			out.Count++
+		}
+	}
+	out.Scenarios = kept
+	keptQ := make([]string, 0, len(out.Quarantined))
+	for _, id := range out.Quarantined {
+		if want[id] {
+			keptQ = append(keptQ, id)
+		}
+	}
+	out.Quarantined = keptQ
+	return nil
 }
 
 // quarantineFile mirrors the structure of evals/custom/quarantine.yaml.

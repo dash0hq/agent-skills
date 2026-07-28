@@ -77,6 +77,12 @@ type KindFixture struct {
 
 	mu       sync.Mutex
 	cleanups []func()
+
+	// Captured by run() for the current attempt so diagnose() can dump the
+	// delivery-path state (namespace resources, relay container logs) after a
+	// telemetry stall, while the cluster is still up.
+	namespace      string
+	relayContainer string
 }
 
 // NewKindFixture returns a KindFixture for the scenario, cleaned up when the
@@ -102,7 +108,7 @@ func NewKindFixture(t testingT, cluster *KindCluster, repoRoot, scenarioID strin
 
 // Hooks returns the harness fixture hooks backed by this KindFixture.
 func (f *KindFixture) Hooks() harness.FixtureHooks {
-	return harness.FixtureHooks{Build: f.build, Run: f.run}
+	return harness.FixtureHooks{Build: f.build, Run: f.run, Diagnose: f.diagnose}
 }
 
 // Close removes every cluster and Docker resource created so far, in
@@ -172,8 +178,10 @@ func (f *KindFixture) run(ctx context.Context, workdir string, env map[string]st
 		return err
 	}
 	f.addCleanup(relay.Close)
+	f.relayContainer = relay.containerName
 
 	namespace := "eval-" + randomSuffix()
+	f.namespace = namespace
 	if err := createRunSecrets(ctx, f.cluster, namespace, runSecretEnv(relay, env)); err != nil {
 		return err
 	}
@@ -193,6 +201,56 @@ func (f *KindFixture) run(ctx context.Context, workdir string, env map[string]st
 	}
 
 	return f.spec.Run(f, ctx, relay, namespace, workdir, env[harness.EnvOTLPToken], env["OTEL_RESOURCE_ATTRIBUTES"])
+}
+
+// diagnose dumps the delivery-path state for the current attempt's namespace
+// into the test log after a telemetry stall (ClassAgentTelemetry) or a wrong-
+// telemetry failure (ClassAgentAssert), so the uploaded evidence shows which
+// hop dropped the telemetry. It is best-effort: every step tolerates errors,
+// because the point is to capture whatever is reachable while the cluster is
+// still up. The flaky operator scenarios are the motivating case — test.id
+// survives the operator's OTEL_RESOURCE_ATTRIBUTES merge locally, yet CI
+// intermittently sees no telemetry — but the dump is scenario-agnostic.
+func (f *KindFixture) diagnose(ctx context.Context, class harness.FailureClass, detail string) {
+	ns := f.namespace
+	if ns == "" {
+		return
+	}
+	f.t.Logf("delivery-stall diagnostic [%s]: %s", class, detail)
+
+	dump := func(label string, args ...string) {
+		out, err := f.cluster.Kubectl(ctx, args...)
+		if err != nil {
+			f.t.Logf("  [%s] kubectl error: %v\n%s", label, err, strings.TrimSpace(out))
+			return
+		}
+		f.t.Logf("  [%s]\n%s", label, strings.TrimSpace(out))
+	}
+
+	// Cluster-side resource state and recent events.
+	dump("resources", "-n", ns, "get", "pods,deployments,opentelemetrycollectors,instrumentations", "-o", "wide")
+	dump("events", "-n", ns, "get", "events", "--sort-by=.lastTimestamp")
+
+	// Per pod: the injected OTEL_RESOURCE_ATTRIBUTES (confirms test.id survived
+	// the operator's env merge) and each container's log tail (did the SDK
+	// initialise and export? did the collector receive and forward?).
+	names, err := f.cluster.Kubectl(ctx, "-n", ns, "get", "pods", "-o", "jsonpath={range .items[*]}{.metadata.name}{\"\\n\"}{end}")
+	if err != nil {
+		f.t.Logf("  [pods] kubectl error: %v", err)
+	}
+	for _, pod := range strings.Fields(names) {
+		dump("env "+pod, "-n", ns, "get", "pod", pod, "-o", "jsonpath={range .spec.containers[*]}{.name}{\"\\t\"}{range .env[?(@.name=='OTEL_RESOURCE_ATTRIBUTES')]}{.value}{end}{\"\\n\"}{end}")
+		dump("logs "+pod, "-n", ns, "logs", pod, "--all-containers", "--prefix", "--tail=80")
+	}
+
+	// Relay logs: did the collector's export reach the in-network relay at all?
+	if f.relayContainer != "" {
+		if out, err := docker(ctx, "logs", "--tail", "80", f.relayContainer); err == nil {
+			f.t.Logf("  [relay-logs %s]\n%s", f.relayContainer, strings.TrimSpace(out))
+		} else {
+			f.t.Logf("  [relay-logs %s] error: %v", f.relayContainer, err)
+		}
+	}
 }
 
 // runDownwardAPI applies the agent-edited workspace (the pre-instrumented

@@ -20,6 +20,10 @@ import (
 // waiting for the first telemetry.
 const telemetryPollInterval = 100 * time.Millisecond
 
+// diagnoseTimeout bounds the best-effort FixtureHooks.Diagnose dump so a
+// wedged cluster cannot hang the run after a telemetry stall.
+const diagnoseTimeout = 90 * time.Second
+
 // FixtureHooks are the pluggable per-fixture build and run steps. Actual
 // fixtures (and their hooks) arrive with U3; the harness only defines the
 // contract. Both hooks receive the fixture workspace (the temp copy the agent
@@ -34,6 +38,12 @@ type FixtureHooks struct {
 	// at it. At runtime the fixture must only be able to reach the relay
 	// (R21); the composed environment points OTLP at the relay.
 	Run func(ctx context.Context, workdir string, env map[string]string) error
+	// Diagnose is called when telemetry never satisfied the assertion
+	// (ClassAgentTelemetry or ClassAgentAssert), while the fixture is still
+	// up, so it can dump live delivery-path state (pod env, app/collector/
+	// relay logs, events) into the test log for the uploaded evidence. It is
+	// best-effort — it must not fail the run — and optional.
+	Diagnose func(ctx context.Context, class FailureClass, detail string)
 }
 
 // Runner executes scenarios end to end and applies the retry policy.
@@ -243,6 +253,14 @@ func (r *Runner) attempt(t *testing.T, sc Scenario, attemptDir string) attemptOu
 	}
 
 	class, detail := awaitTelemetry(t, ctx, sink, sc.Assert, telemetryTimeout)
+	if class != ClassNone && r.Hooks.Diagnose != nil {
+		// Best-effort delivery-path dump while the fixture is still up. Run on
+		// a fresh bounded context so it works even when the scenario ctx is at
+		// its deadline (the common trigger for a telemetry stall).
+		dctx, cancel := context.WithTimeout(context.Background(), diagnoseTimeout)
+		r.Hooks.Diagnose(dctx, class, detail)
+		cancel()
+	}
 	return finish(class, detail, res.CostUSD, transcript)
 }
 

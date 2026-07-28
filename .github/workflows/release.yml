@@ -55,7 +55,10 @@ jobs:
           exit $exit_code
 
   # Release gate (R12): the full scenario matrix runs against the pinned SHA
-  # the same way the nightly run does (see evals-matrix.yml).
+  # (see evals-matrix.yml). This is the only place that runs the full matrix
+  # now that the nightly schedule is gone; evals-matrix.yml's jobs read
+  # ANTHROPIC_API_KEY as a repository secret rather than an environment-scoped
+  # one, precisely so this run never blocks on a manual approval.
   evals:
     name: Eval full matrix
     needs: resolve

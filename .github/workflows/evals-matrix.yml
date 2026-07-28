@@ -1,12 +1,18 @@
-# Reusable full-matrix eval run, called by evals-nightly.yml (on the default
-# branch) and by release.yml (against the SHA pinned at dispatch). It runs
-# select-scenarios in nightly gate mode, so the matrix includes quarantined
-# scenarios, any FullMatrixOnly scenarios, and every RequiresKind scenario.
+# Reusable full-matrix eval run, called by release.yml (against the SHA
+# pinned at dispatch). It runs select-scenarios in nightly gate mode, so the
+# matrix includes quarantined scenarios, any FullMatrixOnly scenarios, and
+# every RequiresKind scenario.
 #
-# Secrets policy (R14): agent jobs bind the "evals" GitHub Actions
-# environment, which holds the environment-scoped ANTHROPIC_API_KEY.
-# Repository-level secrets must NOT be used; callers pass `secrets: inherit`
-# so the environment binding resolves in this workflow.
+# Secrets policy (R14 amended): agent jobs read ANTHROPIC_API_KEY as a plain
+# repository secret, not an environment-scoped one, so no environment
+# protection rule (e.g. required reviewers) can gate them on manual approval.
+# In place of that gate, agent-scenarios and kind-scenarios each carry an
+# `if: github.event_name == 'workflow_dispatch'` guard: this workflow only
+# ever runs as a workflow_call from release.yml, which is workflow_dispatch-
+# only, so the guard fails closed against a fork PR, a Dependabot PR, or any
+# other PR-authored trigger reaching the secret. Do not reuse this workflow
+# from anything that runs on `pull_request`; that path (evals-pr.yml) must
+# keep the key environment-scoped, per the secrets policy comment there.
 name: Evals matrix
 
 on:
@@ -83,31 +89,34 @@ jobs:
   agent-scenarios:
     name: Scenario ${{ matrix.scenario }}
     needs: select
-    if: needs.select.outputs.count > 0
+    # No environment binds this job (see the secrets policy comment at the
+    # top of this file), so this if: is the only thing standing between the
+    # repository-secret API key and an untrusted trigger. Fail closed on
+    # event type: only run for the workflow_dispatch caller (release.yml).
+    # If this workflow is ever wired into anything else, a job here must
+    # never run for a pull_request-triggered call.
+    if: needs.select.outputs.count > 0 && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 25m internal go-test timeout plus setup, CLI install, and artifact upload
     # headroom.
     timeout-minutes: 40
-    # ANTHROPIC_API_KEY is environment-scoped (R14); repository-level secrets
-    # must NOT be used.
-    environment: evals
     # Quarantined scenarios (quarantine.yaml) still run for observability but
-    # never block: a failing quarantined leg is neutral (continue-on-error), so
-    # nightly and release are not gated by known-red scenarios.
+    # never block: a failing quarantined leg is neutral (continue-on-error),
+    # so a release is not gated by known-red scenarios.
     continue-on-error: ${{ contains(fromJSON(needs.select.outputs.quarantined), matrix.scenario) }}
     strategy:
       fail-fast: false
       matrix:
         scenario: ${{ fromJSON(needs.select.outputs.matrix) }}
     steps:
-      - name: Require the environment-scoped API key
+      - name: Require the API key
         env:
           HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         run: |
           # Fail closed: TestScenarios skips (exit 0) without the key, so a
           # missing secret would otherwise turn into a vacuous green run.
           if [ "$HAS_KEY" != "true" ]; then
-            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/custom/README.md)"
+            echo "::error::ANTHROPIC_API_KEY did not resolve; configure it as a repository secret (see evals/custom/README.md)"
             exit 1
           fi
 
@@ -167,22 +176,24 @@ jobs:
   kind-scenarios:
     name: Kind scenario ${{ matrix.scenario }}
     needs: select
-    if: needs.select.outputs.kind-count > 0
+    # See the same-named guard on agent-scenarios above: no environment binds
+    # this job, so this if: is the only thing standing between the
+    # repository-secret API key and an untrusted trigger.
+    if: needs.select.outputs.kind-count > 0 && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 40m internal go-test timeout plus cluster provisioning, CLI install, and
     # artifact upload headroom.
     timeout-minutes: 55
-    environment: evals
     # Quarantined kind scenarios still run for observability but never block:
-    # a failing quarantined leg is neutral (continue-on-error), so nightly and
-    # release are not gated by known-red scenarios.
+    # a failing quarantined leg is neutral (continue-on-error), so a release
+    # is not gated by known-red scenarios.
     continue-on-error: ${{ contains(fromJSON(needs.select.outputs.quarantined), matrix.scenario) }}
     strategy:
       fail-fast: false
       matrix:
         scenario: ${{ fromJSON(needs.select.outputs.kind-matrix) }}
     steps:
-      - name: Require the environment-scoped API key
+      - name: Require the API key
         env:
           HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         run: |
@@ -190,7 +201,7 @@ jobs:
           # key, so a missing secret would otherwise turn into a vacuous
           # green run.
           if [ "$HAS_KEY" != "true" ]; then
-            echo "::error::ANTHROPIC_API_KEY did not resolve from the environment; configure it as an environment-scoped secret (see evals/custom/README.md)"
+            echo "::error::ANTHROPIC_API_KEY did not resolve; configure it as a repository secret (see evals/custom/README.md)"
             exit 1
           fi
 

@@ -1,17 +1,19 @@
 # Eval gate for pull requests (U7 of the skill-evals plan).
 #
-# Secrets policy (R14): the Anthropic API key exists ONLY as an
+# Secrets policy (R14): the Anthropic API key exists here ONLY as an
 # environment-scoped secret (ANTHROPIC_API_KEY) on the "evals" GitHub Actions
 # environment, which only same-repo PRs bind. Repository-level secrets must
-# NOT be used for it. Fork and Dependabot PRs must never run the agent: it
-# executes PR-authored content, and giving that a usable key (even behind an
-# approval prompt) would let it exfiltrate the secret. The select job
-# therefore deselects every scenario for fork and Dependabot PRs, so no job
-# binds the key or runs untrusted content with it. The deterministic
+# NOT be used for this workflow, since it runs on pull_request and PR-authored
+# content could otherwise reach the key. Fork and Dependabot PRs must never
+# run the agent: it executes PR-authored content, and giving that a usable
+# key (even behind an approval prompt) would let it exfiltrate the secret. The
+# select job therefore deselects every scenario for fork and Dependabot PRs,
+# so no job binds the key or runs untrusted content with it. The deterministic
 # infrastructure jobs (unit tests, example validation, fixture builds,
 # selection) never reference the key and still run on every PR — smoking the
 # eval harness itself — while agent-scenario coverage for those PRs comes from
-# the post-merge and nightly runs on the trusted "evals" environment.
+# the release run, which re-runs the full matrix against the merged commit
+# each time a release is cut (see release.yml).
 #
 # Gating (R11-R13, R16): there is deliberately NO path filter on the trigger.
 # Selection happens inside the workflow via evals/custom/cmd/select-scenarios, and
@@ -27,7 +29,6 @@ on:
 permissions:
   contents: read
   checks: write
-  issues: read
 
 concurrency:
   group: evals-pr-${{ github.event.pull_request.number }}
@@ -180,37 +181,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           quarantined=$(jq -r '.quarantined | join(", ")' /tmp/selection.json)
           if [ -n "$quarantined" ]; then
-            echo "::notice::Quarantined scenarios excluded from the PR gate (nightly still runs them): ${quarantined}"
-          fi
-
-  heartbeat-check:
-    name: Nightly heartbeat freshness
-    runs-on: ubuntu-latest
-    steps:
-      - name: Warn when the nightly heartbeat is stale
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Never fails the job: it warns when the pinned heartbeat issue
-          # (updated by evals-nightly.yml on every run) is older than 48
-          # hours — GitHub disables cron schedules after 60 days of
-          # repository inactivity — and stays silent during bootstrap while
-          # the issue does not exist yet.
-          issues=$(gh api "repos/${GITHUB_REPOSITORY}/issues?labels=eval-heartbeat&state=open&per_page=1" 2>/dev/null || echo '[]')
-          if [ "$(echo "$issues" | jq 'length')" -eq 0 ]; then
-            echo "No nightly heartbeat issue found yet (bootstrap); skipping the freshness check."
-            exit 0
-          fi
-          last=$(echo "$issues" | jq -r '.[0].body' | sed -n 's/^Last nightly run: //p' | head -1)
-          if [ -z "$last" ]; then
-            last=$(echo "$issues" | jq -r '.[0].updated_at')
-          fi
-          last_epoch=$(date -d "$last" +%s 2>/dev/null || echo 0)
-          age_hours=$(( ($(date +%s) - last_epoch) / 3600 ))
-          if [ "$last_epoch" -eq 0 ] || [ "$age_hours" -gt 48 ]; then
-            echo "::warning::The nightly eval heartbeat is stale (last update: ${last:-unknown}, ${age_hours}h ago); check the evals-nightly.yml schedule."
-          else
-            echo "Nightly heartbeat is fresh (${age_hours}h old)."
+            echo "::notice::Quarantined scenarios excluded from the PR gate (the release run still runs them): ${quarantined}"
           fi
 
   agent-scenarios:
@@ -218,8 +189,8 @@ jobs:
     needs: select
     # Skip on fork and Dependabot PRs: the agent runs PR-authored content and
     # must never bind the API key (see the secrets policy at the top). Their
-    # scenario coverage comes from the post-merge and nightly runs; the gate
-    # accepts this skip.
+    # scenario coverage comes from the release run instead; the gate accepts
+    # this skip.
     if: >-
       needs.select.outputs.count > 0
       && github.event.pull_request.head.repo.fork == false
@@ -400,7 +371,6 @@ jobs:
       - list-fixtures
       - fixture-builds
       - select
-      - heartbeat-check
       - agent-scenarios
       - kind-scenarios
     if: always()
@@ -413,7 +383,6 @@ jobs:
           RESULT_LIST_FIXTURES: ${{ needs.list-fixtures.result }}
           RESULT_FIXTURE_BUILDS: ${{ needs.fixture-builds.result }}
           RESULT_SELECT: ${{ needs.select.result }}
-          RESULT_HEARTBEAT: ${{ needs.heartbeat-check.result }}
           RESULT_AGENT: ${{ needs.agent-scenarios.result }}
           RESULT_KIND: ${{ needs.kind-scenarios.result }}
           COUNT: ${{ needs.select.outputs.count }}
@@ -460,7 +429,6 @@ jobs:
           require_success "list-fixtures" "$RESULT_LIST_FIXTURES"
           require_success "fixture-builds" "$RESULT_FIXTURE_BUILDS"
           require_success "select" "$RESULT_SELECT"
-          require_success "heartbeat-check" "$RESULT_HEARTBEAT"
           require_success_or_deselected "agent-scenarios" "$RESULT_AGENT" "$COUNT"
           require_success_or_deselected "kind-scenarios" "$RESULT_KIND" "$KIND_COUNT"
 

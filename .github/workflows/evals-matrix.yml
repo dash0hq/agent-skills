@@ -7,12 +7,15 @@
 # repository secret, not an environment-scoped one, so no environment
 # protection rule (e.g. required reviewers) can gate them on manual approval.
 # In place of that gate, agent-scenarios and kind-scenarios each carry an
-# `if: github.event_name == 'workflow_dispatch'` guard: this workflow only
-# ever runs as a workflow_call from release.yml, which is workflow_dispatch-
-# only, so the guard fails closed against a fork PR, a Dependabot PR, or any
-# other PR-authored trigger reaching the secret. Do not reuse this workflow
-# from anything that runs on `pull_request`; that path (evals-pr.yml) must
-# keep the key environment-scoped, per the secrets policy comment there.
+# `if: github.event_name == 'workflow_dispatch'` guard. This workflow runs
+# only two ways, both reporting event_name == 'workflow_dispatch': as a
+# workflow_call from release.yml (itself workflow_dispatch-only), and as a
+# direct workflow_dispatch a maintainer starts to re-run the matrix (or a
+# scenario subset) without publishing — dispatching requires repo write
+# access. The guard therefore fails closed against a fork PR, a Dependabot
+# PR, or any other PR-authored trigger reaching the secret. Do not reuse this
+# workflow from anything that runs on `pull_request`; that path (evals-pr.yml)
+# keeps the key environment-scoped, per the secrets policy comment there.
 name: Evals matrix
 
 on:
@@ -20,6 +23,11 @@ on:
     inputs:
       ref:
         description: "Git ref (SHA) to check out; empty means the default for the caller's event"
+        required: false
+        type: string
+        default: ""
+      scenarios:
+        description: "Comma-separated scenario IDs to run; empty runs the full matrix"
         required: false
         type: string
         default: ""
@@ -39,6 +47,20 @@ on:
       quarantined:
         description: "JSON array of quarantined scenario IDs included in the matrix"
         value: ${{ jobs.select.outputs.quarantined }}
+  # Direct manual trigger: re-run the matrix (or a scenario subset) on demand,
+  # without cutting a release. Dispatching requires repo write access.
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (SHA or branch) to check out; empty uses this workflow's ref"
+        required: false
+        type: string
+        default: ""
+      scenarios:
+        description: "Comma-separated scenario IDs, e.g. k8s-deploy-otel-operator,k8s-deploy-dash0-operator; empty runs the full matrix"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -74,9 +96,13 @@ jobs:
 
       - name: Select every scenario (nightly gate)
         id: select
+        env:
+          SCENARIOS: ${{ inputs.scenarios }}
         run: |
           cd evals/custom
-          go run ./cmd/select-scenarios --gate nightly > /tmp/selection.json
+          args="--gate nightly"
+          [ -n "$SCENARIOS" ] && args="$args --scenarios $SCENARIOS"
+          go run ./cmd/select-scenarios $args > /tmp/selection.json
           cat /tmp/selection.json
           {
             echo "count=$(jq '.count' /tmp/selection.json)"

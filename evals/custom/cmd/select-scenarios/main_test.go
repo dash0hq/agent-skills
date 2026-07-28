@@ -118,7 +118,7 @@ func TestRunWithChangedFileExitsCleanly(t *testing.T) {
 	require.NoError(t, os.WriteFile(changed, []byte("skills/otel-instrumentation/rules/sdks/go.md\n\n"), 0o644))
 
 	var stdout, stderr bytes.Buffer
-	require.NoError(t, run(&stdout, &stderr, gatePR, changed, "", root))
+	require.NoError(t, run(&stdout, &stderr, gatePR, changed, "", root, ""))
 
 	var out output
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
@@ -133,7 +133,7 @@ func TestRunWithChangedFromGitSelectsFromDiff(t *testing.T) {
 	root := gitRepoWithGoRuleChange(t)
 
 	var stdout, stderr bytes.Buffer
-	require.NoError(t, run(&stdout, &stderr, gatePR, "", "HEAD~1", root))
+	require.NoError(t, run(&stdout, &stderr, gatePR, "", "HEAD~1", root, ""))
 
 	var out output
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
@@ -148,7 +148,7 @@ func TestRunWithChangedFromGitBadRefErrors(t *testing.T) {
 	root := gitRepoWithGoRuleChange(t)
 
 	var stdout, stderr bytes.Buffer
-	err := run(&stdout, &stderr, gatePR, "", "no-such-ref", root)
+	err := run(&stdout, &stderr, gatePR, "", "no-such-ref", root, "")
 	require.Error(t, err, "an unresolvable base ref must fail")
 	require.Contains(t, err.Error(), "git diff")
 }
@@ -196,7 +196,7 @@ func TestRunZeroScenarioDiffExitsCleanly(t *testing.T) {
 	require.NoError(t, os.WriteFile(changed, []byte("LICENSE\n"), 0o644))
 
 	var stdout, stderr bytes.Buffer
-	require.NoError(t, run(&stdout, &stderr, gatePR, changed, "", root))
+	require.NoError(t, run(&stdout, &stderr, gatePR, changed, "", root, ""))
 
 	var out output
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
@@ -208,13 +208,13 @@ func TestRunFlagValidation(t *testing.T) {
 	root := testRepoRoot(t)
 	var stdout, stderr bytes.Buffer
 
-	require.Error(t, run(&stdout, &stderr, gatePR, "", "", root),
+	require.Error(t, run(&stdout, &stderr, gatePR, "", "", root, ""),
 		"pr gate requires a changed-paths input")
-	require.Error(t, run(&stdout, &stderr, gatePR, "a", "b", root),
+	require.Error(t, run(&stdout, &stderr, gatePR, "a", "b", root, ""),
 		"--changed and --changed-from-git are mutually exclusive")
-	require.Error(t, run(&stdout, &stderr, gateNightly, "a", "", root),
+	require.Error(t, run(&stdout, &stderr, gateNightly, "a", "", root, ""),
 		"changed inputs are invalid for the nightly gate")
-	require.Error(t, run(&stdout, &stderr, "release", "", "", root),
+	require.Error(t, run(&stdout, &stderr, "release", "", "", root, ""),
 		"unknown gates are rejected")
 }
 
@@ -222,7 +222,7 @@ func TestRunNightlyGate(t *testing.T) {
 	root := testRepoRoot(t)
 
 	var stdout, stderr bytes.Buffer
-	require.NoError(t, run(&stdout, &stderr, gateNightly, "", "", root))
+	require.NoError(t, run(&stdout, &stderr, gateNightly, "", "", root, ""))
 
 	var out output
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))

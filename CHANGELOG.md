@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.3.1 (2026-07-28)
+
+### Added
+
+- comprehensive CI-gated evals for the OpenTelemetry skills (#23)
+- improve instructions for service identity
+
+### Fixed
+
+- grant the release job contents:write so it can push
+- record exceptions as structured logs in the quickstart (#33)
+- license otel-collector and otel-instrumentation skills as Apache-2.0
+- remove batch processor from example pipelines
+- use deployment.environment.name per semconv rename
+- correct log body access in redaction examples
+- use inferred contexts and correct error_mode default
+
+### Changed
+
+- update plugin manifests for v1.3.1
+- bump the fixtures group across 1 directory with 2 updates (#38)
+- remove nightly run, decouple release from the evals environment's approval gate (#88)
+- make quarantine release/nightly-exempt; quarantine flaky operator scenarios
+- bump the fixtures group across 1 directory with 4 updates
+- bump the fixtures group across 1 directory with 3 updates
+- bump org.springframework.boot:spring-boot-starter-parent
+- bump actions/upload-artifact from 5 to 7
+- bump actions/download-artifact from 5 to 8
+- bump actions/setup-go from 6 to 7
+- steer agents to the right module system in code snippets (#18)
+- bump actions/cache from 5 to 6
+- split into evals/custom (harness) + evals/tessl (scenarios), score at publish (#34)
+- skip agent scenarios on fork and Dependabot PRs (#32)
+- bump actions/checkout from 6 to 7 (#16)
+- reframe README around vendor-neutral OpenTelemetry
+- validate tessl publish source
+
+
 ## v1.3.0 (2026-05-19)
 
 ### Added

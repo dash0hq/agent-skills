@@ -13,6 +13,7 @@ A scenario run has 4 moving parts:
 - **Sink** — an in-process `otelsink` (from [opentelemetry-packaging](https://github.com/open-telemetry/opentelemetry-packaging)) on loopback receives everything the relay forwards; per-run isolation rides on a `test.id` resource attribute.
 - **Verdicts** — the harness queries the sink and emits a verdict with a failure class: `infra` (retried up to 3 times, never skill-attributed), `agent-noskill` (no evidence the skill entered context), `agent-build`, `agent-telemetry`, or `agent-assert` (agent-attributable classes retry once).
   Verdict evidence includes the agent transcript and the received telemetry.
+  On failure the harness also copies each attempt's transcript (token-scrubbed) into `$EVAL_VERDICT_DIR/transcripts/<scenario>/<attempt>/`, next to the preserved `agent-workspace/`, so it ships with the uploaded CI evidence artifact.
 
 ## Running locally
 

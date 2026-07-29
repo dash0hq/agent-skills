@@ -195,10 +195,12 @@ func (r *Runner) attempt(t *testing.T, sc Scenario, attemptDir string) attemptOu
 	env := FixtureEnv(sink, relay, token)
 	finish := func(class FailureClass, detail string, cost float64, transcript string) attemptOutcome {
 		if class != ClassNone {
-			// On any failure, preserve the agent-authored source (scrubbed of
-			// the per-run token) for post-mortem, since the containers and the
-			// workspace temp dir are torn down before they can be inspected.
+			// On any failure, preserve the agent-authored source and the agent
+			// transcript (both scrubbed of the per-run token) for post-mortem,
+			// since the containers and the attempt temp dir are torn down
+			// before they can be inspected.
 			preserveAgentWorkspace(sc.ID, workdir, token)
+			preserveTranscript(sc.ID, attemptDir, token)
 		}
 		return attemptOutcome{
 			class:          class,
@@ -360,6 +362,36 @@ func preserveAgentWorkspace(scenarioID, workdir, token string) {
 		_ = os.WriteFile(out, content, 0o644)
 		return nil
 	})
+}
+
+// preserveTranscript copies the attempt's agent transcript (and its .stderr
+// sibling, when the CLI wrote one) into
+// $EVAL_VERDICT_DIR/transcripts/<scenarioID>/<attempt>/ so the raw
+// stream-json record survives in the uploaded CI evidence. The verdict's
+// transcript_paths point into the test's temp directory, which is removed
+// with the runner — without this copy the CLI's turn-by-turn record and its
+// result event (including any API error text) are unrecoverable after a CI
+// run. The per-run bearer token is scrubbed, matching preserveAgentWorkspace.
+// It is best-effort: any error is ignored, since this is diagnostics only.
+func preserveTranscript(scenarioID, attemptDir, token string) {
+	dir := strings.TrimSpace(os.Getenv("EVAL_VERDICT_DIR"))
+	if dir == "" || attemptDir == "" {
+		return
+	}
+	dest := filepath.Join(dir, "transcripts", scenarioID, filepath.Base(attemptDir))
+	for _, name := range []string{"transcript.jsonl", "transcript.jsonl.stderr"} {
+		content, err := os.ReadFile(filepath.Join(attemptDir, name))
+		if err != nil {
+			continue // transcript may not exist when the CLI never started
+		}
+		if token != "" {
+			content = bytes.ReplaceAll(content, []byte(token), []byte("***"))
+		}
+		if os.MkdirAll(dest, 0o755) != nil {
+			return
+		}
+		_ = os.WriteFile(filepath.Join(dest, name), content, 0o644)
+	}
 }
 
 // telemetryFiles lists the signal JSONL files that exist under the sink

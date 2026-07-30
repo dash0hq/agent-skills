@@ -74,7 +74,7 @@ The flag reads the scenarios from the working tree, which carries them regardles
 4. **Commit changelog** — commits the updated `CHANGELOG.md` to `main`.
 5. **Create tag** — creates and pushes an annotated `vMAJOR.MINOR.PATCH` tag on the changelog commit.
 6. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag.
-7. **Publish to npm** — publishes `@dash0/agent-skills` (the `skills/` trees only) to npmjs.com with provenance, authenticated via OIDC trusted publishing.
+7. **Publish to npm** — publishes `@dash0/agent-skills` (the `skills/` trees only) to npmjs.com with provenance, authenticated via OIDC trusted publishing. This runs as a separate workflow ([`publish-npm.yml`](./.github/workflows/publish-npm.yml)) called with the new tag; it can also be [dispatched manually](https://github.com/dash0hq/agent-skills/actions/workflows/publish-npm.yml) with any existing tag — to retrofit a release cut before npm publishing existed, or to retry a failed publish without re-releasing.
 
 ## Post-release verification
 

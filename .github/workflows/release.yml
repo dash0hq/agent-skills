@@ -74,6 +74,8 @@ jobs:
       - validate
       - evals
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     permissions:
       id-token: write
       # write (not read): this job pushes the version-bump and changelog
@@ -222,25 +224,6 @@ jobs:
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
-      - uses: actions/setup-node@v4
-        with:
-          # npm >= 11.5 (bundled with Node 24) is required for OIDC trusted publishing.
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Verify publish exclusions (npm)
-        run: |
-          # R20 for the npm artifact: the package.json `files` allowlist ships only
-          # skills/ (plus README, LICENSE, package.json); fail if the pack would
-          # include evals/ or docs/ paths anyway.
-          leaked=$(npm pack --dry-run --json | jq -r '[.[0].files[].path | select(test("^(evals|docs)/"))] | length')
-          if [ "$leaked" != "0" ]; then
-            npm pack --dry-run
-            echo "::error::npm pack would include evals/ or docs/ paths; fix the package.json files allowlist before releasing"
-            exit 1
-          fi
-          echo "npm publish exclusions verified: no evals/ or docs/ paths in the pack."
-
       - name: Verify publish exclusions
         run: |
           # R20: published artifacts must exclude the eval harness and docs
@@ -280,12 +263,15 @@ jobs:
             --title "${TAG}" \
             --generate-notes
 
-      - name: Publish to npm
-        run: |
-          # Runs after the GitHub release so the tag/release stay the source of
-          # truth; a failed npm publish can be retried without re-releasing.
-          # Authenticates via OIDC trusted publishing (the job's id-token: write
-          # permission); no npm token secret. Requires @dash0/agent-skills on
-          # npmjs.com to have this repository + release.yml configured as a
-          # trusted publisher. --provenance links the tarball to this run.
-          npm publish --provenance --access public
+  # Runs after the GitHub release so the tag/release stay the source of truth;
+  # a failed npm publish can be retried by dispatching publish-npm.yml with the
+  # tag, without re-releasing.
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-npm.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}

@@ -1,0 +1,75 @@
+name: Publish to npm
+
+# Publishes @dash0/agent-skills for an existing release tag. Called by
+# release.yml after the GitHub release is created, and dispatchable on its
+# own to retrofit a tag that was released before npm publishing existed
+# (or to retry a failed publish without re-releasing).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v1.3.1)"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Publish ${{ inputs.tag }} to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-node@v4
+        with:
+          # npm >= 11.5 (bundled with Node 24) is required for OIDC trusted publishing.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure package.json matches the tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ ! -f package.json ]; then
+            # Retrofit path: tags cut before the npm package existed carry no
+            # package.json; take the manifest from main. The packed content
+            # (skills/) still comes from the tag checkout.
+            git fetch --depth 1 origin main
+            git checkout FETCH_HEAD -- package.json
+          fi
+          # npm requires bare semver (no leading v).
+          jq ".version = \"${TAG#v}\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+
+      - name: Verify publish exclusions
+        run: |
+          # R20 for the npm artifact: the package.json `files` allowlist ships only
+          # skills/ (plus README, LICENSE, package.json); fail if the pack would
+          # include evals/ or docs/ paths anyway.
+          leaked=$(npm pack --dry-run --json | jq -r '[.[0].files[].path | select(test("^(evals|docs)/"))] | length')
+          if [ "$leaked" != "0" ]; then
+            npm pack --dry-run
+            echo "::error::npm pack would include evals/ or docs/ paths; fix the package.json files allowlist before releasing"
+            exit 1
+          fi
+          echo "npm publish exclusions verified: no evals/ or docs/ paths in the pack."
+
+      - name: Publish to npm
+        run: |
+          # Authenticates via OIDC trusted publishing (this job's id-token: write
+          # permission); no npm token secret. Requires @dash0/agent-skills on
+          # npmjs.com to have this repository + publish-npm.yml configured as a
+          # trusted publisher. --provenance links the tarball to this run.
+          npm publish --provenance --access public

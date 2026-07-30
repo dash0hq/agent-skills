@@ -1,16 +1,26 @@
 name: Publish to npm
 
-# Publishes @dash0/agent-skills for an existing release tag. Dispatched by
-# release.yml after the GitHub release is created, and dispatchable by hand
-# to retrofit a tag that was released before npm publishing existed (or to
-# retry a failed publish without re-releasing). Always dispatch (never
-# workflow_call): npm's trusted-publisher check matches the run's entry
-# workflow, so publishes must always enter through this file.
+# Publishes @dash0/agent-skills for an existing release tag. Called as a job
+# by release.yml after the GitHub release is created, and dispatchable by
+# hand to retrofit a tag that was released before npm publishing existed (or
+# to retry a failed publish without re-releasing).
+#
+# Auth is the DASH0_NPMJS_PUBLISH_TOKEN organization secret, NOT OIDC
+# trusted publishing: npm validates the calling workflow's name and allows
+# one trusted publisher per package, so it cannot cover both the
+# workflow_call path (entry: release.yml) and the dispatch path (entry: this
+# file). Provenance still works — it uses the Actions OIDC token
+# independently of how npm authenticates.
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: "Release tag to publish (e.g. v1.3.1)"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
         required: true
         type: string
 
@@ -31,8 +41,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # npm >= 11.5 (bundled with Node 24) is required for OIDC trusted publishing.
           node-version: 24
+          # Writes an .npmrc that reads the auth token from NODE_AUTH_TOKEN.
           registry-url: https://registry.npmjs.org
 
       - name: Ensure package.json matches the tag
@@ -64,9 +74,9 @@ jobs:
           echo "npm publish exclusions verified: no evals/ or docs/ paths in the pack."
 
       - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.DASH0_NPMJS_PUBLISH_TOKEN }}
         run: |
-          # Authenticates via OIDC trusted publishing (this job's id-token: write
-          # permission); no npm token secret. Requires @dash0/agent-skills on
-          # npmjs.com to have this repository + publish-npm.yml configured as a
-          # trusted publisher. --provenance links the tarball to this run.
+          # --provenance links the tarball to this workflow run via the job's
+          # OIDC id-token; npm auth itself is the organization publish token.
           npm publish --provenance --access public

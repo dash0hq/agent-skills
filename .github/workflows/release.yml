@@ -74,14 +74,14 @@ jobs:
       - validate
       - evals
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     permissions:
       id-token: write
       # write (not read): this job pushes the version-bump and changelog
       # commits and the release tag back to the branch (main is unprotected),
       # so github-actions[bot] needs contents write or the push 403s.
       contents: write
-      # to dispatch publish-npm.yml at the end of the release.
-      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -263,14 +263,16 @@ jobs:
             --title "${TAG}" \
             --generate-notes
 
-      - name: Publish to npm
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          # After the GitHub release so the tag/release stay the source of
-          # truth; a failed publish is retried by re-dispatching with the tag,
-          # without re-releasing. Dispatched rather than workflow_call so
-          # npm's OIDC trusted-publisher check always sees publish-npm.yml as
-          # the entry workflow, on the release and retrofit paths alike.
-          gh workflow run publish-npm.yml -f tag="${TAG}"
+  # After the GitHub release so the tag/release stay the source of truth; a
+  # failed publish is retried by dispatching publish-npm.yml with the tag,
+  # without re-releasing.
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/publish-npm.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets: inherit

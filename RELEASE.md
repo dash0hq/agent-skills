@@ -32,7 +32,8 @@ Verify with:
 npm pack --dry-run
 ```
 
-The release workflow re-checks this and publishes with `npm publish --provenance` via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers) — no npm token secret; the package's trusted publisher on npmjs.com must point at this repository and `release.yml`.
+The release workflow re-checks this and publishes with `npm publish --provenance`, authenticated with the `DASH0_NPMJS_PUBLISH_TOKEN` organization secret.
+(Not [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers): npm validates the calling workflow's name and allows one trusted publisher per package, which cannot cover both the release path and the manual-dispatch path.)
 The workflow also bumps the `version` field in `package.json` (bare semver, no `v` prefix) alongside the plugin manifests.
 
 The Claude Code plugin, the Cursor plugin, and the Gemini CLI extension install by cloning this repository.
@@ -74,7 +75,7 @@ The flag reads the scenarios from the working tree, which carries them regardles
 4. **Commit changelog** — commits the updated `CHANGELOG.md` to `main`.
 5. **Create tag** — creates and pushes an annotated `vMAJOR.MINOR.PATCH` tag on the changelog commit.
 6. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag.
-7. **Publish to npm** — publishes `@dash0/agent-skills` (the `skills/` trees only) to npmjs.com with provenance, authenticated via OIDC trusted publishing. This runs as a separate workflow ([`publish-npm.yml`](./.github/workflows/publish-npm.yml)) that the release dispatches with the new tag; it can also be [dispatched manually](https://github.com/dash0hq/agent-skills/actions/workflows/publish-npm.yml) with any existing tag — to retrofit a release cut before npm publishing existed, or to retry a failed publish without re-releasing. Publishes always enter through `publish-npm.yml`, so npm's trusted-publisher configuration points at that one workflow.
+7. **Publish to npm** — publishes `@dash0/agent-skills` (the `skills/` trees only) to npmjs.com with provenance, authenticated with the `DASH0_NPMJS_PUBLISH_TOKEN` organization secret. This runs as a separate job that calls [`publish-npm.yml`](./.github/workflows/publish-npm.yml) with the new tag; the same workflow can also be [dispatched manually](https://github.com/dash0hq/agent-skills/actions/workflows/publish-npm.yml) with any existing tag — to retrofit a release cut before npm publishing existed, or to retry a failed publish without re-releasing.
 
 ## Post-release verification
 

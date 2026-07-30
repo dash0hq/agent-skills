@@ -25,6 +25,22 @@ npx skills add https://github.com/dash0hq/agent-skills --skill otel-semantic-con
 
 For tool-specific installation instructions (Claude Code, Cursor, Tessl, and others), see [INSTALL.md](./INSTALL.md).
 
+**Consume programmatically via npm** (for agent runtimes that embed the skills rather than install them into a tool):
+
+```bash
+npm install @dash0/agent-skills
+```
+
+The package ships the `skills/` directory trees verbatim — no code. Resolve a skill's location at runtime, for example:
+
+```js
+const { createRequire } = require("node:module");
+const path = require("node:path");
+
+const pkgJson = createRequire(__filename).resolve("@dash0/agent-skills/package.json");
+const skillDir = path.join(path.dirname(pkgJson), "skills", "otel-instrumentation");
+```
+
 ## How to use
 
 Once installed, skills load automatically and the agent picks them up when a task matches.

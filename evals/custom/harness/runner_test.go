@@ -175,6 +175,46 @@ func TestPreserveAgentWorkspaceScrubsToken(t *testing.T) {
 	require.True(t, os.IsNotExist(err), "node_modules must be skipped")
 }
 
+// preserveTranscript must copy the transcript and its stderr sibling into the
+// evidence dir with the per-run token scrubbed, so the uploaded CI artifact
+// carries the CLI's raw output but never the secret.
+func TestPreserveTranscriptScrubsToken(t *testing.T) {
+	attemptDir := filepath.Join(t.TempDir(), "attempt-1")
+	require.NoError(t, os.MkdirAll(attemptDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(attemptDir, "transcript.jsonl"), []byte(`{"result":"Bearer SEKRET-TOKEN-42 rejected"}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(attemptDir, "transcript.jsonl.stderr"), []byte("token SEKRET-TOKEN-42"), 0o644))
+
+	verdictDir := t.TempDir()
+	t.Setenv("EVAL_VERDICT_DIR", verdictDir)
+	preserveTranscript("scn", attemptDir, "SEKRET-TOKEN-42")
+
+	dest := filepath.Join(verdictDir, "transcripts", "scn", "attempt-1")
+	got, err := os.ReadFile(filepath.Join(dest, "transcript.jsonl"))
+	require.NoError(t, err)
+	require.Equal(t, `{"result":"Bearer *** rejected"}`, string(got))
+	got, err = os.ReadFile(filepath.Join(dest, "transcript.jsonl.stderr"))
+	require.NoError(t, err)
+	require.Equal(t, "token ***", string(got))
+}
+
+// A failing run must ship every attempt's transcript into the evidence dir:
+// the verdict's transcript_paths point into the test temp dir, which is gone
+// once the CI runner is torn down.
+func TestRunnerFailureShipsTranscriptsToEvidence(t *testing.T) {
+	stub := testutil.WriteStub(t, testutil.GoodStubBody(string(SkillInstrumentation), goSkillFile(t)))
+	// The span arrives, but without the service.name the assertion demands.
+	r := newRunner(t, stub, sendSpanHooks("GET /checkout", nil))
+	verdictDir := t.TempDir()
+	t.Setenv("EVAL_VERDICT_DIR", verdictDir)
+
+	v := r.Run(t, testScenario())
+
+	require.False(t, v.Passed)
+	for attempt := 1; attempt <= MaxAgentAttempts; attempt++ {
+		require.FileExists(t, filepath.Join(verdictDir, "transcripts", v.ScenarioID, fmt.Sprintf("attempt-%d", attempt), "transcript.jsonl"))
+	}
+}
+
 // Covers harness-level AE4: telemetry arrives without the expected attribute;
 // the verdict fails with class agent-assert and attaches evidence.
 func TestRunnerAssertFailureAttachesEvidence(t *testing.T) {

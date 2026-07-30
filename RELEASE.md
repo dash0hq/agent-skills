@@ -25,6 +25,18 @@ tessl plugin publish . --dry-run --verbose
 
 The `--verbose` file listing must contain no paths under `evals/` or `docs/`; if it does, fix the ignore files before running the release workflow.
 
+The npm package ([`@dash0/agent-skills`](https://www.npmjs.com/package/@dash0/agent-skills)) excludes them through the `files` allowlist in `package.json`, which ships only `skills/` (plus `README.md`, `LICENSE`, and `package.json`).
+Verify with:
+
+```bash
+npm pack --dry-run
+```
+
+The release workflow re-checks this and publishes with `npm publish --provenance`, authenticated with [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers) — no npm token is involved.
+The trusted publisher configured on npmjs.com for `@dash0/agent-skills` is pinned to `publish-npm.yml` in this repository.
+npm allows one trusted publisher per package and validates the top-level workflow's filename, so `release.yml` dispatches `publish-npm.yml` (rather than calling it as a reusable workflow) to keep it the single entry point for both the release path and the manual-retry path.
+The workflow also bumps the `version` field in `package.json` (bare semver, no `v` prefix) alongside the plugin manifests.
+
 The Claude Code plugin, the Cursor plugin, and the Gemini CLI extension install by cloning this repository.
 Neither `plugin.json` nor `gemini-extension.json` supports an include or exclude field, and no ignore-file mechanism exists for those installers (verified against the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference) and the [Gemini CLI extension reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md) as of 2026-07).
 Those installs therefore contain `evals/` and `docs/`; the content is inert for consumers, and removing it would require a separate distribution repository or release archives instead of git clones.
@@ -64,6 +76,7 @@ The flag reads the scenarios from the working tree, which carries them regardles
 4. **Commit changelog** — commits the updated `CHANGELOG.md` to `main`.
 5. **Create tag** — creates and pushes an annotated `vMAJOR.MINOR.PATCH` tag on the changelog commit.
 6. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag.
+7. **Publish to npm** — publishes `@dash0/agent-skills` (the `skills/` trees only) to npmjs.com with provenance, authenticated via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers). This runs as a separate job that dispatches [`publish-npm.yml`](./.github/workflows/publish-npm.yml) with the new tag, and the publish outcome appears on that workflow's own run rather than on the release run; the same workflow can also be [dispatched manually](https://github.com/dash0hq/agent-skills/actions/workflows/publish-npm.yml) with any existing tag — to retrofit a release cut before npm publishing existed, or to retry a failed publish without re-releasing.
 
 ## Post-release verification
 
@@ -72,4 +85,10 @@ The flag reads the scenarios from the working tree, which carries them regardles
 
    ```bash
    npx skills add dash0hq/agent-skills
+   ```
+
+3. Verify the npm package:
+
+   ```bash
+   npm view @dash0/agent-skills version
    ```

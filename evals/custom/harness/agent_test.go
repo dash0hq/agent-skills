@@ -2,6 +2,7 @@ package harness
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,7 @@ func TestStreamParserSkillLoadedFromInit(t *testing.T) {
 func TestStreamParserInitAndResult(t *testing.T) {
 	p, res := newParser(SkillInstrumentation)
 	p.feed([]byte(`{"type":"system","subtype":"init","plugin_errors":["skill A failed","skill B failed"]}`))
-	p.feed([]byte(`{"type":"result","subtype":"success","is_error":true,"total_cost_usd":1.25}`))
+	p.feed([]byte(`{"type":"result","subtype":"success","is_error":true,"total_cost_usd":1.25,"result":"Invalid API key · Please run /login"}`))
 	p.feed([]byte(`not json at all`)) // tolerated
 
 	require.True(t, res.SawInit)
@@ -52,6 +53,7 @@ func TestStreamParserInitAndResult(t *testing.T) {
 	require.True(t, res.SawResult)
 	require.True(t, res.IsError)
 	require.InDelta(t, 1.25, res.CostUSD, 1e-9)
+	require.Equal(t, "Invalid API key · Please run /login", res.ResultText)
 }
 
 func TestStreamParserOverloadMarkerInStream(t *testing.T) {
@@ -122,6 +124,42 @@ func TestClassifyAgentRun(t *testing.T) {
 	t.Run("nil result is infra", func(t *testing.T) {
 		class, _ := classifyAgentRun(nil)
 		require.Equal(t, ClassInfra, class)
+	})
+
+	// The result event's error text is the CLI's only statement of why an
+	// is_error run failed; the detail must carry it on both branches.
+	t.Run("is_error detail carries the result text", func(t *testing.T) {
+		res := good()
+		res.IsError = true
+		res.ResultSubtype = "success"
+		res.ResultText = "Invalid API key · Please run /login"
+		class, detail := classifyAgentRun(res)
+		require.Equal(t, ClassAgentTelemetry, class)
+		require.Contains(t, detail, `(subtype "success"): Invalid API key · Please run /login`)
+	})
+	t.Run("infra is_error detail carries the result text", func(t *testing.T) {
+		res := good()
+		res.IsError = true
+		res.ResultSubtype = "error_authentication"
+		res.ResultText = "OAuth token has expired"
+		class, detail := classifyAgentRun(res)
+		require.Equal(t, ClassInfra, class)
+		require.Contains(t, detail, `(subtype "error_authentication"): OAuth token has expired`)
+	})
+}
+
+func TestAppendResultText(t *testing.T) {
+	t.Run("empty text leaves the detail unchanged", func(t *testing.T) {
+		require.Equal(t, "detail", appendResultText("detail", ""))
+		require.Equal(t, "detail", appendResultText("detail", " \n\t "))
+	})
+	t.Run("multi-line text collapses to one line", func(t *testing.T) {
+		require.Equal(t, "detail: line one line two", appendResultText("detail", "line one\n\n  line two\n"))
+	})
+	t.Run("long text truncates to maxResultTextLen runes", func(t *testing.T) {
+		long := strings.Repeat("é", maxResultTextLen+10)
+		got := appendResultText("detail", long)
+		require.Equal(t, "detail: "+strings.Repeat("é", maxResultTextLen)+"…", got)
 	})
 }
 

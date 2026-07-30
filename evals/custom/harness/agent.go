@@ -83,6 +83,11 @@ type AgentResult struct {
 	// ResultSubtype carries the subtype of the result event (for example
 	// "success", "error_max_turns", or "error_during_execution").
 	ResultSubtype string
+	// ResultText carries the result field of the result event. On is_error
+	// results this is the CLI's own error message ("Invalid API key", "credit
+	// balance is too low", …) — often the only statement of why the run
+	// failed, since the CLI reports API-side errors under subtype "success".
+	ResultText string
 	// CostUSD carries total_cost_usd from the result event.
 	CostUSD float64
 	// Overloaded is true when API overload markers (429/529, rate limit,
@@ -222,9 +227,9 @@ func classifyAgentRun(res *AgentResult) (FailureClass, string) {
 		// agent's own failure to finish, attributed like the timeout path
 		// (agent-telemetry, since no telemetry could be produced).
 		if isInfraResultSubtype(res.ResultSubtype) {
-			return ClassInfra, fmt.Sprintf("CLI reported an infrastructure error result (subtype %q)", res.ResultSubtype)
+			return ClassInfra, appendResultText(fmt.Sprintf("CLI reported an infrastructure error result (subtype %q)", res.ResultSubtype), res.ResultText)
 		}
-		return ClassAgentTelemetry, fmt.Sprintf("CLI reported an error result before telemetry could be produced (subtype %q)", res.ResultSubtype)
+		return ClassAgentTelemetry, appendResultText(fmt.Sprintf("CLI reported an error result before telemetry could be produced (subtype %q)", res.ResultSubtype), res.ResultText)
 	case !res.SkillLoaded:
 		return ClassInfra, "the plugin did not expose the target skill command in system/init slash_commands; the harness could not load the skill (check --plugin-dir and .claude-plugin/plugin.json)"
 	default:
@@ -294,6 +299,9 @@ func (p *streamParser) feed(line []byte) {
 		if subtype, ok := ev["subtype"].(string); ok {
 			p.res.ResultSubtype = subtype
 		}
+		if text, ok := ev["result"].(string); ok {
+			p.res.ResultText = text
+		}
 	}
 }
 
@@ -328,6 +336,26 @@ var infraResultSubtypeMarkers = []string{
 	"credit",
 	"quota",
 	"billing",
+}
+
+// maxResultTextLen bounds how much of the result event's error text is quoted
+// in a failure detail; the full text stays in the transcript.
+const maxResultTextLen = 300
+
+// appendResultText appends the result event's error text to a failure detail,
+// collapsed to one line and truncated to maxResultTextLen runes. The verdict
+// detail is often the only evidence readable after a CI run, so the CLI's own
+// error message must travel with it rather than stay behind in a transcript
+// file on the runner.
+func appendResultText(detail, text string) string {
+	text = strings.Join(strings.Fields(text), " ")
+	if text == "" {
+		return detail
+	}
+	if runes := []rune(text); len(runes) > maxResultTextLen {
+		text = string(runes[:maxResultTextLen]) + "…"
+	}
+	return detail + ": " + text
 }
 
 // isInfraResultSubtype reports whether an is_error result subtype names an

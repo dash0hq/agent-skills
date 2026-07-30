@@ -74,6 +74,8 @@ jobs:
       - validate
       - evals
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     permissions:
       id-token: write
       # write (not read): this job pushes the version-bump and changelog
@@ -128,6 +130,11 @@ jobs:
             mv "${manifest}.tmp" "${manifest}"
             git add "${manifest}"
           done
+
+          # npm requires bare semver (no leading v).
+          jq ".version = \"${TAG#v}\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+          git add package.json
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -255,3 +262,31 @@ jobs:
           gh release create "${TAG}" \
             --title "${TAG}" \
             --generate-notes
+
+  # After the GitHub release so the tag/release stay the source of truth; a
+  # failed publish is retried by dispatching publish-npm.yml with the tag,
+  # without re-releasing.
+  #
+  # Dispatched rather than called as a reusable workflow: npm's trusted
+  # publisher for @dash0/agent-skills is pinned to publish-npm.yml, and npm
+  # validates the top-level workflow's filename — a workflow_call here would
+  # present release.yml and be rejected. workflow_dispatch is one of the two
+  # event types the default GITHUB_TOKEN is allowed to trigger, so this does
+  # not need a PAT. The publish run's outcome is reported on its own run,
+  # not on this one.
+  publish-npm:
+    name: Dispatch npm publish
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch publish-npm.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          gh workflow run publish-npm.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            -f tag="${TAG}"
+          echo "Dispatched publish-npm.yml for ${TAG}; its result appears on that workflow's own run."

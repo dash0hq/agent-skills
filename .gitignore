@@ -21,3 +21,6 @@ evals/**/bin/
 evals/custom/fixtures/*/obj/
 evals/custom/fixtures/*/target/
 evals/custom/fixtures/*/vendor/
+
+# npm: the package has no dependencies; a stray npm install must not commit a lockfile.
+package-lock.json

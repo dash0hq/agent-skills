@@ -1,19 +1,16 @@
 name: Publish to npm
 
-# Publishes @dash0/agent-skills for an existing release tag. Called by
-# release.yml after the GitHub release is created, and dispatchable on its
-# own to retrofit a tag that was released before npm publishing existed
-# (or to retry a failed publish without re-releasing).
+# Publishes @dash0/agent-skills for an existing release tag. Dispatched by
+# release.yml after the GitHub release is created, and dispatchable by hand
+# to retrofit a tag that was released before npm publishing existed (or to
+# retry a failed publish without re-releasing). Always dispatch (never
+# workflow_call): npm's trusted-publisher check matches the run's entry
+# workflow, so publishes must always enter through this file.
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: "Release tag to publish (e.g. v1.3.1)"
-        required: true
-        type: string
-  workflow_call:
-    inputs:
-      tag:
         required: true
         type: string
 

@@ -129,6 +129,11 @@ jobs:
             git add "${manifest}"
           done
 
+          # npm requires bare semver (no leading v).
+          jq ".version = \"${TAG#v}\"" package.json > package.json.tmp
+          mv package.json.tmp package.json
+          git add package.json
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --cached --quiet; then
@@ -217,6 +222,25 @@ jobs:
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
+      - uses: actions/setup-node@v4
+        with:
+          # npm >= 11.5 (bundled with Node 24) is required for OIDC trusted publishing.
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify publish exclusions (npm)
+        run: |
+          # R20 for the npm artifact: the package.json `files` allowlist ships only
+          # skills/ (plus README, LICENSE, package.json); fail if the pack would
+          # include evals/ or docs/ paths anyway.
+          leaked=$(npm pack --dry-run --json | jq -r '[.[0].files[].path | select(test("^(evals|docs)/"))] | length')
+          if [ "$leaked" != "0" ]; then
+            npm pack --dry-run
+            echo "::error::npm pack would include evals/ or docs/ paths; fix the package.json files allowlist before releasing"
+            exit 1
+          fi
+          echo "npm publish exclusions verified: no evals/ or docs/ paths in the pack."
+
       - name: Verify publish exclusions
         run: |
           # R20: published artifacts must exclude the eval harness and docs
@@ -255,3 +279,13 @@ jobs:
           gh release create "${TAG}" \
             --title "${TAG}" \
             --generate-notes
+
+      - name: Publish to npm
+        run: |
+          # Runs after the GitHub release so the tag/release stay the source of
+          # truth; a failed npm publish can be retried without re-releasing.
+          # Authenticates via OIDC trusted publishing (the job's id-token: write
+          # permission); no npm token secret. Requires @dash0/agent-skills on
+          # npmjs.com to have this repository + release.yml configured as a
+          # trusted publisher. --provenance links the tarball to this run.
+          npm publish --provenance --access public

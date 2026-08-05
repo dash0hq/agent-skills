@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.3.2 (2026-08-05)
+
+### Added
+
+- ship failing attempts' transcripts in the CI evidence artifact (#117)
+- publish the skills as the @dash0/agent-skills npm package (#118)
+- log the received-telemetry summary on a stall/assert failure (#115)
+- capture the result event's error text in failure details (#116)
+- dump kind delivery-path state on a telemetry stall
+
+### Fixed
+
+- quoted name=value ENV form for NODE_OPTIONS
+
+### Changed
+
+- update plugin manifests for v1.3.2
+- add manual workflow_dispatch to run the eval matrix on demand
+
+
 ## v1.3.1 (2026-07-28)
 
 ### Added

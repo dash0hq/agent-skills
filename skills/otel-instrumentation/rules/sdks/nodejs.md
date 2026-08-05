@@ -91,6 +91,24 @@ The classic (non-BuildKit) Docker builder — still what `docker build` through 
 ENV NODE_OPTIONS --require @opentelemetry/auto-instrumentations-node/register
 ```
 
+Place the `ENV NODE_OPTIONS=…` instruction **after** the `RUN` step that installs dependencies.
+`ENV` applies to every subsequent build step, and npm, pnpm, and yarn are themselves Node.js processes — so a `NODE_OPTIONS` that preloads a package which is not installed yet makes the install step itself crash:
+
+```dockerfile
+# BAD: NODE_OPTIONS is set before the dependencies exist, so the npm process
+# crashes with "Error: Cannot find module '@opentelemetry/auto-instrumentations-node/register'"
+ENV NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
+COPY package*.json ./
+RUN npm install --omit=dev
+```
+
+```dockerfile
+# GOOD: dependencies are installed first; NODE_OPTIONS only affects later steps and the container runtime
+COPY package*.json ./
+RUN npm install --omit=dev
+ENV NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
+```
+
 #### Module system in code snippets
 
 Before writing or copying any Node.js snippet from this file into an application, determine the target file's module system and translate the snippet if needed.

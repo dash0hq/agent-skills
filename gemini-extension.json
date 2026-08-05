@@ -1,5 +1,5 @@
 {
   "name": "dash0-agent-skills",
-  "version": "v1.3.2",
+  "version": "v1.3.3",
   "description": "OpenTelemetry skills and reference documentation for AI coding assistants"
 }

@@ -295,6 +295,33 @@ spec:
 	}
 }
 
+func TestValidateDockerfileBlocks(t *testing.T) {
+	// dockerfile blocks are linted, not exempted: the legacy space-separated
+	// ENV form that fails classic Docker builders (issue #120) must fail
+	// validation, and the quoted name=value form must pass. This path needs
+	// no external binary, so a bare Validator suffices.
+	validator := &Validator{}
+	makeDoc := func(content string) *Document {
+		block := &Block{File: "inline.md", Line: 1, Tag: "dockerfile", Content: content}
+		return block.Documents()[0]
+	}
+
+	good := validator.validateDocument(makeDoc(
+		"FROM node:22-alpine\nENV NODE_OPTIONS=\"--require @opentelemetry/auto-instrumentations-node/register\"\n"))
+	if len(good) != 1 || good[0].Status != StatusValidated {
+		t.Fatalf("quoted name=value dockerfile block did not validate: %+v", good[0])
+	}
+
+	bad := validator.validateDocument(makeDoc(
+		"FROM node:22-alpine\nENV NODE_OPTIONS --require @opentelemetry/auto-instrumentations-node/register\n"))
+	if len(bad) != 1 || bad[0].Status != StatusFailed {
+		t.Fatalf("legacy-form dockerfile block did not fail: %+v", bad[0])
+	}
+	if !strings.Contains(bad[0].Detail, "classic") {
+		t.Errorf("failure detail does not explain the classic-builder rejection: %s", bad[0].Detail)
+	}
+}
+
 func TestRenderSummaryHeadlineCounts(t *testing.T) {
 	// The headline counts every status and reports code-complete compiles
 	// and the exempt breakdown, so a green run cannot overstate itself.

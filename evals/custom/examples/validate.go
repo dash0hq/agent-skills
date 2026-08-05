@@ -149,6 +149,17 @@ func (v *Validator) validateDocument(doc *Document) []*Result {
 		result.Detail = "fragment — not compiled (needs surrounding context; covered by agent scenarios)"
 	case CategoryCodeComplete:
 		v.Code.Validate(result, block.Tag, doc.Content)
+	case CategoryDockerfile:
+		if issues := LintDockerfile(doc.Content); len(issues) > 0 {
+			var details []string
+			for _, issue := range issues {
+				details = append(details, issue.String())
+			}
+			result.Status = StatusFailed
+			result.Detail = "dockerfile: " + strings.Join(details, "; ")
+		} else {
+			result.Status = StatusValidated
+		}
 	case CategoryNotValidated:
 		result.Status = StatusExempt
 		result.Detail = "no validator for tag " + block.Tag

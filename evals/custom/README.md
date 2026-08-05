@@ -67,6 +67,9 @@ Complete Go blocks compile against a pinned OpenTelemetry Go SDK dependency set 
 Complete blocks in other languages report `skipped-no-toolchain` too, naming the language, because their fixture-image compilers are a follow-up.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
 
+`dockerfile` blocks are linted for the `ENV` and `LABEL` `name=value` contract: the legacy space-separated form fails validation because the classic (non-BuildKit) Docker builder rejects values containing spaces at parse time ([issue #120](https://github.com/dash0hq/agent-skills/issues/120)).
+The same check gates every scenario's fixture workspace before `docker build`, so an agent-written Dockerfile using the legacy form fails the attempt even on BuildKit-backed hosts that would accept it.
+
 ## Adding a scenario when adding a rule file
 
 The registry test (`Default().Validate(...)` in [`scenarios/scenarios_test.go`](./scenarios/scenarios_test.go)) fails CI when a rule file is unclassified or a dedicated rule file has no scenario, so this workflow is mandatory:

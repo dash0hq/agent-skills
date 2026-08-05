@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.3.3 (2026-08-05)
+
+### Fixed
+
+- place ENV NODE_OPTIONS after dependency install
+
+### Changed
+
+- update plugin manifests for v1.3.3
+
+
 ## v1.3.2 (2026-08-05)
 
 ### Added

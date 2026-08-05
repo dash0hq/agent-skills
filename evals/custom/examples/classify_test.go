@@ -153,6 +153,12 @@ service:
 			content: `{"a": 1}`,
 			want:    CategoryNotValidated,
 		},
+		{
+			name:    "dockerfile tag routes to the dockerfile linter",
+			tag:     "dockerfile",
+			content: "FROM node:22-alpine\nENV NODE_ENV=production\n",
+			want:    CategoryDockerfile,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

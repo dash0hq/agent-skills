@@ -89,8 +89,12 @@ const (
 	CategoryCodeFragment Category = "code-fragment"
 	// CategoryBash is a shell block, exempt by default (scope boundary).
 	CategoryBash Category = "bash"
+	// CategoryDockerfile is a dockerfile-tagged block, linted for the
+	// ENV/LABEL name=value contract (the legacy space-separated form fails
+	// classic Docker builders — see dockerfile.go).
+	CategoryDockerfile Category = "dockerfile"
 	// CategoryNotValidated is a tagged block with no validator (json, xml,
-	// ini, makefile, dockerfile, html, and so on).
+	// ini, makefile, html, and so on).
 	CategoryNotValidated Category = "not-validated"
 	// CategoryUnclassified is a yaml or untagged block no heuristic
 	// matched; unclassified blocks are validation failures.

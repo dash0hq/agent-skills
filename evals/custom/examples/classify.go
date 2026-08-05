@@ -64,6 +64,8 @@ func Classify(doc *Document) Category {
 	switch b.Tag {
 	case "bash":
 		return CategoryBash
+	case "dockerfile":
+		return CategoryDockerfile
 	case "yaml", "":
 		return classifyYAMLOrUntagged(doc)
 	}

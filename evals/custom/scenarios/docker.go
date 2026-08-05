@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dash0hq/agent-skills/evals/custom/examples"
 	"github.com/dash0hq/agent-skills/evals/custom/harness"
 )
 
@@ -123,6 +124,9 @@ func (d *DockerFixture) addCleanup(f func()) {
 
 // build compiles the fixture workspace into an image tagged per attempt.
 func (d *DockerFixture) build(ctx context.Context, workdir string, _ map[string]string) error {
+	if err := checkClassicBuilderCompatibility(workdir); err != nil {
+		return err
+	}
 	tag := "eval-fixture-" + randomSuffix()
 	if out, err := docker(ctx, "build", "-t", tag, workdir); err != nil {
 		return fmt.Errorf("docker build of the fixture workspace failed: %w\n%s", err, out)
@@ -131,6 +135,55 @@ func (d *DockerFixture) build(ctx context.Context, workdir string, _ map[string]
 	d.mu.Lock()
 	d.currentImage = tag
 	d.mu.Unlock()
+	return nil
+}
+
+// checkClassicBuilderCompatibility scans the workspace for Dockerfiles and
+// rejects instructions that the classic (non-BuildKit) Docker builder fails
+// to parse, most notably the legacy space-separated ENV form with a value
+// containing spaces (issue #120). The harness's own `docker build` runs
+// under BuildKit, which accepts that form, so without this gate an
+// agent-written Dockerfile can pass the eval here yet break `docker build`
+// on stock GitHub Actions runners and other classic-builder CI environments.
+func checkClassicBuilderCompatibility(workdir string) error {
+	var problems []string
+	err := filepath.WalkDir(workdir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if name == ".git" || name == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if name != "Dockerfile" && !strings.HasPrefix(name, "Dockerfile.") &&
+			!strings.HasSuffix(strings.ToLower(name), ".dockerfile") {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		relPath, relErr := filepath.Rel(workdir, path)
+		if relErr != nil {
+			relPath = path
+		}
+		for _, issue := range examples.LintDockerfile(string(content)) {
+			if issue.BreaksClassicBuilder {
+				problems = append(problems, fmt.Sprintf("%s:%d: %s", relPath, issue.Line, issue.Message))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("classic-builder compatibility scan of the fixture workspace failed: %w", err)
+	}
+	if len(problems) > 0 {
+		return fmt.Errorf("the fixture workspace contains Dockerfile instructions the classic (non-BuildKit) docker builder rejects:\n%s",
+			strings.Join(problems, "\n"))
+	}
 	return nil
 }
 

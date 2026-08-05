@@ -74,6 +74,23 @@ export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/registe
 
 **Note**: Tools like npm, pnpm, and yarn are Node.js applications, so you may observe instrumentation data from package managers when running commands.
 
+#### Dockerfile activation
+
+When activating the SDK in a Dockerfile, set `NODE_OPTIONS` with the `ENV` instruction in the quoted `name=value` form (use `--import` instead of `--require` for ESM projects, per the module system rules below):
+
+```dockerfile
+ENV NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"
+```
+
+Never write the legacy space-separated `ENV` form.
+The classic (non-BuildKit) Docker builder — still what `docker build` through the Engine API uses, for example on stock GitHub Actions runners — rejects it at parse time whenever the value contains spaces:
+
+```dockerfile
+# BAD: legacy space-separated ENV form — the classic Docker builder fails the build with
+# "Syntax error - can't find = in ... Must be of the form: name=value"
+ENV NODE_OPTIONS --require @opentelemetry/auto-instrumentations-node/register
+```
+
 #### Module system in code snippets
 
 Before writing or copying any Node.js snippet from this file into an application, determine the target file's module system and translate the snippet if needed.

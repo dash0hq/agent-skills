@@ -16,6 +16,7 @@ otel-collector/
     ├── pipelines.md      # Service section, per-signal config, connectors
     ├── deployment.md     # Agent vs gateway patterns, deployment method selection
     ├── deployment/
+    │   ├── serverless.md             # Direct SDK export (App Runner, Cloud Run, Lambda)
     │   ├── collector-helm-chart.md    # Collector Helm chart
     │   ├── opentelemetry-operator.md  # OTel Operator and auto-instrumentation
     │   ├── dash0-operator.md         # Dash0 Kubernetes Operator
@@ -45,6 +46,7 @@ The skill activates automatically when working on Collector configuration tasks.
 | [deployment](./rules/deployment.md) | HIGH | Agent vs gateway patterns, deployment method selection |
 | [raw-manifests](./rules/deployment/raw-manifests.md) | HIGH | Raw Kubernetes manifests — DaemonSet, Deployment, RBAC, Docker Compose |
 | [dash0-operator](./rules/deployment/dash0-operator.md) | HIGH | Dash0 Kubernetes Operator — automated instrumentation and Collector management |
+| [serverless](./rules/deployment/serverless.md) | HIGH | Serverless and sidecar-less platforms: direct SDK-to-backend export, no Collector |
 | [sampling](./rules/sampling.md) | HIGH | Head sampling, tail sampling, load balancing |
 | [red-metrics](./rules/red-metrics.md) | HIGH | Semconv-aligned RED metrics from traces |
 

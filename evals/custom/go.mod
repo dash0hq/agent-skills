@@ -1,14 +1,14 @@
 module github.com/dash0hq/agent-skills/evals/custom
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.157.0
-	github.com/open-telemetry/opentelemetry-packaging v0.0.2
+	github.com/open-telemetry/opentelemetry-packaging v0.0.3
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/component/componenttest v0.157.0
 	go.opentelemetry.io/proto/otlp v1.11.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )

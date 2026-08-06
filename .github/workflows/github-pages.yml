@@ -1,0 +1,51 @@
+name: Deploy GitHub Pages
+
+# Deploys the repository as a Jekyll site to GitHub Pages for an existing
+# release tag. Dispatched by release.yml after the GitHub release is created,
+# and dispatchable by hand to retry a failed deployment without re-releasing.
+#
+# Prerequisite: enable Pages in the repository settings with "GitHub Actions"
+# as the source (Settings > Pages > Build and deployment > Source). GitHub
+# creates the github-pages environment automatically on the first deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy (e.g. v1.3.1)"
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.tag }} to GitHub Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

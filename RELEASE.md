@@ -67,6 +67,27 @@ The flag reads the scenarios from the working tree, which carries them regardles
 4. Click **Run workflow** to start the release.
 5. Review the generated release notes on the [releases page](https://github.com/dash0hq/agent-skills/releases) and edit them if needed to group changes by skill and clarify impact.
 
+## Retrying post-release steps
+
+Each post-release step (npm publish, Tessl sync, and GitHub Pages deploy) runs as its own dispatchable workflow so a timeout or failure can be retried independently with the existing tag, without re-running the full release.
+
+| Step | Workflow to dispatch | Input |
+|---|---|---|
+| npm publish | [`publish-npm.yml`](https://github.com/dash0hq/agent-skills/actions/workflows/publish-npm.yml) | `tag` |
+| Tessl website sync | [`sync-website.yml`](https://github.com/dash0hq/agent-skills/actions/workflows/sync-website.yml) | `tag` |
+| GitHub Pages | [`github-pages.yml`](https://github.com/dash0hq/agent-skills/actions/workflows/github-pages.yml) | `tag` |
+
+## GitHub Pages prerequisite
+
+The [`github-pages.yml`](./.github/workflows/github-pages.yml) workflow deploys the repository as a Jekyll site.
+Before the first release, enable GitHub Pages for the repository:
+
+1. Go to **Settings > Pages** in the repository.
+2. Under **Build and deployment**, set the source to **GitHub Actions**.
+
+No branch or directory needs to be selected; the workflow manages the deployment.
+GitHub creates the `github-pages` environment automatically on the first successful deployment.
+
 ## What the workflow does
 
 1. **Validate skills** — checks that every directory under `skills/` contains a `SKILL.md`.
@@ -76,7 +97,8 @@ The flag reads the scenarios from the working tree, which carries them regardles
 4. **Commit changelog** — commits the updated `CHANGELOG.md` to `main`.
 5. **Create tag** — creates and pushes an annotated `vMAJOR.MINOR.PATCH` tag on the changelog commit.
 6. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag.
-7. **Publish to npm** — publishes `@dash0/agent-skills` (the `skills/` trees only) to npmjs.com with provenance, authenticated via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers). This runs as a separate job that dispatches [`publish-npm.yml`](./.github/workflows/publish-npm.yml) with the new tag, and the publish outcome appears on that workflow's own run rather than on the release run; the same workflow can also be [dispatched manually](https://github.com/dash0hq/agent-skills/actions/workflows/publish-npm.yml) with any existing tag — to retrofit a release cut before npm publishing existed, or to retry a failed publish without re-releasing.
+7. **Publish to npm**, **sync website**, and **deploy GitHub Pages** — three jobs that dispatch [`publish-npm.yml`](./.github/workflows/publish-npm.yml), [`sync-website.yml`](./.github/workflows/sync-website.yml), and [`github-pages.yml`](./.github/workflows/github-pages.yml) in parallel with the new tag.
+   Each dispatched run's outcome appears on its own workflow run rather than on the release run; each can also be dispatched manually to retry a failed step without re-releasing.
 
 ## Post-release verification
 

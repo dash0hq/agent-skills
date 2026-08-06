@@ -1,0 +1,54 @@
+name: Sync website
+
+# Publishes the plugin to the Tessl registry for an existing release tag.
+# Dispatched by release.yml after the GitHub release is created, and
+# dispatchable by hand to retry a failed sync without re-releasing.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to sync (e.g. v1.3.1)"
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  sync:
+    name: Sync ${{ inputs.tag }} to Tessl
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - uses: tesslio/setup-tessl@v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+
+      - name: Verify publish exclusions
+        run: |
+          # R20: published artifacts must exclude the eval harness and docs
+          # (enforced by the repository-root .tesslignore; see RELEASE.md).
+          if ! output=$(tessl plugin publish . --dry-run --verbose 2>&1); then
+            echo "$output"
+            echo "::error::tessl plugin publish --dry-run failed"
+            exit 1
+          fi
+          echo "$output"
+          if echo "$output" | grep -E '(^|[[:space:]"'"'"'])(\./)?(evals|docs)/' ; then
+            echo "::error::tessl plugin publish would include evals/ or docs/ paths; fix .tesslignore before releasing"
+            exit 1
+          fi
+          echo "Publish exclusions verified: no evals/ or docs/ paths in the dry-run output."
+
+      - name: Publish to Tessl
+        run: |
+          # Score the authored Tessl scenarios at publish time. --eval-scenarios
+          # points the publisher at evals/tessl/ in the working tree; the packaged
+          # plugin still excludes all of evals/ (R20, verified above). See RELEASE.md.
+          tessl plugin publish . --eval-scenarios evals/tessl

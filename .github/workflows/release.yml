@@ -77,10 +77,6 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
     permissions:
-      id-token: write
-      # write (not read): this job pushes the version-bump and changelog
-      # commits and the release tag back to the branch (main is unprotected),
-      # so github-actions[bot] needs contents write or the push 403s.
       contents: write
     steps:
       - name: Checkout
@@ -90,10 +86,6 @@ jobs:
           # top of it and pushed to the dispatched branch explicitly.
           ref: ${{ needs.resolve.outputs.sha }}
           fetch-depth: 0
-
-      - uses: tesslio/setup-tessl@v2
-        with:
-          token: ${{ secrets.TESSL_TOKEN }}
 
       - name: Compute next version
         id: version
@@ -139,7 +131,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --cached --quiet; then
-            echo "plugin manifests unchanged, skipping commit."
+            echo "Plugin manifests unchanged, skipping commit."
           else
             git commit -m "chore: update plugin manifests for ${TAG}"
             # HEAD is detached at the pinned SHA; push to the dispatched
@@ -224,29 +216,6 @@ jobs:
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
-      - name: Verify publish exclusions
-        run: |
-          # R20: published artifacts must exclude the eval harness and docs
-          # (enforced by the repository-root .tesslignore; see RELEASE.md).
-          if ! output=$(tessl plugin publish . --dry-run --verbose 2>&1); then
-            echo "$output"
-            echo "::error::tessl plugin publish --dry-run failed"
-            exit 1
-          fi
-          echo "$output"
-          if echo "$output" | grep -E '(^|[[:space:]"'"'"'])(\./)?(evals|docs)/' ; then
-            echo "::error::tessl plugin publish would include evals/ or docs/ paths; fix .tesslignore before releasing"
-            exit 1
-          fi
-          echo "Publish exclusions verified: no evals/ or docs/ paths in the dry-run output."
-
-      - name: Publish to Tessl
-        run: |
-          # Score the authored Tessl scenarios at publish time. --eval-scenarios
-          # points the publisher at evals/tessl/ in the working tree; the packaged
-          # plugin still excludes all of evals/ (R20, verified above). See RELEASE.md.
-          tessl plugin publish . --eval-scenarios evals/tessl
-
       - name: Create tag
         env:
           TAG: ${{ steps.version.outputs.tag }}
@@ -263,17 +232,18 @@ jobs:
             --title "${TAG}" \
             --generate-notes
 
-  # After the GitHub release so the tag/release stay the source of truth; a
-  # failed publish is retried by dispatching publish-npm.yml with the tag,
-  # without re-releasing.
+  # publish-npm, sync-website, and github-pages all run in parallel after the
+  # GitHub release is created. Each is a separate dispatchable workflow so a
+  # failed or timed-out step can be retried independently with the existing tag
+  # without re-running the full release.
   #
-  # Dispatched rather than called as a reusable workflow: npm's trusted
-  # publisher for @dash0/agent-skills is pinned to publish-npm.yml, and npm
-  # validates the top-level workflow's filename — a workflow_call here would
-  # present release.yml and be rejected. workflow_dispatch is one of the two
-  # event types the default GITHUB_TOKEN is allowed to trigger, so this does
-  # not need a PAT. The publish run's outcome is reported on its own run,
-  # not on this one.
+  # Dispatched rather than called as reusable workflows: npm's trusted publisher
+  # for @dash0/agent-skills is pinned to publish-npm.yml, and npm validates the
+  # top-level workflow's filename — a workflow_call here would present release.yml
+  # and be rejected. The same dispatch pattern is applied to sync-website.yml and
+  # github-pages.yml for consistency. workflow_dispatch is one of the two event
+  # types the default GITHUB_TOKEN is allowed to trigger, so none of these need a
+  # PAT. Each dispatched run's outcome is reported on its own run, not on this one.
   publish-npm:
     name: Dispatch npm publish
     needs: release
@@ -290,3 +260,37 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             -f tag="${TAG}"
           echo "Dispatched publish-npm.yml for ${TAG}; its result appears on that workflow's own run."
+
+  sync-website:
+    name: Dispatch website sync
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch sync-website.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          gh workflow run sync-website.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            -f tag="${TAG}"
+          echo "Dispatched sync-website.yml for ${TAG}; its result appears on that workflow's own run."
+
+  github-pages:
+    name: Dispatch GitHub Pages
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch github-pages.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          gh workflow run github-pages.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            -f tag="${TAG}"
+          echo "Dispatched github-pages.yml for ${TAG}; its result appears on that workflow's own run."

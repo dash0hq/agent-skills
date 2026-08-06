@@ -37,6 +37,17 @@ Install instrumentation packages for the libraries you use from the [OpenTelemet
 
 **Note**: Installing the packages alone is insufficient—you must write initialization code to activate the SDK AND enable exporters.
 
+### Verifying dependencies
+
+Never hand-write a `require` line in `go.mod` with a version from memory; verify the module against the module proxy first, per [verify-dependencies](../verify-dependencies.md):
+
+```bash
+go list -m -versions go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
+```
+
+The module proxy lists every published version; a module it does not know is not a published instrumentation.
+Add modules with `go get <module>@latest` followed by `go mod tidy`, which resolves real versions and prunes the manifest.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

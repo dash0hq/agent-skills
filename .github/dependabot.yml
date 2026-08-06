@@ -62,6 +62,15 @@ updates:
       fixtures:
         patterns:
           - "*"
+    ignore:
+      # python-elasticsearch-service is the upgrade-scenario fixture: it
+      # deliberately pins an old OpenTelemetry release line whose
+      # elasticsearch instrumentation upstream retired, and upgrading past it
+      # is the task under eval. Bumping these pins is doing the scenario's
+      # job for the agent; change them only together with a review of the
+      # scenario's premise (see evals/custom/scenarios/verify_dependencies.go).
+      - dependency-name: "elasticsearch"
+      - dependency-name: "opentelemetry-*"
 
   - package-ecosystem: "maven"
     directories:

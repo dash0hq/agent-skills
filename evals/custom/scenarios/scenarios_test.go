@@ -22,6 +22,7 @@ var allScenarioIDs = []string{
 	NextJSHTTPID, BrowserHTTPID,
 	CollectorPipelineHardeningID, OTTLRedactionID, OTTLEnrichmentID, SemconvAttributesID,
 	K8sDownwardAPIID, K8sOTelOperatorID, K8sHelmChartID, K8sRawManifestsID, K8sDash0OperatorID,
+	PythonRetiredInstrumentationUpgradeID,
 }
 
 // instrumentationSelectable is every otel-instrumentation scenario reachable
@@ -31,6 +32,7 @@ var instrumentationSelectable = []string{
 	PythonHTTPID, JavaHTTPID, RubyHTTPID, PHPHTTPID, ScalaHTTPID,
 	DotnetHTTPID, DotnetNuGetID, DotnetEnrichmentID,
 	NextJSHTTPID, BrowserHTTPID,
+	PythonRetiredInstrumentationUpgradeID,
 }
 
 // The registry completeness test (R17), in both directions: every dedicated

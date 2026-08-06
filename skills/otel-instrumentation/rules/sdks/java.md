@@ -31,6 +31,15 @@ wget "https://github.com/open-telemetry/opentelemetry-java-instrumentation/relea
 
 **Note**: The javaagent.jar contains both the agent and instrumentation libraries, enabling automatic instrumentation without modifying source code.
 
+### Verifying dependencies
+
+The javaagent needs no per-library coordinates; prefer it over adding instrumentation libraries to the build.
+When you do add library coordinates, never write a version from memory; verify the coordinate resolves from Maven Central first, per [verify-dependencies](../verify-dependencies.md), and prefer importing the OpenTelemetry BOM at a verified version so per-artifact versions can be omitted:
+
+```bash
+mvn dependency:get -Dartifact=io.opentelemetry:opentelemetry-bom:1.51.0 -Dpackaging=pom
+```
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

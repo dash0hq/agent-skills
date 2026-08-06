@@ -33,6 +33,16 @@ curl -L -O "https://github.com/open-telemetry/opentelemetry-dotnet-instrumentati
 **Note**: This script is not supported on Apple Silicon.
 For Windows, use the [PowerShell guide](https://opentelemetry.io/docs/zero-code/dotnet/getting-started/).
 
+### Verifying dependencies
+
+Never write a package id or version into a `.csproj` from memory; verify it against NuGet first, per [verify-dependencies](../verify-dependencies.md):
+
+```bash
+dotnet package search OpenTelemetry.Instrumentation.AspNetCore --exact-match
+```
+
+Prefer `dotnet add package <id>` (no version) over hand-editing the project file, so NuGet resolves and records the real latest stable version.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

@@ -16,6 +16,7 @@ Before adding any instrumentation dependency to a manifest, verify all three aga
    It resolves the latest published version from the registry and fails loudly when the package does not exist.
 2. When you must write a manifest entry by hand, first run the lookup command from your language's section (indexed below) and copy the version it reports.
 3. When the lookup shows the package is deprecated, yanked, or has no recent release, do not add it: fall back to the auto-instrumentation path or manual instrumentation per the language's SDK rule, and state why.
+   When this means removing a dependency that is already in the manifest, follow [Dropping an existing dependency](#dropping-an-existing-dependency).
 4. When the lookup finds no package at all, do not invent a name: check the [OpenTelemetry registry](https://opentelemetry.io/ecosystem/registry/) for the library, and if nothing current exists, instrument manually per [spans](./spans.md) and the SDK rule.
 5. Never guess a version to complete a manifest entry.
    A wrong pin fails the build (`npm error notarget`, `go: no matching versions`), or worse, resolves to an incompatible release.
@@ -30,6 +31,19 @@ Before adding any instrumentation dependency to a manifest, verify all three aga
 ```
 
 The version above was written from memory; no `0.57.x` release of that package was ever published, and `npm install` fails with `npm error code ETARGET`.
+
+## Dropping an existing dependency
+
+Removing an instrumentation dependency makes the telemetry it produced disappear, and dashboards and alerts may be built on that telemetry.
+When an existing instrumentation dependency cannot survive a change — it is retired and blocks an upgrade, or its pins conflict with the rest of the dependency set — do not drop it silently.
+
+Ask the user for confirmation before removing it, naming:
+
+1. The package, and why it cannot be kept.
+2. Exactly which telemetry disappears: the library whose spans, metrics, or logs stop being produced.
+3. The replacement, if any — native client telemetry or manual instrumentation per the language's SDK rule — and any span names or attributes that change with it, since renamed telemetry breaks dashboards and alerts just like removed telemetry.
+
+When you have no way to ask — running non-interactively or in a pipeline — proceed only if the task cannot complete otherwise, and report the removal and its telemetry impact prominently in your summary.
 
 ## Language-specific verification commands
 

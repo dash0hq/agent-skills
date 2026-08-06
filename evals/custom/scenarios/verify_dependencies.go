@@ -25,6 +25,10 @@
 // working build; the assertion additionally requires telemetry.sdk.version
 // to have moved off the fixture's pinned 1.43.0, so an agent that changes
 // nothing (or resolves the conflict by staying on the old line) fails.
+// Interactively the rule requires confirming the drop with the user first,
+// because removed instrumentation is telemetry that disappears; this
+// headless run exercises the rule's non-interactive fallback (proceed only
+// because the task cannot complete otherwise, and report the removal).
 package scenarios
 
 import (

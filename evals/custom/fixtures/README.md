@@ -29,6 +29,13 @@ The full contract still applies — the server serves `GET /checkout` backed by 
 
 The contract lint in `evals/scenarios/fixtures_test.go` encodes this list as `browserContractExceptions` and fails when a documented exception disappears from the fixture, so the lint stays at full strength for every fixture.
 
+## Pre-instrumented fixture exception
+
+Most fixtures start from zero so the agent adds instrumentation; a pre-instrumented fixture inverts that for scenarios whose task is changing existing instrumentation (today: the dependency-upgrade scenario, where the fixture pins an OpenTelemetry release line containing a retired instrumentation package).
+Such a fixture follows the full service contract except the "no OpenTelemetry dependencies" clause, and its instrumentation must be zero-code where the language allows it, so the application source stays plain and the dependency manifest plus container command carry the whole instrumentation surface.
+
+The contract lint encodes these fixtures as `preInstrumentedFixtures` in `evals/scenarios/fixtures_test.go`, each entry naming the scenario premise that needs the pre-existing instrumentation; every other lint clause still applies to them.
+
 ## Synthetic data
 
 All fixture data must be obviously synthetic so leaked telemetry can never be mistaken for real customer data.

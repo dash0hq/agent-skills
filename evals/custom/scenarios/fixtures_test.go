@@ -17,16 +17,17 @@ import (
 // data) for the contract lint below. Ports supplied through the container
 // command line list the Dockerfile as a source.
 var fixtureSourceFiles = map[string][]string{
-	"evals/custom/fixtures/browser-service": {"server.js", "static/app.js"},
-	"evals/custom/fixtures/dotnet-service":  {"Program.cs"},
-	"evals/custom/fixtures/go-service":      {"main.go"},
-	"evals/custom/fixtures/java-service":    {"src/main/java/checkout/CheckoutServer.java", "src/main/resources/application.properties"},
-	"evals/custom/fixtures/nextjs-service":  {"app/checkout/route.js", "Dockerfile"},
-	"evals/custom/fixtures/nodejs-service":  {"server.js"},
-	"evals/custom/fixtures/php-service":     {"index.php", "Dockerfile"},
-	"evals/custom/fixtures/python-service":  {"app.py"},
-	"evals/custom/fixtures/ruby-service":    {"config.ru", "Dockerfile"},
-	"evals/custom/fixtures/scala-service":   {"src/main/scala/checkout/CheckoutServer.scala"},
+	"evals/custom/fixtures/browser-service":              {"server.js", "static/app.js"},
+	"evals/custom/fixtures/dotnet-service":               {"Program.cs"},
+	"evals/custom/fixtures/go-service":                   {"main.go"},
+	"evals/custom/fixtures/java-service":                 {"src/main/java/checkout/CheckoutServer.java", "src/main/resources/application.properties"},
+	"evals/custom/fixtures/nextjs-service":               {"app/checkout/route.js", "Dockerfile"},
+	"evals/custom/fixtures/nodejs-service":               {"server.js"},
+	"evals/custom/fixtures/php-service":                  {"index.php", "Dockerfile"},
+	"evals/custom/fixtures/python-elasticsearch-service": {"app.py"},
+	"evals/custom/fixtures/python-service":               {"app.py"},
+	"evals/custom/fixtures/ruby-service":                 {"config.ru", "Dockerfile"},
+	"evals/custom/fixtures/scala-service":                {"src/main/scala/checkout/CheckoutServer.scala"},
 }
 
 // nonServiceFixtures lists fixture directories that are not HTTP services and
@@ -36,6 +37,16 @@ var fixtureSourceFiles = map[string][]string{
 var nonServiceFixtures = map[string]string{
 	"evals/custom/fixtures/collector-workspace": "Collector config workspace the agent edits (U5); no service contract",
 	"evals/custom/fixtures/k8s":                 "Kubernetes manifests and workspaces the agent edits (U6); no service contract",
+}
+
+// preInstrumentedFixtures lists service fixtures that deviate from the
+// "no OpenTelemetry dependencies" contract clause because starting already
+// instrumented is their point (see the "Pre-instrumented fixture exception"
+// section of evals/custom/fixtures/README.md): each entry names the scenario
+// premise that needs the pre-existing instrumentation. The rest of the
+// service contract lint still applies to them.
+var preInstrumentedFixtures = map[string]string{
+	"evals/custom/fixtures/python-elasticsearch-service": "upgrade scenario: pre-instrumented on the 0.64b0 line whose elasticsearch instrumentation upstream retired (see verify_dependencies.go)",
 }
 
 // browserContractExceptions documents how the browser fixture deviates from
@@ -114,7 +125,12 @@ func TestFixturesFollowTheContract(t *testing.T) {
 			require.Contains(t, code, "TEST-0001", "synthetic order identifier")
 
 			// The fixture is the code the agent instruments: no file in its
-			// tree may carry an OpenTelemetry dependency of any kind.
+			// tree may carry an OpenTelemetry dependency of any kind — unless
+			// the fixture is documented as pre-instrumented, in which case
+			// the pre-existing instrumentation is the scenario premise.
+			if _, ok := preInstrumentedFixtures[fixture]; ok {
+				return
+			}
 			err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 				if err != nil {
 					return err

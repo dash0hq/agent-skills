@@ -25,6 +25,16 @@ bundle add opentelemetry-sdk opentelemetry-instrumentation-all opentelemetry-exp
 
 **Note**: Installing the gems alone is insufficient—you must initialize the SDK AND enable exporters.
 
+### Verifying dependencies
+
+Never write a gem name or version into the `Gemfile` from memory; verify it against RubyGems first, per [verify-dependencies](../verify-dependencies.md):
+
+```bash
+gem info --remote opentelemetry-instrumentation-rails
+```
+
+Prefer `bundle add <gem>` (no version) over hand-editing the `Gemfile`, so Bundler resolves the real latest version.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

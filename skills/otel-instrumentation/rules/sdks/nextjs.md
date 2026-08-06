@@ -22,6 +22,10 @@ Full-stack OpenTelemetry setup for Next.js 13+ with App Router. Server-side uses
   - In Dash0: [Settings → Auth Tokens → Create Token](https://app.dash0.com/settings/auth-tokens)
   - For browser telemetry, use a token with limited permissions (Ingesting only)
 
+## Verifying dependencies
+
+Never write a package name or version into `package.json` from memory; verify it against the npm registry first (`npm view <pkg> version`, `npm view <pkg> deprecated`), per [verify-dependencies](../verify-dependencies.md), and prefer `npm install <pkg>` (no version) so npm resolves the real latest version.
+
 ## Quick Start
 
 ### 1. Install Packages

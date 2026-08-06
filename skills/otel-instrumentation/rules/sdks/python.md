@@ -29,6 +29,19 @@ The `opentelemetry-bootstrap` command detects installed libraries and installs t
 
 **Note**: Installing the packages alone is insufficient—you must activate the SDK AND configure exporters.
 
+### Verifying dependencies
+
+Never write an `opentelemetry-instrumentation-*` package or version into `requirements.txt` (or `pyproject.toml`) from memory; verify it first, per [verify-dependencies](../verify-dependencies.md).
+`opentelemetry-bootstrap` is the authoritative check: it lists only the instrumentation packages the installed contrib release ships, matched against the libraries present in the environment.
+
+```bash
+opentelemetry-bootstrap             # prints package==version for every detected library
+pip index versions opentelemetry-instrumentation-flask  # existence and published versions
+```
+
+A library missing from the bootstrap output has no current instrumentation — retired instrumentations (such as elasticsearch) still install from PyPI at their last release but are no longer maintained or shipped.
+Do not hand-pin such a package; instrument the library manually instead.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

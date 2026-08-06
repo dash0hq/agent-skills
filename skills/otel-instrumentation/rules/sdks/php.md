@@ -56,6 +56,16 @@ Set the `OTEL_PHP_AUTOLOAD_ENABLED` environment variable to `true` so the SDK au
 
 **Note**: Installing the packages and extension alone is insufficient—you must enable auto-loading AND configure exporters.
 
+### Verifying dependencies
+
+Never write a package name or version into `composer.json` from memory; verify it against Packagist first, per [verify-dependencies](../verify-dependencies.md):
+
+```bash
+composer show --available open-telemetry/opentelemetry-auto-slim
+```
+
+Prefer `composer require <pkg>` (no version) over hand-editing `composer.json`, so Composer resolves the real latest version.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

@@ -25,6 +25,19 @@ npm install @opentelemetry/auto-instrumentations-node
 
 **Note**: Installing the package alone is insufficient—you must activate the SDK AND enable exporters.
 
+### Verifying dependencies
+
+Never write a package name or version into `package.json` from memory; verify it against the npm registry first, per [verify-dependencies](../verify-dependencies.md):
+
+```bash
+npm view @opentelemetry/instrumentation-undici version         # latest published version
+npm view @opentelemetry/instrumentation-undici versions --json # every published version
+npm view @opentelemetry/instrumentation-undici deprecated      # prints the notice when deprecated, nothing otherwise
+```
+
+A range that matches no published version prints nothing: `npm view '<pkg>@^1.2.3' version`.
+Prefer `npm install <pkg>` (no version) over hand-editing `package.json`, so npm resolves and records the real latest version.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

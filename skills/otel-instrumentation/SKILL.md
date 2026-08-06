@@ -21,6 +21,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 |-----------------|-------------|
 | [telemetry](./rules/telemetry.md) | **Entrypoint** — signal types, correlation, and navigation |
 | [resolve-values](./rules/resolve-values.md) | Resolving configuration values from the codebase |
+| [verify-dependencies](./rules/verify-dependencies.md) | Verifying instrumentation packages and versions exist before adding them |
 | [resources](./rules/resources.md) | Resource attributes — service identity and environment |
 | [k8s](./rules/platforms/k8s.md) | Kubernetes deployment — downward API, pod spec |
 | [spans](./rules/spans.md) | Spans — naming, kind, status, and hygiene |

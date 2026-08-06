@@ -60,6 +60,15 @@ libraryDependencies += "io.opentelemetry" % "opentelemetry-api" % "<version>"
 
 Find the current version at [Maven Central — opentelemetry-api](https://central.sonatype.com/artifact/io.opentelemetry/opentelemetry-api).
 
+### Verifying dependencies
+
+Never fill a `<version>` placeholder in `build.sbt` from memory; verify the coordinate and version exist on Maven Central first, per [verify-dependencies](../verify-dependencies.md).
+Look the artifact up on [Maven Central](https://central.sonatype.com/) (as the links above do), or verify resolution from the command line with Coursier, which sbt uses internally:
+
+```bash
+cs resolve io.opentelemetry:opentelemetry-api:1.51.0
+```
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

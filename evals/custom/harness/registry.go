@@ -62,6 +62,7 @@ var defaultRuleClassification = map[string]RuleClassification{
 	"skills/otel-instrumentation/rules/sensitive-data.md":                    {Class: ClassificationShared},
 	"skills/otel-instrumentation/rules/spans.md":                             {Class: ClassificationShared},
 	"skills/otel-instrumentation/rules/telemetry.md":                         {Class: ClassificationShared},
+	"skills/otel-instrumentation/rules/verify-dependencies.md":               {Class: ClassificationShared},
 	"skills/otel-instrumentation/rules/validation.md":                        {Class: ClassificationShared},
 
 	// otel-collector — dedicated: the pipeline file and the 4 deployment

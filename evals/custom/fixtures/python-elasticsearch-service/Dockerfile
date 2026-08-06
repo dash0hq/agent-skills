@@ -6,6 +6,7 @@
 #
 #   docker build -t python-elasticsearch-service-eval .
 FROM python:3.13-slim
+ENV OTEL_SERVICE_NAME="python-search-service-eval"
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt

@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.3.5 (2026-08-07)
+
+### Fixed
+
+- newest published is not newest usable — check toolchain compatibility
+
+### Changed
+
+- update plugin manifests for v1.3.5
+
+
 ## v1.3.4 (2026-08-07)
 
 ### Added

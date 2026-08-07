@@ -1,5 +1,5 @@
 // The .NET instrumentation scenarios: the per-language HTTP happy path plus
-// the 2 regression scenarios recorded in TODO.md — the NuGet-package setup
+// the 2 regression scenarios found in manual testing — the NuGet-package setup
 // route (the documented install script is not the only viable path) and
 // enrichment of the auto-instrumented server span via Activity.Current.
 package scenarios
@@ -20,11 +20,11 @@ import (
 const (
 	// DotnetHTTPID is the .NET instrumentation happy path.
 	DotnetHTTPID = "instr-dotnet-http"
-	// DotnetNuGetID pins the NuGet-package setup route from TODO.md: the
+	// DotnetNuGetID pins the NuGet-package setup route found in manual testing: the
 	// install script is forbidden, so the scenario fails while the .NET
 	// rule file documents no package-based path.
 	DotnetNuGetID = "instr-dotnet-nuget"
-	// DotnetEnrichmentID is the TODO.md enrichment regression: the task
+	// DotnetEnrichmentID is the manually-found enrichment regression: the task
 	// demands order.id on the auto-instrumented SERVER span itself (the
 	// Activity.Current pattern), not on a new child span.
 	DotnetEnrichmentID = "instr-dotnet-enrichment"
@@ -54,7 +54,7 @@ func DotnetHTTP() harness.Scenario {
 	)
 }
 
-// DotnetNuGet pins the NuGet-package setup route: the TODO.md regression
+// DotnetNuGet pins the NuGet-package setup route: the manually-found regression
 // where the skill documents only the zero-code install script, leaving an
 // agent with no package-based path. The prompt forbids the script; the
 // scenario passes only when the skill-guided agent produces working traces
@@ -74,7 +74,7 @@ func DotnetNuGet() harness.Scenario {
 	return sc
 }
 
-// DotnetEnrichment is the TODO.md enrichment regression: business attributes
+// DotnetEnrichment is the manually-found enrichment regression: business attributes
 // belong on the auto-instrumented SERVER span (Activity.Current), and the
 // assertion rejects runs that only put order.id on a child span.
 func DotnetEnrichment() harness.Scenario {
@@ -98,7 +98,7 @@ func DotnetEnrichment() harness.Scenario {
 // assertServerSpanAttribute builds the enrichment assertion: on top of the
 // shared HTTP-traces assertion, the SERVER span for GET /checkout itself must
 // carry the given attribute value. Checking only SERVER spans is what rejects
-// the child-span shortcut the TODO.md regression describes.
+// the child-span shortcut the manually-found regression describes.
 func assertServerSpanAttribute(serviceName, key, want string) harness.Assertion {
 	return func(t *testing.T, sink *otelsink.Sink) error {
 		if err := assertHTTPTraces(serviceName)(t, sink); err != nil {

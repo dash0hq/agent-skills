@@ -27,7 +27,7 @@ func TestAssertServerSpanAttributePassesWhenServerSpanCarriesIt(t *testing.T) {
 	require.NoError(t, assertServerSpanAttribute(DotnetServiceName, "order.id", "TEST-0001")(t, sink))
 }
 
-// The TODO.md regression shape: the agent creates a child span to carry the
+// The manually-found regression shape: the agent creates a child span to carry the
 // business attribute instead of enriching the auto-instrumented SERVER span
 // via Activity.Current. The assertion must reject it.
 func TestAssertServerSpanAttributeRejectsTheChildSpanShortcut(t *testing.T) {

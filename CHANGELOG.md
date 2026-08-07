@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.3.6 (2026-08-07)
+
+### Fixed
+
+- keep the lockfile in step with the manifest
+
+### Changed
+
+- update plugin manifests for v1.3.6
+
+
 ## v1.3.5 (2026-08-07)
 
 ### Fixed

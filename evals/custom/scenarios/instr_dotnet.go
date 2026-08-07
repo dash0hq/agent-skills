@@ -16,6 +16,10 @@ import (
 	"github.com/dash0hq/agent-skills/evals/custom/harness"
 )
 
+func init() {
+	registerScenarios(DotnetHTTP(), DotnetNuGet(), DotnetEnrichment())
+}
+
 // Scenario IDs of the .NET scenarios.
 const (
 	// DotnetHTTPID is the .NET instrumentation happy path.

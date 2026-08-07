@@ -2,7 +2,7 @@
   "name": "dash0-agent-skills",
   "displayName": "Dash0 OpenTelemetry skills",
   "description": "OpenTelemetry skills and reference documentation for AI coding assistants",
-  "version": "v1.3.5",
+  "version": "v1.3.6",
   "author": {
     "name": "Dash0",
     "email": "support@dash0.com"

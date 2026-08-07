@@ -21,6 +21,10 @@ import (
 	"github.com/dash0hq/agent-skills/evals/custom/harness"
 )
 
+func init() {
+	registerScenarios(BrowserHTTP())
+}
+
 // BrowserHTTPID is the browser instrumentation scenario: page spans received
 // over OTLP/HTTP through the relay.
 const BrowserHTTPID = "instr-browser-http"

@@ -66,6 +66,10 @@ composer show --available open-telemetry/opentelemetry-auto-slim
 
 Prefer `composer require <pkg>` (no version) over hand-editing `composer.json`, so Composer resolves the real latest version.
 
+`composer.lock` must move with `composer.json`: `composer install` against a stale lockfile warns (`Warning: The lock file is not up to date with the latest changes in composer.json.`), and since Composer 2.5 it fails outright when a required package is missing from the lockfile (`Required package "..." is not present in the lock file.`).
+Regenerate the lockfile where Composer runs with `composer update <pkg>` scoped to the touched package, per [verify-dependencies](../verify-dependencies.md#keeping-the-lockfile-in-step).
+Only as a fallback, when no environment with Composer exists outside the image build, have the builder stage run the same scoped `composer update <pkg>` before `composer install`.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

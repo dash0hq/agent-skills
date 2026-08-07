@@ -35,6 +35,10 @@ gem info --remote opentelemetry-instrumentation-rails
 
 Prefer `bundle add <gem>` (no version) over hand-editing the `Gemfile`, so Bundler resolves the real latest version.
 
+`Gemfile.lock` must move with the `Gemfile`: frozen installs (`BUNDLE_FROZEN=true`, `bundle config set frozen true`, deployment mode) refuse to install after a `Gemfile` change, listing the drift (`You have added to the Gemfile:`) and telling you to run `bundle install` elsewhere and commit the updated `Gemfile.lock`.
+Regenerate the lockfile where Bundler runs — `bundle lock` resolves and writes `Gemfile.lock` without installing — per [verify-dependencies](../verify-dependencies.md#keeping-the-lockfile-in-step).
+Only as a fallback, when no environment with Bundler exists outside the image build, have the builder stage reconcile with a non-frozen `bundle install` — frozen installs are what keep image builds reproducible, so prefer regenerating the lockfile and keeping them frozen.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

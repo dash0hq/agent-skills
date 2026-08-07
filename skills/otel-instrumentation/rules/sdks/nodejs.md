@@ -39,6 +39,17 @@ A range that matches no published version prints nothing: `npm view '<pkg>@^1.2.
 Prefer `npm install <pkg>` (no version) over hand-editing `package.json`, so npm resolves and records the real latest version.
 Check the package's runtime requirement against the project's Node.js version (`engines` in `package.json`, base images in Dockerfiles, `.nvmrc`) with `npm view <pkg> engines` — npm only warns on an engines mismatch by default, so an incompatible package installs fine and breaks at runtime.
 
+`package-lock.json` must move with `package.json`: a hand-edited manifest leaves the lockfile stale, and `npm ci` fails on the mismatch by design:
+
+```text
+npm error code EUSAGE
+npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync. Please update your lock file with `npm install` before continuing.
+npm error Missing: @opentelemetry/instrumentation-undici@0.15.0 from lock file
+```
+
+Regenerate the lockfile where npm runs (`npm install` rewrites it) per [verify-dependencies](../verify-dependencies.md#keeping-the-lockfile-in-step).
+Only as a fallback, when no environment with npm exists outside the image build, have the builder stage reconcile by running `npm install` instead of `npm ci` — this trades away the exact-lockfile reproducibility `npm ci` guarantees, so prefer regenerating the lockfile and keeping `npm ci`.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

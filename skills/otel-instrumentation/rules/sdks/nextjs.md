@@ -25,6 +25,7 @@ Full-stack OpenTelemetry setup for Next.js 13+ with App Router. Server-side uses
 ## Verifying dependencies
 
 Never write a package name or version into `package.json` from memory; verify it against the npm registry first (`npm view <pkg> version`, `npm view <pkg> deprecated`), per [verify-dependencies](../verify-dependencies.md), and prefer `npm install <pkg>` (no version) so npm resolves the real latest version.
+The npm manifest-and-lockfile rule applies unchanged: a hand-edited `package.json` desynchronizes `package-lock.json` and `npm ci` fails on the mismatch — follow [nodejs](./nodejs.md#verifying-dependencies).
 
 ## Quick Start
 

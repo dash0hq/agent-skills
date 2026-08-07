@@ -42,6 +42,8 @@ pip index versions opentelemetry-instrumentation-flask  # existence and publishe
 A library missing from the bootstrap output has no current instrumentation — retired instrumentations (such as elasticsearch) still install from PyPI at their last release but are no longer maintained or shipped.
 Do not hand-pin such a package; instrument the library manually instead.
 
+pip enforces `Requires-Python` natively, resolving to the newest release compatible with the interpreter — but only the interpreter pip runs under, so run the resolution (or `pip index versions`) under the same Python version the project builds and deploys with (base image, CI), not whatever is on your PATH.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

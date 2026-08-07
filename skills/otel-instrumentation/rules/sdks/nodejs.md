@@ -37,6 +37,7 @@ npm view @opentelemetry/instrumentation-undici deprecated      # prints the noti
 
 A range that matches no published version prints nothing: `npm view '<pkg>@^1.2.3' version`.
 Prefer `npm install <pkg>` (no version) over hand-editing `package.json`, so npm resolves and records the real latest version.
+Check the package's runtime requirement against the project's Node.js version (`engines` in `package.json`, base images in Dockerfiles, `.nvmrc`) with `npm view <pkg> engines` — npm only warns on an engines mismatch by default, so an incompatible package installs fine and breaks at runtime.
 
 ## Environment variables
 

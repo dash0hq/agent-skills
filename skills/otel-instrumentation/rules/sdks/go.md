@@ -47,6 +47,15 @@ go list -m -versions go.opentelemetry.io/contrib/instrumentation/net/http/otelht
 The module proxy lists every published version; a module it does not know is not a published instrumentation.
 Add modules with `go get <module>@latest` followed by `go mod tidy`, which resolves real versions and prunes the manifest.
 
+The newest published release is not always usable: a module version's `go` directive must be satisfied by the project's toolchain — the `go` line in `go.mod` **and** the Go version of the build environment (Go container base images set `GOTOOLCHAIN=local`, so a builder like `golang:1.24` cannot auto-download the newer toolchain a dependency demands, and `go mod download` fails with `requires go >= ...`).
+A version's directive is one request away:
+
+```bash
+curl -s https://proxy.golang.org/go.opentelemetry.io/otel/@v/v1.45.0.mod | grep '^go '
+```
+
+When the newest release requires a newer toolchain than the project has, walk `go list -m -versions` down to the newest release whose directive the toolchain satisfies and pin that — or upgrade the toolchain deliberately (go.mod directive, builder images, CI) as its own visible change.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

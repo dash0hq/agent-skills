@@ -1,6 +1,6 @@
 {
   "name": "@dash0/agent-skills",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "description": "OpenTelemetry skills and reference documentation for AI coding assistants",
   "license": "Apache-2.0",
   "author": {

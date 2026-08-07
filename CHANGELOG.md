@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.3.4 (2026-08-07)
+
+### Added
+
+- verify dependencies exist before adding or bumping them (#124)
+
+### Fixed
+
+- scope the dotnet env-var contract per activation path
+- bridge-free stdout trace correlation for Go logs
+
+### Changed
+
+- update plugin manifests for v1.3.4
+- move eval scenario declarations into per-language files
+- retire the references to the deleted TODO.md
+- bump the fixtures group across 1 directory with 2 updates
+- delete TODO.md
+- bump actions/setup-node from 4 to 7
+
+
 ## v1.3.3 (2026-08-05)
 
 ### Fixed

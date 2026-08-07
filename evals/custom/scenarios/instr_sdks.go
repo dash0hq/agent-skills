@@ -1,7 +1,7 @@
 // The U4 SDK instrumentation scenarios: the remaining 8 SDK rule files after
 // the U3 Go and Node.js proving ground. This file declares the additive
 // registration mechanism (registerScenarios) plus the 6 straightforward
-// per-language HTTP happy paths; the .NET scenarios (including the 2 TODO.md
+// per-language HTTP happy paths; the .NET scenarios (including the 2 manually-found
 // regressions) live in instr_dotnet.go and the browser scenario in
 // instr_browser.go.
 package scenarios

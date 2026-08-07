@@ -112,7 +112,7 @@ Set `EVAL_VERDICT_DIR=/tmp/verdicts` to write each verdict as JSON alongside the
 To watch a quarantined scenario locally, name it explicitly in `EVAL_SCENARIOS`.
 
 No scenarios are currently quarantined.
-`instr-go-logs` and `instr-dotnet-nuget` were quarantined as the `TODO.md` gaps this eval exists to catch (the Go slog bridge and the .NET NuGet install path are undocumented in the skills), but both were un-quarantined once repeated real runs showed the agent handles the gap itself; the remaining skill-doc improvements stay tracked in `TODO.md`.
+`instr-go-logs` and `instr-dotnet-nuget` were quarantined as known skill-content gaps this eval exists to catch (the Go log-correlation recipe and the .NET NuGet install path were undocumented in the skills), but both were un-quarantined once repeated real runs showed the agent handles the gap itself; skill-doc improvements are tracked as GitHub issues.
 
 ## Adding a scenario
 

@@ -1,6 +1,9 @@
 package scenarios
 
 import (
+	"encoding/hex"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -74,17 +77,77 @@ func TestAssertHTTPTracesFailsWithoutServerCheckoutSpan(t *testing.T) {
 	require.Contains(t, err.Error(), "/checkout")
 }
 
-func TestAssertLogsPresent(t *testing.T) {
-	sink := otelsink.Start(t)
+// The stdout correlation assertion of the go-logs scenario, end to end
+// against a real sink: the record's (trace_id, span_id) pair must name an
+// exported span of the right service, and OTLP application logs are refused.
+func TestAssertStdoutLogCorrelation(t *testing.T) {
+	const traceID = "4bf92f3577b34da6a3ce929d0e0e4736"
+	const spanID = "00f067aa0ba902b7"
+	feed := func(t *testing.T) *otelsink.Sink {
+		sink := otelsink.Start(t)
+		rawTrace, err := hex.DecodeString(traceID)
+		require.NoError(t, err)
+		rawSpan, err := hex.DecodeString(spanID)
+		require.NoError(t, err)
+		server := serverSpan(map[string]string{"http.request.method": "GET", "url.path": "/checkout"})
+		server.traceID, server.spanID = rawTrace, rawSpan
+		feedSpans(t, sink, map[string]string{"service.name": GoServiceName}, server,
+			clientSpan(map[string]string{"http.request.method": "GET"}))
+		return sink
+	}
+	record := func(traceKey, traceVal, spanKey, spanVal string) string {
+		return fmt.Sprintf(`{"level":"INFO","msg":"checkout completed","%s":%q,"%s":%q}`,
+			traceKey, traceVal, spanKey, spanVal)
+	}
+	assert := assertStdoutLogCorrelation(GoServiceName, "checkout completed")
 
-	err := assertLogsPresent(GoServiceName)(t, sink)
-	require.Error(t, err, "no records at all must fail")
-
-	feedLog(t, sink, map[string]string{"service.name": "some-other-service"}, "checkout completed")
-	err = assertLogsPresent(GoServiceName)(t, sink)
-	require.Error(t, err, "records under another service.name must not satisfy the assertion")
-	require.Contains(t, err.Error(), GoServiceName)
-
-	feedLog(t, sink, map[string]string{"service.name": GoServiceName}, "checkout completed")
-	require.NoError(t, assertLogsPresent(GoServiceName)(t, sink))
+	t.Run("matching pair passes, snake_case keys", func(t *testing.T) {
+		sink := feed(t)
+		require.NoError(t, assert(t, sink, record("trace_id", traceID, "span_id", spanID)))
+	})
+	t.Run("matching pair passes, camelCase keys and uppercase hex", func(t *testing.T) {
+		sink := feed(t)
+		require.NoError(t, assert(t, sink, record("traceId", strings.ToUpper(traceID), "spanId", strings.ToUpper(spanID))))
+	})
+	t.Run("non-JSON noise around the record is skipped", func(t *testing.T) {
+		sink := feed(t)
+		output := "boot noise\n" + record("trace_id", traceID, "span_id", spanID) + "\ntrailing noise"
+		require.NoError(t, assert(t, sink, output))
+	})
+	t.Run("no structured record fails", func(t *testing.T) {
+		sink := feed(t)
+		err := assert(t, sink, "checkout completed but not JSON")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no single-line JSON record")
+	})
+	t.Run("missing span id fails", func(t *testing.T) {
+		sink := feed(t)
+		err := assert(t, sink, fmt.Sprintf(`{"msg":"checkout completed","trace_id":%q}`, traceID))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no span id field")
+	})
+	t.Run("invalid hex ids fail", func(t *testing.T) {
+		sink := feed(t)
+		err := assert(t, sink, record("trace_id", "not-hex", "span_id", spanID))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "not valid hex")
+	})
+	t.Run("right trace, wrong span fails", func(t *testing.T) {
+		sink := feed(t)
+		err := assert(t, sink, record("trace_id", traceID, "span_id", "ffffffffffffffff"))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "matches no span")
+	})
+	t.Run("OTLP application logs are refused", func(t *testing.T) {
+		sink := feed(t)
+		feedLog(t, sink, map[string]string{"service.name": GoServiceName}, "checkout completed")
+		err := assert(t, sink, record("trace_id", traceID, "span_id", spanID))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "arrived over OTLP")
+	})
+	t.Run("OTLP logs of another service do not interfere", func(t *testing.T) {
+		sink := feed(t)
+		feedLog(t, sink, map[string]string{"service.name": "some-other-service"}, "unrelated")
+		require.NoError(t, assert(t, sink, record("trace_id", traceID, "span_id", spanID)))
+	})
 }

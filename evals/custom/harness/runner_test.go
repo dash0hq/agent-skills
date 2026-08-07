@@ -355,3 +355,72 @@ func TestRunnerCopiesFixtureAndComposesEnv(t *testing.T) {
 	require.Contains(t, seenEnv["OTEL_RESOURCE_ATTRIBUTES"], otelsink.TestIDAttribute+"=")
 	require.Equal(t, seenEnv[EnvOTLPEndpoint], seenEnv["OTEL_EXPORTER_OTLP_ENDPOINT"])
 }
+
+// AssertApp receives the fixture output the hooks expose, re-read on every
+// poll, and passes together with the telemetry assertion.
+func TestRunnerAssertAppReceivesFixtureOutput(t *testing.T) {
+	stub := testutil.WriteStub(t, testutil.GoodStubBody(string(SkillInstrumentation), goSkillFile(t)))
+	hooks := sendSpanHooks("GET /checkout", map[string]string{"service.name": "checkout"})
+	reads := 0
+	hooks.AppOutput = func(context.Context) (string, error) {
+		reads++
+		return `{"msg":"checkout completed","trace_id":"abc"}`, nil
+	}
+	r := newRunner(t, stub, hooks)
+
+	sc := testScenario()
+	var seenOutput string
+	sc.AssertApp = func(t *testing.T, sink *otelsink.Sink, appOutput string) error {
+		seenOutput = appOutput
+		if !strings.Contains(appOutput, "checkout completed") {
+			return errors.New("expected record missing from the fixture output")
+		}
+		return nil
+	}
+	v := r.Run(t, sc)
+
+	require.True(t, v.Passed, "verdict: %+v", v)
+	require.Contains(t, seenOutput, "checkout completed")
+	require.GreaterOrEqual(t, reads, 1, "fixture output read through the hook")
+}
+
+// A failing AssertApp classifies the attempt agent-assert, exactly like a
+// failing telemetry assertion.
+func TestRunnerAssertAppFailureClassifiedAgentAssert(t *testing.T) {
+	stub := testutil.WriteStub(t, testutil.GoodStubBody(string(SkillInstrumentation), goSkillFile(t)))
+	hooks := sendSpanHooks("GET /checkout", map[string]string{"service.name": "checkout"})
+	hooks.AppOutput = func(context.Context) (string, error) {
+		return "plain text, no structured record", nil
+	}
+	r := newRunner(t, stub, hooks)
+
+	sc := testScenario()
+	sc.AssertApp = func(t *testing.T, sink *otelsink.Sink, appOutput string) error {
+		if !strings.Contains(appOutput, "checkout completed") {
+			return errors.New("no structured checkout record on stdout")
+		}
+		return nil
+	}
+	v := r.Run(t, sc)
+
+	require.False(t, v.Passed)
+	require.Equal(t, ClassAgentAssert, v.Class)
+	require.Contains(t, v.Detail, "no structured checkout record")
+	require.Equal(t, MaxAgentAttempts, v.AgentAttempts)
+}
+
+// An AssertApp scenario against hooks that expose no fixture output is a
+// harness misconfiguration: classified infra, never skill-attributed.
+func TestRunnerAssertAppWithoutAppOutputHookIsInfra(t *testing.T) {
+	stub := testutil.WriteStub(t, testutil.GoodStubBody(string(SkillInstrumentation), goSkillFile(t)))
+	r := newRunner(t, stub, sendSpanHooks("GET /checkout", map[string]string{"service.name": "checkout"}))
+
+	sc := testScenario()
+	sc.AssertApp = func(t *testing.T, sink *otelsink.Sink, appOutput string) error { return nil }
+	v := r.Run(t, sc)
+
+	require.False(t, v.Passed)
+	require.Equal(t, ClassInfraFail, v.Class)
+	require.True(t, v.NonSkillAttributable)
+	require.Contains(t, v.Detail, "FixtureHooks.AppOutput")
+}

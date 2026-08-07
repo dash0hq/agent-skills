@@ -77,6 +77,7 @@ type DockerFixture struct {
 
 	mu           sync.Mutex
 	currentImage string
+	currentApp   string
 	cleanups     []func()
 	infraBuilt   bool
 }
@@ -101,7 +102,24 @@ func NewDockerFixture(t testingT, evalsDir string) *DockerFixture {
 
 // Hooks returns the harness fixture hooks backed by this DockerFixture.
 func (d *DockerFixture) Hooks() harness.FixtureHooks {
-	return harness.FixtureHooks{Build: d.build, Run: d.run}
+	return harness.FixtureHooks{Build: d.build, Run: d.run, AppOutput: d.appOutput}
+}
+
+// appOutput returns the current fixture container's captured stdout/stderr.
+// The runner calls it on every assertion poll of an AssertApp scenario, so
+// it re-reads the container logs each time.
+func (d *DockerFixture) appOutput(ctx context.Context) (string, error) {
+	d.mu.Lock()
+	app := d.currentApp
+	d.mu.Unlock()
+	if app == "" {
+		return "", fmt.Errorf("docker logs: no fixture container running for this attempt")
+	}
+	out, err := docker(ctx, "logs", app)
+	if err != nil {
+		return "", fmt.Errorf("docker logs %s: %w\n%s", app, err, out)
+	}
+	return out, nil
 }
 
 // Close removes every Docker resource (and host proxy) created so far, in
@@ -312,6 +330,9 @@ func (d *DockerFixture) run(ctx context.Context, _ string, env map[string]string
 	if err != nil {
 		return err
 	}
+	d.mu.Lock()
+	d.currentApp = topo.appName
+	d.mu.Unlock()
 
 	// Traffic driver: a helper container on the internal network probes
 	// GET /checkout, retrying while the fixture starts up.

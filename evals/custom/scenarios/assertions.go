@@ -1,7 +1,9 @@
 package scenarios
 
 import (
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -38,20 +40,6 @@ func assertHTTPTraces(serviceName string) harness.Assertion {
 			return fmt.Errorf("no CLIENT span for the outbound GET call with service.name=%q (span names: %v)", serviceName, svc.Names())
 		}
 		return nil
-	}
-}
-
-// assertLogsPresent builds the assertion of the logs scenarios: at least 1
-// log record carrying the fixture's service.name must reach the sink.
-func assertLogsPresent(serviceName string) harness.Assertion {
-	return func(t *testing.T, sink *otelsink.Sink) error {
-		logs := sink.Logs(t)
-		for _, lv := range logs.Records() {
-			if attrValue(lv.Resource.GetAttributes(), "service.name") == serviceName {
-				return nil
-			}
-		}
-		return fmt.Errorf("no log record with resource attribute service.name=%q at the sink (%d records total)", serviceName, logs.Len())
 	}
 }
 
@@ -99,4 +87,96 @@ func strAttrs(attrs map[string]string) []*commonpb.KeyValue {
 		})
 	}
 	return out
+}
+
+// Keys accepted for the trace-context fields on stdout log records: logging
+// setups differ in casing conventions, and every spelling proves the same
+// correlation.
+var (
+	stdoutTraceIDKeys = []string{"trace_id", "traceId", "traceID", "trace.id"}
+	stdoutSpanIDKeys  = []string{"span_id", "spanId", "spanID", "span.id"}
+)
+
+// W3C trace-context ids as lowercase hex: 16 bytes for the trace, 8 for the span.
+var (
+	hexTraceIDRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
+	hexSpanIDRe  = regexp.MustCompile(`^[0-9a-f]{16}$`)
+)
+
+// assertStdoutLogCorrelation builds the fixture-output assertion of the
+// go-logs scenario: the record containing message on the fixture's stdout
+// must be single-line JSON carrying a (trace_id, span_id) pair that names a
+// span actually exported for serviceName — matching the pair, not just the
+// trace, proves the record was emitted inside the span's context rather than
+// stamped loosely. Application logs additionally must NOT arrive over OTLP:
+// logs.md prescribes stdout as the only application-log delivery channel.
+func assertStdoutLogCorrelation(serviceName, message string) harness.AppAssertion {
+	return func(t *testing.T, sink *otelsink.Sink, appOutput string) error {
+		for _, lv := range sink.Logs(t).Records() {
+			if attrValue(lv.Resource.GetAttributes(), "service.name") == serviceName {
+				return fmt.Errorf("application log records for service.name=%q arrived over OTLP; stdout must be the only application-log delivery channel", serviceName)
+			}
+		}
+
+		records := stdoutJSONRecords(appOutput, message)
+		if len(records) == 0 {
+			return fmt.Errorf("no single-line JSON record containing %q on the fixture's stdout", message)
+		}
+
+		exported := map[string]bool{}
+		for _, sv := range sink.Traces(t).WithResourceAttribute("service.name", serviceName).Spans() {
+			exported[fmt.Sprintf("%x:%x", sv.Span.GetTraceId(), sv.Span.GetSpanId())] = true
+		}
+
+		var lastProblem error
+		for _, rec := range records {
+			traceID := strings.ToLower(stringField(rec, stdoutTraceIDKeys))
+			spanID := strings.ToLower(stringField(rec, stdoutSpanIDKeys))
+			switch {
+			case traceID == "":
+				lastProblem = fmt.Errorf("the %q record carries no trace id field (accepted keys: %s)", message, strings.Join(stdoutTraceIDKeys, ", "))
+			case spanID == "":
+				lastProblem = fmt.Errorf("the %q record carries no span id field (accepted keys: %s)", message, strings.Join(stdoutSpanIDKeys, ", "))
+			case !hexTraceIDRe.MatchString(traceID) || !hexSpanIDRe.MatchString(spanID):
+				lastProblem = fmt.Errorf("the %q record's ids are not valid hex trace/span ids: trace_id=%q span_id=%q", message, traceID, spanID)
+			case !exported[traceID+":"+spanID]:
+				lastProblem = fmt.Errorf("the %q record's (trace_id, span_id) pair (%s, %s) matches no span exported for service.name=%q", message, traceID, spanID, serviceName)
+			default:
+				return nil
+			}
+		}
+		return lastProblem
+	}
+}
+
+// stdoutJSONRecords parses each line of output as JSON and returns the
+// records whose message field (msg or message) contains message. Non-JSON
+// lines are skipped: container output interleaves runtime noise with the
+// application's structured records.
+func stdoutJSONRecords(output, message string) []map[string]any {
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			continue
+		}
+		if strings.Contains(stringField(rec, []string{"msg", "message"}), message) {
+			records = append(records, rec)
+		}
+	}
+	return records
+}
+
+// stringField returns the first of keys present in rec with a string value.
+func stringField(rec map[string]any, keys []string) string {
+	for _, key := range keys {
+		if v, ok := rec[key].(string); ok {
+			return v
+		}
+	}
+	return ""
 }

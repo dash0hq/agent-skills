@@ -74,6 +74,7 @@ logger.info('order.placed', { ...getTraceContext(), order_id: orderId });
 
 Wrap this in a logger helper to avoid repeating the extraction at every call site.
 The output must be single-line structured JSON so that log collectors can parse it without multiline aggregation.
+In Go, implement the extraction as a context-aware `slog.Handler` and log through the `Context` call variants — see the worked recipe in [go](./sdks/go.md#trace-correlation-with-a-context-aware-slog-handler).
 
 ## Log events
 

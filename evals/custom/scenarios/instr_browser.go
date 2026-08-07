@@ -128,6 +128,9 @@ func (d *DockerFixture) runBrowser(ctx context.Context, _ string, env map[string
 	if err != nil {
 		return err
 	}
+	d.mu.Lock()
+	d.currentApp = topo.appName
+	d.mu.Unlock()
 
 	// Readiness: 1 successful GET /checkout proves the server is up before
 	// Chromium spends its page-load budget.

@@ -74,6 +74,13 @@ const (
 // surrounding test instead of returning, bypassing failure classification.
 type Assertion func(t *testing.T, sink *otelsink.Sink) error
 
+// AppAssertion judges the telemetry received by the sink together with the
+// fixture application's captured stdout/stderr output. The runner re-reads
+// the output on every assertion poll (FixtureHooks.AppOutput), so records
+// that appear while batched exporters drain are not missed. The same
+// non-fatal-query rules as Assertion apply.
+type AppAssertion func(t *testing.T, sink *otelsink.Sink, appOutput string) error
+
 // Scenario is a data-only description of one eval: what skill it exercises,
 // which rule files it covers, which fixture it runs against, what the agent
 // is asked to do, and how the resulting telemetry is judged.
@@ -142,6 +149,15 @@ type Scenario struct {
 	// Assert judges the telemetry received by the sink. A returned error
 	// classifies the attempt ClassAgentAssert.
 	Assert Assertion
+
+	// AssertApp judges the telemetry together with the fixture application's
+	// captured stdout/stderr (see AppAssertion). Scenarios whose contract
+	// includes what the application writes to its output streams — for
+	// example stdout log correlation — set this, alone or alongside Assert;
+	// both must pass. Requires fixture hooks that expose the output
+	// (FixtureHooks.AppOutput); running such a scenario against hooks that
+	// do not is an infrastructure error, not an agent failure.
+	AssertApp AppAssertion
 }
 
 // Defaults applied by the runner when the corresponding Scenario field is zero.

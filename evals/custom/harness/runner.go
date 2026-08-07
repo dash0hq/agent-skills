@@ -45,6 +45,13 @@ type FixtureHooks struct {
 	// relay logs, events) into the test log for the uploaded evidence. It is
 	// best-effort — it must not fail the run — and optional.
 	Diagnose func(ctx context.Context, class FailureClass, detail string)
+	// AppOutput returns the fixture application's stdout/stderr captured so
+	// far. The runner calls it on every assertion poll of a scenario that
+	// sets AssertApp, so implementations must return fresh output on each
+	// call. Optional; nil means the topology cannot expose the output, and
+	// running an AssertApp scenario against such hooks is an infrastructure
+	// error.
+	AppOutput func(ctx context.Context) (string, error)
 }
 
 // Runner executes scenarios end to end and applies the retry policy.
@@ -255,7 +262,10 @@ func (r *Runner) attempt(t *testing.T, sc Scenario, attemptDir string) attemptOu
 		}
 	}
 
-	class, detail := awaitTelemetry(t, ctx, sink, sc.Assert, telemetryTimeout)
+	if sc.AssertApp != nil && r.Hooks.AppOutput == nil {
+		return finish(ClassInfra, "scenario asserts on the fixture's output, but the fixture hooks do not expose it (FixtureHooks.AppOutput is nil)", res.CostUSD, transcript)
+	}
+	class, detail := awaitTelemetry(t, ctx, sink, sc.Assert, sc.AssertApp, r.Hooks.AppOutput, telemetryTimeout)
 	if class != ClassNone {
 		// Show what actually reached the sink (or that nothing did), then let
 		// the fixture dump the delivery-path infrastructure. Together they say
@@ -327,19 +337,21 @@ func firstAttr(attrs []*commonpb.KeyValue, keys ...string) string {
 // It distinguishes two failure modes: telemetry that never arrives at all is
 // ClassAgentTelemetry (the agent produced nothing), while telemetry that
 // arrives but never satisfies the assertion within the budget is
-// ClassAgentAssert (the agent produced the wrong telemetry). A nil assertion
-// passes as soon as any telemetry scoped to the sink's test.id is present.
-func awaitTelemetry(t *testing.T, ctx context.Context, sink *otelsink.Sink, assert Assertion, timeout time.Duration) (FailureClass, string) {
+// ClassAgentAssert (the agent produced the wrong telemetry). With neither an
+// Assertion nor an AppAssertion set, the scenario passes as soon as any
+// telemetry scoped to the sink's test.id is present. The fixture output that
+// AssertApp judges is re-read on every poll, so it stays as fresh as the sink.
+func awaitTelemetry(t *testing.T, ctx context.Context, sink *otelsink.Sink, assert Assertion, assertApp AppAssertion, appOutput func(context.Context) (string, error), timeout time.Duration) (FailureClass, string) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	for {
 		anyTelemetry := sink.Traces(t).Len() > 0 || sink.Metrics(t).Len() > 0 || sink.Logs(t).Len() > 0
 		if anyTelemetry {
-			if assert == nil {
+			if assert == nil && assertApp == nil {
 				return ClassNone, ""
 			}
-			if lastErr = assert(t, sink); lastErr == nil {
+			if lastErr = runAssertions(t, ctx, sink, assert, assertApp, appOutput); lastErr == nil {
 				return ClassNone, ""
 			}
 		}
@@ -347,13 +359,38 @@ func awaitTelemetry(t *testing.T, ctx context.Context, sink *otelsink.Sink, asse
 			if !anyTelemetry {
 				return ClassAgentTelemetry, fmt.Sprintf("no telemetry with %s=%s reached the sink within %s", otelsink.TestIDAttribute, sink.TestID(), timeout)
 			}
-			if assert == nil {
+			if assert == nil && assertApp == nil {
 				return ClassNone, ""
 			}
 			return ClassAgentAssert, fmt.Sprintf("assertion failed: %v", lastErr)
 		}
 		time.Sleep(telemetryPollInterval)
 	}
+}
+
+// runAssertions evaluates the scenario's telemetry assertion and, when set,
+// its fixture-output assertion; both must pass. A failure to read the fixture
+// output surfaces as the assertion error of this poll, so a transient
+// docker-logs hiccup is retried on the next poll rather than failing the run.
+func runAssertions(t *testing.T, ctx context.Context, sink *otelsink.Sink, assert Assertion, assertApp AppAssertion, appOutput func(context.Context) (string, error)) error {
+	t.Helper()
+	if assert != nil {
+		if err := assert(t, sink); err != nil {
+			return err
+		}
+	}
+	if assertApp == nil {
+		return nil
+	}
+	output := ""
+	if appOutput != nil {
+		o, err := appOutput(ctx)
+		if err != nil {
+			return fmt.Errorf("reading the fixture's output: %w", err)
+		}
+		output = o
+	}
+	return assertApp(t, sink, output)
 }
 
 // preserveAgentWorkspace copies the agent-authored source files into

@@ -30,7 +30,6 @@ go get go.opentelemetry.io/otel/sdk
 # gRPC exporters
 go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
 go get go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc
-go get go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc
 ```
 
 Install instrumentation packages for the libraries you use from the [OpenTelemetry Registry](https://opentelemetry.io/ecosystem/registry/?language=go).
@@ -57,7 +56,7 @@ All environment variables that control the SDK behavior:
 | `OTEL_SERVICE_NAME` | Yes | `unknown_service` | Identifies your service in telemetry data |
 | `OTEL_TRACES_EXPORTER` | Yes | `none` | **Must set to `otlp`** to export traces |
 | `OTEL_METRICS_EXPORTER` | No | `none` | Set to `otlp` to export metrics |
-| `OTEL_LOGS_EXPORTER` | No | `none` | Set to `otlp` to export logs |
+| `OTEL_LOGS_EXPORTER` | No | `none` | Leave unset: application logs stay on stdout per [logs](../logs.md) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4317` | OTLP collector endpoint |
 | `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `grpc` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
@@ -79,7 +78,8 @@ All environment variables that control the SDK behavior:
 ### 1. Activate the SDK
 
 Unlike Node.js, Go requires explicit initialization code.
-Create an initialization function that sets up the trace, metric, and log providers:
+Create an initialization function that sets up the trace and metric providers.
+Application logs are not part of this setup: they stay on stdout as structured JSON per [logs](../logs.md), correlated with traces through a context-aware handler (see [Structured logging](#structured-logging)) — do not initialize an OTLP log provider or wire a logging bridge for them.
 
 ```go
 package main
@@ -89,11 +89,8 @@ import (
 	"log"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/log/global"
-	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -133,21 +130,9 @@ func initTelemetry(ctx context.Context) (func(), error) {
 	)
 	otel.SetMeterProvider(mp)
 
-	// Log exporter
-	logExporter, err := otlploggrpc.New(ctx)
-	if err != nil {
-		return nil, err
-	}
-	lp := sdklog.NewLoggerProvider(
-		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
-		sdklog.WithResource(res),
-	)
-	global.SetLoggerProvider(lp)
-
 	shutdown := func() {
 		_ = tp.Shutdown(ctx)
 		_ = mp.Shutdown(ctx)
-		_ = lp.Shutdown(ctx)
 	}
 
 	return shutdown, nil
@@ -181,10 +166,11 @@ export OTEL_SERVICE_NAME="my-service"
 # Required for traces
 export OTEL_TRACES_EXPORTER="otlp"
 
-# Optional: also export metrics and logs
+# Optional: also export metrics
 export OTEL_METRICS_EXPORTER="otlp"
-export OTEL_LOGS_EXPORTER="otlp"
 ```
+
+Leave `OTEL_LOGS_EXPORTER` unset: application logs stay on stdout per [logs](../logs.md).
 
 ### 4. Configure endpoint
 
@@ -210,7 +196,6 @@ export OTEL_SERVICE_NAME="my-service"
 # Enable exporters (required!)
 export OTEL_TRACES_EXPORTER="otlp"
 export OTEL_METRICS_EXPORTER="otlp"
-export OTEL_LOGS_EXPORTER="otlp"
 
 # Configure endpoint
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
@@ -229,7 +214,6 @@ Use a library like [godotenv](https://github.com/joho/godotenv) or source the fi
 OTEL_SERVICE_NAME=my-service
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
-OTEL_LOGS_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 ```
@@ -325,7 +309,7 @@ Install only the packages you need for the frameworks and libraries your applica
 | gRPC | google.golang.org/grpc |
 | Messaging | sarama (Kafka), amqp091-go |
 | AWS | aws-sdk-go-v2 |
-| Logging | slog (via bridges) |
+| Logging | log/slog (context-aware JSON handler to stdout; see [Structured logging](#structured-logging)) |
 | Runtime | runtime metrics (automatic with SDK) |
 
 Refer to the [OpenTelemetry Go instrumentation registry](https://opentelemetry.io/ecosystem/registry/?language=go) for the complete list.
@@ -703,6 +687,79 @@ if err != nil {
 
 Go errors do not include stack traces by default.
 If you use a library that adds stack traces (e.g., `pkg/errors` or `cockroachdb/errors`), format the error with `fmt.Sprintf("%+v", err)` and log it as a single string field to avoid multi-line output.
+
+### Trace correlation with a context-aware slog handler
+
+Per [logs](../logs.md), every record emitted inside an active span must carry `trace_id` and `span_id`, and stdout stays the only delivery channel for application logs — no OTLP log export, no logging bridge.
+In Go, wrap the JSON handler in a `slog.Handler` that reads the span context from the record's context and stamps the ids:
+
+```go
+package main
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+
+	"go.opentelemetry.io/otel/trace"
+)
+
+// traceContextHandler stamps every record emitted inside an active span with
+// the span's trace_id and span_id, so stdout logs correlate with traces
+// without exporting the logs over OTLP.
+type traceContextHandler struct {
+	slog.Handler
+}
+
+func (h traceContextHandler) Handle(ctx context.Context, record slog.Record) error {
+	if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
+		record = record.Clone()
+		record.AddAttrs(
+			slog.String("trace_id", sc.TraceID().String()),
+			slog.String("span_id", sc.SpanID().String()),
+		)
+	}
+	return h.Handler.Handle(ctx, record)
+}
+
+// WithAttrs and WithGroup must re-wrap, or the derived handler loses the
+// trace-context stamping.
+func (h traceContextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return traceContextHandler{Handler: h.Handler.WithAttrs(attrs)}
+}
+
+func (h traceContextHandler) WithGroup(name string) slog.Handler {
+	return traceContextHandler{Handler: h.Handler.WithGroup(name)}
+}
+
+func main() {
+	slog.SetDefault(slog.New(traceContextHandler{
+		Handler: slog.NewJSONHandler(os.Stdout, nil),
+	}))
+
+	http.HandleFunc("GET /checkout", func(w http.ResponseWriter, r *http.Request) {
+		// The request context carries the active span (for example started
+		// by otelhttp); the Context logging variant hands it to the handler.
+		slog.InfoContext(r.Context(), "checkout completed", "order_id", "TEST-0001")
+		w.WriteHeader(http.StatusOK)
+	})
+}
+```
+
+Two rules make the correlation work:
+
+1. **Log through the `Context` variants** (`slog.InfoContext`, `logger.ErrorContext`, and so on), passing the request's context.
+   A bare `logger.Info` call has no context, so the handler cannot see the active span and the record carries no ids.
+2. **Stamp the ids per record, inside the handler.**
+   Reading the span context once at startup (or hardcoding ids) stamps every record with the same ids and correlates nothing.
+
+<!-- eval:bad -->
+```go
+// BAD: no context — the handler cannot see the active span, so the record
+// carries no trace_id/span_id even though a span is active in ctx.
+logger.Info("checkout completed", "order_id", "TEST-0001")
+```
 
 ### zerolog
 

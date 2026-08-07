@@ -9,7 +9,7 @@
 
 # Go
 
-  OTEL_LOGS_EXPORTER=otlp silently does nothing: The skill initializes an OTel log provider in initTelemetry but never shows how to bridge slog to it. The log provider sits idle and zero log records reach the collector. This is different from Python, where the auto-instrumentation bridges the stdlib logging module automatically. In Go, the bridge is manual and the skill doesn't document it.
+  ~~OTEL_LOGS_EXPORTER=otlp silently does nothing~~ — resolved by the stdout-first realignment (#127): go.md no longer initializes an OTel log provider; application logs stay on stdout, correlated with traces via the context-aware slog.Handler recipe, per logs.md.
 [3:06 PM]Moving to Java and then Ruby
 Julia Furst Morgado  [4:24 PM]
 

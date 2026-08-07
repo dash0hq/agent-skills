@@ -44,6 +44,8 @@ Do not hand-pin such a package; instrument the library manually instead.
 
 pip enforces `Requires-Python` natively, resolving to the newest release compatible with the interpreter — but only the interpreter pip runs under, so run the resolution (or `pip index versions`) under the same Python version the project builds and deploys with (base image, CI), not whatever is on your PATH.
 
+Plain `requirements.txt` carries no lockfile, so there is nothing to regenerate; projects locked with Poetry, uv, or Pipenv follow the manifest-and-lockfile rule in [verify-dependencies](../verify-dependencies.md#keeping-the-lockfile-in-step) — regenerate the lockfile (`poetry lock`, `uv lock`, `pipenv lock`) with every manifest edit.
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

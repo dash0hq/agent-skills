@@ -18,10 +18,11 @@ Before adding any instrumentation dependency to a manifest, verify all four agai
 2. When you must write a manifest entry by hand, first run the lookup command from your language's section (indexed below) and copy the version it reports.
 3. Check the version's runtime or toolchain requirement against the project before pinning it: the project's manifest (for example the `go` directive in `go.mod`, `engines` in `package.json`) and its build and runtime environments (base images in Dockerfiles, CI toolchains).
    When the newest release requires a newer toolchain than the project has, pin the newest release that satisfies the project's toolchain instead — or upgrade the toolchain deliberately, as its own visible change (manifest directive, base images, CI), never as a side effect of a dependency bump.
-4. When the lookup shows the package is deprecated, yanked, or has no recent release, do not add it: fall back to the auto-instrumentation path or manual instrumentation per the language's SDK rule, and state why.
+4. After any manifest edit, bring the lockfile in step per [Keeping the lockfile in step](#keeping-the-lockfile-in-step): lockfile entries cannot be hand-written, and a stale lockfile fails strict installs and Go builds.
+5. When the lookup shows the package is deprecated, yanked, or has no recent release, do not add it: fall back to the auto-instrumentation path or manual instrumentation per the language's SDK rule, and state why.
    When this means removing a dependency that is already in the manifest, follow [Dropping an existing dependency](#dropping-an-existing-dependency).
-5. When the lookup finds no package at all, do not invent a name: check the [OpenTelemetry registry](https://opentelemetry.io/ecosystem/registry/) for the library, and if nothing current exists, instrument manually per [spans](./spans.md) and the SDK rule.
-6. Never guess a version to complete a manifest entry.
+6. When the lookup finds no package at all, do not invent a name: check the [OpenTelemetry registry](https://opentelemetry.io/ecosystem/registry/) for the library, and if nothing current exists, instrument manually per [spans](./spans.md) and the SDK rule.
+7. Never guess a version to complete a manifest entry.
    A wrong pin fails the build (`npm error notarget`, `go: no matching versions`, `go: module ... requires go >= ...`), or worse, resolves to an incompatible release.
 
 <!-- eval:bad -->
@@ -34,6 +35,16 @@ Before adding any instrumentation dependency to a manifest, verify all four agai
 ```
 
 The version above was written from memory; no `0.57.x` release of that package was ever published, and `npm install` fails with `npm error code ETARGET`.
+
+## Keeping the lockfile in step
+
+A dependency manifest and its lockfile move together: `go.mod` with `go.sum`, `package.json` with `package-lock.json`, `Gemfile` with `Gemfile.lock`, and `composer.json` with `composer.lock`.
+The lockfile records resolver output and content hashes that only the package manager can compute, so a lockfile entry cannot be hand-written.
+Editing the manifest without regenerating the lockfile breaks the next build: strict installs refuse the mismatch by design (`npm ci`, frozen Bundler installs, Composer installing from a lockfile that no longer satisfies `composer.json`), and Go refuses to compile (`missing go.sum entry for module providing package ...`).
+
+Regenerate the lockfile with the ecosystem's lock-refreshing command (`go mod tidy`, `npm install`, `bundle lock`, `composer update <pkg>`) in the same change as every manifest edit, and ship both files together.
+When the edit happens somewhere the toolchain cannot run — the change is applied through a web interface or a review suggestion, made by a CI bot or dependency tooling, or the project only builds inside a container — regenerate the lockfile where the toolchain does run.
+For container builds, that place is the builder stage itself: make it self-sufficient by regenerating the lockfile before the build or install step, using the command from the language's "Verifying dependencies" section (indexed below).
 
 ## Dropping an existing dependency
 

@@ -56,6 +56,23 @@ curl -s https://proxy.golang.org/go.opentelemetry.io/otel/@v/v1.45.0.mod | grep 
 
 When the newest release requires a newer toolchain than the project has, walk `go list -m -versions` down to the newest release whose directive the toolchain satisfies and pin that — or upgrade the toolchain deliberately (go.mod directive, builder images, CI) as its own visible change.
 
+`go.sum` must move with `go.mod`: its hashes cannot be hand-written, so after any `go.mod` edit, regenerate it with `go mod tidy`.
+A `go.mod` that requires modules missing from `go.sum` fails every subsequent build:
+
+```text
+main.go:23:2: missing go.sum entry for module providing package go.opentelemetry.io/otel/sdk/resource
+```
+
+When the `go.mod` edit happens somewhere the Go toolchain cannot run — per [verify-dependencies](../verify-dependencies.md#keeping-the-lockfile-in-step) — and the project builds in a container, make the builder stage regenerate the module metadata itself before compiling:
+
+```dockerfile
+FROM golang:1.24 AS builder
+WORKDIR /src
+COPY . .
+RUN go mod tidy
+RUN go build -o /service .
+```
+
 ## Environment variables
 
 All environment variables that control the SDK behavior:

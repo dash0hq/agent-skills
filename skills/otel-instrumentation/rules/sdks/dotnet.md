@@ -58,7 +58,20 @@ All environment variables that control the SDK behavior:
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `http/protobuf` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
 | `OTEL_RESOURCE_ATTRIBUTES` | No | - | Additional resource attributes (e.g., `deployment.environment.name=production`) |
 
-**Critical**: Without `OTEL_TRACES_EXPORTER=otlp`, the SDK defaults to `none` and no telemetry is exported.
+**Critical**: Without `OTEL_TRACES_EXPORTER=otlp`, the zero-code instrumentation defaults to `none` and no telemetry is exported.
+
+### Which variables apply per activation path
+
+The table above applies as-is on the zero-code path (install script): environment variables select the exporters.
+On the NuGet SDK path (programmatic setup), code wiring wins: the SDK packages do not implement the exporter-selection variables, so `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, and `OTEL_LOGS_EXPORTER` are inert once an exporter such as `.AddOtlpExporter()` is wired in code.
+
+| Variable | Zero-code path | NuGet path |
+|----------|----------------|------------|
+| `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER` | Select exporters | Inert — exporters are selected in code |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_PROTOCOL` | Apply | Apply — the OTLP exporter reads them |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | Apply | Apply — the SDK default resource reads them |
+
+To switch exporters on the NuGet path, change the code wiring; see [switching exporters on the NuGet path](#switching-exporters-on-the-nuget-path).
 
 ### Where to get configuration values
 
@@ -180,6 +193,53 @@ dotnet run
 ```
 
 This prints spans, metrics, and logs directly to stdout—useful for verifying instrumentation works before configuring a remote backend.
+This works on the zero-code path only; on the NuGet path, switch exporters in code as shown below.
+
+### Switching exporters on the NuGet path
+
+If OpenTelemetry is set up through the NuGet SDK packages, setting `OTEL_TRACES_EXPORTER=console` has no effect — switch the exporter in code instead.
+Add the console exporter package first:
+
+```bash
+dotnet add package OpenTelemetry.Exporter.Console
+```
+
+Then branch on a variable you own:
+
+```csharp
+using OpenTelemetry;
+using OpenTelemetry.Trace;
+
+var builder = Sdk.CreateTracerProviderBuilder()
+    .AddSource("MyService");
+
+// OTEL_TRACES_EXPORTER cannot switch exporters here; use your own variable.
+if (Environment.GetEnvironmentVariable("USE_CONSOLE_EXPORTER") == "true")
+{
+    builder.AddConsoleExporter();
+}
+else
+{
+    builder.AddOtlpExporter();
+}
+
+using var tracerProvider = builder.Build();
+```
+
+For ASP.NET Core hosts, `builder.Services.AddOpenTelemetry().UseOtlpExporter()` (available since version 1.8.0 of the OTLP exporter package) registers the OTLP exporter for logs, metrics, and traces in one call.
+`UseOtlpExporter` can only be called once and cannot be combined with the signal-specific `AddOtlpExporter` registrations, so use the conditional wiring above when a console fallback is needed.
+
+The trap to avoid:
+
+```csharp
+// BAD: expecting OTEL_TRACES_EXPORTER=console to take effect on the NuGet path.
+// The SDK packages ignore exporter-selection variables, so this always exports
+// OTLP and nothing is printed to the terminal.
+var tracerProvider = Sdk.CreateTracerProviderBuilder()
+    .AddSource("MyService")
+    .AddOtlpExporter()
+    .Build();
+```
 
 ### Without a collector
 
@@ -476,7 +536,8 @@ tracerProvider?.Dispose();
 echo $OTEL_TRACES_EXPORTER  # Should be "otlp" or "console", not empty
 ```
 
-The SDK defaults `OTEL_TRACES_EXPORTER` to `none`, which silently discards all telemetry.
+The zero-code instrumentation defaults `OTEL_TRACES_EXPORTER` to `none`, which silently discards all telemetry.
+On the NuGet path this check does not apply: exporter-selection variables are inert there, so verify the code wiring (`.AddOtlpExporter()` or `UseOtlpExporter()`) instead.
 
 **Verify the instrument script was sourced:**
 ```bash

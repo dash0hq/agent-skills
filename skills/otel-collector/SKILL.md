@@ -24,6 +24,7 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 | [processors](./rules/processors.md) | Processors — memory limiter, resource detection, ordering, sending queue |
 | [pipelines](./rules/pipelines.md) | Pipelines — service section, per-signal configuration, connectors |
 | [deployment](./rules/deployment.md) | Deployment — agent vs gateway patterns, deployment method selection |
+| [serverless](./rules/deployment/serverless.md) | Serverless / sidecar-less containers (App Runner, Cloud Run, Fly, Lambda) — direct SDK-to-backend export, no Collector |
 | [dash0-operator](./rules/deployment/dash0-operator.md) | Dash0 Kubernetes Operator — automated instrumentation, Collector management, Dash0 export |
 | [collector-helm-chart](./rules/deployment/collector-helm-chart.md) | Collector Helm chart — presets, modes, image selection |
 | [opentelemetry-operator](./rules/deployment/opentelemetry-operator.md) | OpenTelemetry Operator — Collector CRD, auto-instrumentation, sidecar |
@@ -100,7 +101,7 @@ See [exporters](./rules/exporters.md) for full authentication and queue configur
 
 1. **Write config** — define receivers, processors, and exporters; wire them in `service.pipelines`.
 2. **Validate locally** — run `otelcol validate --config=config.yaml` to catch structural errors before deployment.
-3. **Deploy** — choose a deployment method from the [deployment](./rules/deployment.md) rule (Helm, Operator, raw manifests, or Docker Compose).
+3. **Deploy** — choose a deployment method from the [deployment](./rules/deployment.md) rule (Helm, Operator, raw manifests, Docker Compose, or — when you cannot run a Collector at all — [direct SDK export on serverless](./rules/deployment/serverless.md)).
 4. **Verify** — add the `debug` exporter to a pipeline temporarily and inspect stdout to confirm telemetry is flowing; then remove it before going to production.
 
 ## Quick reference

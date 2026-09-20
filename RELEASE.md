@@ -35,10 +35,10 @@ npm pack --dry-run
 The release workflow re-checks this and publishes with `npm publish --provenance`, authenticated with [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers) — no npm token is involved.
 The trusted publisher configured on npmjs.com for `@dash0/agent-skills` is pinned to `publish-npm.yml` in this repository.
 npm allows one trusted publisher per package and validates the top-level workflow's filename, so `release.yml` dispatches `publish-npm.yml` (rather than calling it as a reusable workflow) to keep it the single entry point for both the release path and the manual-retry path.
-The workflow also bumps the `version` field in `package.json` (bare semver, no `v` prefix) alongside the plugin manifests.
+The workflow also bumps the `version` field in `package.json` and in the root `plugin.json`, the Agent Plugins manifest (bare semver, no `v` prefix), alongside the plugin manifests.
 
 The Claude Code plugin, the Cursor plugin, and the Gemini CLI extension install by cloning this repository.
-Neither `plugin.json` nor `gemini-extension.json` supports an include or exclude field, and no ignore-file mechanism exists for those installers (verified against the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference) and the [Gemini CLI extension reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md) as of 2026-07).
+Neither `.claude-plugin/plugin.json` nor `gemini-extension.json` supports an include or exclude field, and no ignore-file mechanism exists for those installers (verified against the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference) and the [Gemini CLI extension reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md) as of 2026-07).
 Those installs therefore contain `evals/` and `docs/`; the content is inert for consumers, and removing it would require a separate distribution repository or release archives instead of git clones.
 
 ### Scoring the Tessl scenarios at publish

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "dash0-agent-skills",
+  "version": "1.3.6",
+  "description": "OpenTelemetry skills and reference documentation for AI coding assistants",
+  "author": {
+    "name": "Dash0",
+    "email": "support@dash0.com"
+  },
+  "homepage": "https://github.com/dash0hq/agent-skills",
+  "repository": "https://github.com/dash0hq/agent-skills",
+  "license": "Apache-2.0",
+  "keywords": [
+    "otel",
+    "opentelemetry",
+    "observability",
+    "o11y",
+    "instrumentation",
+    "monitoring",
+    "ai-agent",
+    "skills",
+    "agentic",
+    "engineering",
+    "developer",
+    "coding",
+    "productivity"
+  ]
+}

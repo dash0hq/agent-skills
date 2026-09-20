@@ -131,10 +131,13 @@ jobs:
             git add "${manifest}"
           done
 
-          # npm requires bare semver (no leading v).
-          jq ".version = \"${TAG#v}\"" package.json > package.json.tmp
-          mv package.json.tmp package.json
-          git add package.json
+          # npm requires bare semver (no leading v); the Agent Plugins manifest
+          # (plugin.json at the root) follows the same convention.
+          for manifest in "package.json" "plugin.json"; do
+            jq ".version = \"${TAG#v}\"" "${manifest}" > "${manifest}.tmp"
+            mv "${manifest}.tmp" "${manifest}"
+            git add "${manifest}"
+          done
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

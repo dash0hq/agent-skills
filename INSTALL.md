@@ -54,6 +54,9 @@ git clone https://github.com/dash0hq/agent-skills.git ~/.copilot/skills/dash0-ag
 
 Copilot auto-discovers skills from `.copilot/skills/`.
 
+`plugin.json` at the repository root is the same plugin in the portable [Agent Plugins](https://agent-plugins.org/) format, which Copilot CLI and marketplaces in that format read.
+Its version follows the release tag.
+
 ## Cursor
 
 Copy skills into the cross-client discovery directory:

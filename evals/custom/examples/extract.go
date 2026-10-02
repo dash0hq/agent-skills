@@ -34,6 +34,7 @@ var knownAnnotations = map[Annotation]bool{
 	AnnotationSkip:            true,
 	AnnotationCollectorConfig: true,
 	AnnotationK8s:             true,
+	AnnotationCloudFormation:  true,
 	AnnotationFragment:        true,
 	AnnotationBad:             true,
 }

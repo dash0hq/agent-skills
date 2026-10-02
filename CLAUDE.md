@@ -47,7 +47,7 @@ Follow these rules when changing skill content:
   Classify it as `dedicated`, `shared`, or `exempt` in `evals/custom/harness/registry.go`, and for `dedicated` files declare a scenario in `evals/custom/scenarios/` or a `pendingScenarios` entry.
   The registry completeness test fails CI on unclassified files, stale entries, and uncovered dedicated files.
 - **Every fenced example must validate or carry an `eval:` annotation.**
-  Unclassifiable blocks fail CI; use `<!-- eval:skip -->`, `<!-- eval:fragment -->`, `<!-- eval:k8s -->`, or `<!-- eval:collector-config -->` per the annotation table in [evals/custom/README.md](evals/custom/README.md).
+  Unclassifiable blocks fail CI; use `<!-- eval:skip -->`, `<!-- eval:fragment -->`, `<!-- eval:k8s -->`, `<!-- eval:cloudformation -->`, or `<!-- eval:collector-config -->` per the annotation table in [evals/custom/README.md](evals/custom/README.md).
   `<!-- eval:fragment -->` is context-aware: on a `yaml` or untagged block it marks a service-less Collector fragment, and on an SDK-code block it marks a code fragment that is reported but not compiled — use it on a genuinely-complete Go block only when the block is deliberately uncompilable, never to hide a real compile failure.
 - **Mark deliberately wrong examples.**
   Use a `// BAD`-style line comment or `<!-- eval:bad -->` so the validator exempts them.

@@ -14,6 +14,9 @@ otel-instrumentation/
     ├── resources.md      # Resource attributes
     ├── metrics.md        # Instrument types, naming, cardinality
     ├── logs.md           # Structured logging, severity, trace correlation
+    ├── platforms/
+    │   ├── k8s.md        # Kubernetes deployment
+    │   └── aws-lambda.md # AWS Lambda OpenTelemetry layers
     └── sdks/
         ├── nodejs.md     # Node.js instrumentation
         ├── go.md         # Go instrumentation
@@ -44,6 +47,8 @@ The skill activates automatically when working on observability tasks.
 | [resources](./rules/resources.md) | CRITICAL | Resource attributes - service identity, environment, Kubernetes |
 | [metrics](./rules/metrics.md) | CRITICAL | Instrument types, naming, units, cardinality |
 | [logs](./rules/logs.md) | CRITICAL | Structured logging, severity, trace correlation |
+| [k8s](./rules/platforms/k8s.md) | HIGH | Kubernetes application deployment and resource metadata |
+| [aws-lambda](./rules/platforms/aws-lambda.md) | HIGH | AWS Lambda OTel layer selection, packaging, and runtime configuration |
 | [nodejs](./rules/sdks/nodejs.md) | HIGH | Node.js auto-instrumentation setup |
 | [go](./rules/sdks/go.md) | HIGH | Go instrumentation setup |
 | [python](./rules/sdks/python.md) | HIGH | Python auto-instrumentation setup |

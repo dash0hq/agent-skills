@@ -88,6 +88,7 @@ Place an HTML-comment annotation on the line directly above a fence to control v
 | `<!-- eval:skip -->` | Exempt from validation; reported as exempt. |
 | `<!-- eval:collector-config -->` | Force classification as a complete Collector configuration. |
 | `<!-- eval:k8s -->` | Force classification as a Kubernetes manifest. |
+| `<!-- eval:cloudformation -->` | Force classification as an AWS CloudFormation or AWS SAM template; checks YAML structure and explicit Lambda package/layer invariants without replacing AWS schema validation. |
 | `<!-- eval:fragment -->` | Context-aware: on a `yaml` or untagged block, a service-less Collector fragment wrapped in a generated scaffold before validation; on an SDK-code block, a code fragment reported in the `code-fragment` category and not compiled. |
 | `<!-- eval:bad -->` | Deliberately wrong example; exempt and reported in the BAD category. |
 

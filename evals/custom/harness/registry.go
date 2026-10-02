@@ -52,6 +52,14 @@ var defaultRuleClassification = map[string]RuleClassification{
 	"skills/otel-instrumentation/rules/sdks/ruby.md":     {Class: ClassificationDedicated},
 	"skills/otel-instrumentation/rules/sdks/scala.md":    {Class: ClassificationDedicated},
 	"skills/otel-instrumentation/rules/platforms/k8s.md": {Class: ClassificationDedicated},
+	// Lambda layer attachment and freeze/thaw behavior require a real AWS
+	// Lambda runtime to exercise in the Go telemetry harness. The fenced
+	// CloudFormation example is checked deterministically, and the Tessl
+	// scenario covers the packaging and layer-selection decisions.
+	"skills/otel-instrumentation/rules/platforms/aws-lambda.md": {
+		Class:  ClassificationExempt,
+		Reason: "AWS Lambda layer attachment and invocation lifecycle require an AWS runtime; deterministic fenced-example validation and a Tessl scenario cover the configuration decisions",
+	},
 	// otel-instrumentation — shared: cross-cutting files affect every SDK
 	// scenario.
 	"skills/otel-instrumentation/rules/capture-database-query-parameters.md": {Class: ClassificationShared},

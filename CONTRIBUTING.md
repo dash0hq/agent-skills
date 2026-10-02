@@ -54,7 +54,8 @@ Run them from the cheapest signal to the most thorough.
 cd evals && go run ./cmd/validate-examples
 ```
 
-Extracts and validates every fenced example in `skills/` — Collector configurations, OTTL statements, Kubernetes manifests, and SDK code.
+Extracts and validates every fenced example in `skills/` — Collector configurations, OTTL statements, Kubernetes manifests, structurally checked CloudFormation/SAM templates, and SDK code.
+The CloudFormation/SAM checker intentionally covers YAML structure and explicit repository invariants; it does not replace AWS schema validation.
 SDK code blocks are classified into complete versus fragment: complete Go blocks compile against a pinned OpenTelemetry Go SDK dependency set via the host `go` toolchain, complete blocks in other languages report `skipped-no-toolchain` until their fixture-image compilers land, and fragments (import snippets, method bodies, and elided examples) are reported in the `code-fragment` category but not compiled.
 When `go` is absent, complete Go blocks report `skipped-no-toolchain` rather than passing silently.
 The run opens with a one-line summary that shows the real validated-versus-exempt split — including how many code blocks compiled and how many were skipped for want of a toolchain — so a green run cannot overstate itself.

@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether an agent correctly applies the AWS Lambda OpenTelemetry platform rule across ZIP and container-image functions without inventing layer versions, mixing distributions, duplicating Collector pipeline configuration, or committing credentials.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "ZIP and image packaging stay distinct",
+      "description": "CheckoutApi remains a ZIP/SAM runtime function, while ReconcileWorker remains PackageType Image; the image function has no Layers property or layer ARN attached.",
+      "max_score": 15
+    },
+    {
+      "name": "Backend-neutral distribution choice",
+      "description": "For CheckoutApi, selects the upstream open-telemetry/opentelemetry-lambda path rather than silently enabling ADOT or CloudWatch Application Signals when no AWS-specific distribution is required.",
+      "max_score": 8
+    },
+    {
+      "name": "No invented layer ARN",
+      "description": "Does not fabricate or freeze a current OpenTelemetry layer ARN/version; models the language and Collector layer ARNs as deployment inputs/placeholders and states they must be resolved from the authoritative upstream release for eu-west-1, arm64, and the Node.js runtime.",
+      "max_score": 10
+    },
+    {
+      "name": "Both upstream ZIP layers represented",
+      "description": "The ZIP function is configured with both a runtime/language OpenTelemetry layer and the upstream Collector extension layer, without mixing them with ADOT layers.",
+      "max_score": 10
+    },
+    {
+      "name": "Correct Node.js upstream wrapper",
+      "description": "CheckoutApi sets AWS_LAMBDA_EXEC_WRAPPER to /opt/otel-handler for the upstream Node.js OpenTelemetry Lambda layer.",
+      "max_score": 8
+    },
+    {
+      "name": "Collector configuration URI wired",
+      "description": "CheckoutApi points OPENTELEMETRY_COLLECTOR_CONFIG_URI at the packaged collector.yaml file, for example /var/task/collector.yaml.",
+      "max_score": 7
+    },
+    {
+      "name": "Stable service resource identity",
+      "description": "Sets a stable OTEL_SERVICE_NAME for CheckoutApi and uses deployment.environment.name rather than the deprecated deployment.environment resource attribute.",
+      "max_score": 7
+    },
+    {
+      "name": "Collector ownership boundary is preserved",
+      "description": "The deployment wires the packaged Collector configuration URI, but does not generate or duplicate collector.yaml; it states that the separately owned Collector configuration must be authored with the otel-collector guidance and checked against the Lambda extension's supported components.",
+      "max_score": 12
+    },
+    {
+      "name": "No committed credential",
+      "description": "No output file contains a real or plausible production token, authorization secret, or plaintext ingest credential; secret-backed values remain deployment/runtime inputs.",
+      "max_score": 10
+    },
+    {
+      "name": "Container image instrumentation guidance",
+      "description": "IMAGE_FUNCTION.md explicitly explains that Lambda layers cannot be attached to PackageType Image and directs the team to package the OpenTelemetry SDK/auto-instrumentation and any required extension in the image without converting the function to ZIP.",
+      "max_score": 8
+    },
+    {
+      "name": "Verification covers deployment risk",
+      "description": "VALIDATION.md checks unchanged function behavior, expected non-duplicated telemetry, exporter/extension errors, warm execution after freeze/thaw, and cold-start or duration regression.",
+      "max_score": 5
+    }
+  ]
+}

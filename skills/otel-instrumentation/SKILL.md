@@ -24,6 +24,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 | [verify-dependencies](./rules/verify-dependencies.md) | Verifying instrumentation packages and versions exist before adding them |
 | [resources](./rules/resources.md) | Resource attributes — service identity and environment |
 | [k8s](./rules/platforms/k8s.md) | Kubernetes deployment — downward API, pod spec |
+| [aws-lambda](./rules/platforms/aws-lambda.md) | AWS Lambda layers — upstream OpenTelemetry, ADOT, packaging, and verification |
 | [spans](./rules/spans.md) | Spans — naming, kind, status, and hygiene |
 | [logs](./rules/logs.md) | Logs — structured logging, severity, trace correlation |
 | [metrics](./rules/metrics.md) | Metrics — instrument types, naming, units, cardinality |

@@ -57,6 +57,8 @@ func Classify(doc *Document) Category {
 		return CategoryCollectorFragment
 	case AnnotationK8s:
 		return CategoryK8sManifest
+	case AnnotationCloudFormation:
+		return CategoryCloudFormation
 	}
 	if b.HasBadMarker() {
 		return CategoryBad
@@ -81,6 +83,9 @@ func Classify(doc *Document) Category {
 func classifyYAMLOrUntagged(doc *Document) Category {
 	var node map[string]any
 	if err := yaml.Unmarshal([]byte(doc.Content), &node); err == nil && node != nil {
+		if isCloudFormation(node) {
+			return CategoryCloudFormation
+		}
 		if _, ok := node["apiVersion"]; ok {
 			return CategoryK8sManifest
 		}
@@ -104,6 +109,30 @@ func classifyYAMLOrUntagged(doc *Document) Category {
 		return CategoryOTTLStatements
 	}
 	return CategoryUnclassified
+}
+
+func isCloudFormation(node map[string]any) bool {
+	if _, ok := node["AWSTemplateFormatVersion"]; ok {
+		return true
+	}
+	resources, ok := node["Resources"].(map[string]any)
+	if !ok || len(resources) == 0 {
+		return false
+	}
+	for logicalID, raw := range resources {
+		if strings.HasPrefix(logicalID, "Fn::ForEach::") {
+			return true
+		}
+		resource, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		resourceType, ok := resource["Type"].(string)
+		if ok && strings.Contains(resourceType, "::") {
+			return true
+		}
+	}
+	return false
 }
 
 // isCompleteCollectorConfig reports whether the parsed Collector config has

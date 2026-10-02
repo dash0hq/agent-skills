@@ -2,7 +2,8 @@
 // classifies them by dialect, and validates each block deterministically
 // (R10). Collector configuration validates via the pinned otelcol-contrib
 // binary, OTTL statements parse via pkg/ottl, Kubernetes manifests parse as
-// YAML with embedded Collector configuration extracted and validated.
+// YAML with embedded Collector configuration extracted and validated, and
+// CloudFormation/SAM examples get deterministic structural validation.
 package examples
 
 // Annotation is the value of an HTML-comment annotation placed on the line
@@ -19,6 +20,9 @@ const (
 	AnnotationCollectorConfig Annotation = "collector-config"
 	// AnnotationK8s forces classification as a Kubernetes manifest.
 	AnnotationK8s Annotation = "k8s"
+	// AnnotationCloudFormation forces classification as an AWS CloudFormation
+	// or AWS SAM template.
+	AnnotationCloudFormation Annotation = "cloudformation"
 	// AnnotationFragment forces classification as a service-less Collector
 	// fragment (scaffolded before validation).
 	AnnotationFragment Annotation = "fragment"
@@ -69,6 +73,8 @@ const (
 	CategoryCollectorFragment Category = "collector-fragment"
 	// CategoryK8sManifest is a Kubernetes manifest.
 	CategoryK8sManifest Category = "k8s-manifest"
+	// CategoryCloudFormation is an AWS CloudFormation or AWS SAM template.
+	CategoryCloudFormation Category = "cloudformation"
 	// CategoryDockerCompose is a Docker Compose file.
 	CategoryDockerCompose Category = "docker-compose"
 	// CategoryOTTLStatements is a bare block of OTTL statements or

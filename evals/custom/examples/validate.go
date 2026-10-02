@@ -185,6 +185,13 @@ func (v *Validator) validateDocument(doc *Document) []*Result {
 		}
 	case CategoryK8sManifest:
 		return v.validateK8sDoc(result, doc)
+	case CategoryCloudFormation:
+		if err := ValidateCloudFormation(doc.Content); err != nil {
+			result.Status = StatusFailed
+			result.Detail = err.Error()
+		} else {
+			result.Status = StatusValidated
+		}
 	default:
 		result.Status = StatusFailed
 		result.Detail = "internal: no validator for category " + string(category)

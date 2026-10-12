@@ -440,24 +440,59 @@ Verify this rule in integration tests — see [testing trace data](#short-durati
 
 ## Sampling
 
-Use the `AlwaysOn` sampler in application SDKs.
-This is the default in every OpenTelemetry SDK — do not change it.
-
-Do not configure `TraceIdRatioBased`, `ParentBased`, or any other sampler that drops spans in the application.
-SDK-side sampling makes irreversible decisions at the head of the trace, before the outcome of the request is known.
-A trace that looked unremarkable at the start may turn out to contain an error, a latency spike, or a rarely exercised code path — all of which are lost if the SDK decided not to sample.
-
-Defer all sampling decisions to the [Collector or observability pipeline](../../otel-collector/rules/sampling.md), where they can be changed centrally without redeploying applications.
-The Collector can apply head sampling with the [`probabilisticsamplerprocessor`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/probabilisticsamplerprocessor), or tail sampling with the [`tailsamplingprocessor`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor), using criteria that are impossible to evaluate at request start (error status, latency, attribute values).
+Configure explicitly the `AlwaysOn` sampler in application SDKs,
+overriding the [specified default](https://opentelemetry.io/docs/specs/otel/trace/sdk/#built-in-samplers) is `ParentBased(root=AlwaysOn)` that is exposed as `parentbased_always_on` in `OTEL_TRACES_SAMPLER`.
 
 ```bash
 # BAD: head sampling in the SDK — loses traces before their outcome is known
 export OTEL_TRACES_SAMPLER=traceidratio
 export OTEL_TRACES_SAMPLER_ARG=0.1
 
-# GOOD: default AlwaysOn sampler — sampling happens in the Collector
-# (no OTEL_TRACES_SAMPLER needed; AlwaysOn is the default)
+# BAD: the SDK default — an unsampled incoming parent silently suppresses this service
+export OTEL_TRACES_SAMPLER=parentbased_always_on
+
+# GOOD: export every span and sample in the Collector
+export OTEL_TRACES_SAMPLER=always_on
 ```
+
+### Why not `ParentBased`, the default sampler
+
+Under `ParentBased`, the `sampled` flag of the incoming `traceparent` header decides whether a service records spans.
+Callers outside the trust boundary control that header, so any client of a public API can switch off tracing for its own requests by sending a `traceparent` with the `sampled` flag cleared:
+
+```bash
+# An external caller suppressing all telemetry for this request and everything downstream of it
+curl -H 'traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00' \
+  https://api.example.com/checkout
+```
+
+The suppression is silent and results in a blind spot for the operator.
+
+Use `ParentBased(root=AlwaysOn)` only when both conditions hold:
+
+1. Every ingress path that reaches the service — API gateway, load balancer, CDN, webhook receiver, message broker — strips or replaces incoming `traceparent` and `tracestate` headers at the trust boundary, so that no externally supplied sampling decision reaches an SDK.
+2. That stripping is explicitly verified per ingress path, not assumed, because a single unreset path reopens the blind spot for the whole service graph behind it.
+
+Resetting trace context at the edge is the correct fix, but it is hard to get right: a path added later — a new gateway route, a partner webhook, a sidecar that passes headers through — silently restores the problem long after the original configuration was validated.
+Default to `AlwaysOn` unless the trust boundary is demonstrably airtight.
+
+### Why not ratio-based sampling
+
+Do not configure `TraceIdRatioBased` or any other sampler that drops spans in the application.
+SDK-side sampling makes irreversible decisions at the head of the trace, before the outcome of the request is known.
+A trace that looked unremarkable at the start may turn out to contain an error, a latency spike, or a rarely exercised code path — all of which are lost if the SDK decided not to sample.
+
+Defer all sampling decisions to the [Collector or observability pipeline](../../otel-collector/rules/sampling.md), where they can be changed centrally without redeploying applications.
+The Collector can apply head sampling with the [`probabilisticsamplerprocessor`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/probabilisticsamplerprocessor), or tail sampling with the [`tailsamplingprocessor`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor), using criteria that are impossible to evaluate at request start (error status, latency, attribute values).
+
+### The cost of `AlwaysOn`
+
+`AlwaysOn` exports every span, which costs egress bandwidth and ingest volume that `ParentBased` would have avoided for unsampled traces.
+It also produces spans whose remote parent was never exported, when an upstream service that does sample decided to drop the trace — the trace then appears to start at this service.
+
+Accept both costs.
+A missing upstream parent is visible in the trace data and can be investigated; a request that produced no telemetry at all cannot.
+See [no orphan spans](#no-orphan-spans) for distinguishing a parent outside the captured scope from genuinely broken context propagation.
 
 Accurate RED metrics (request rate, error rate, duration) cannot be computed from sampled traces.
 If you sample in the Collector, materialize metrics from spans *before* the sampling step — see [connectors](../../otel-collector/rules/pipelines.md#connectors) and [sampling](../../otel-collector/rules/sampling.md#materialize-red-metrics-before-sampling).

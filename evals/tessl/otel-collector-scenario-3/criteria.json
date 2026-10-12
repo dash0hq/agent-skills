@@ -39,7 +39,7 @@
     },
     {
       "name": "AlwaysOn sampler recommendation",
-      "description": "The configuration or accompanying notes.md recommend (or assumes) that application SDKs use AlwaysOn sampling and that sampling only happens in the Collector",
+      "description": "The configuration or accompanying notes.md recommend that application SDKs set the AlwaysOn sampler explicitly — rather than relying on the OpenTelemetry default ParentBased(root=AlwaysOn) — and that sampling only happens in the Collector",
       "max_score": 6
     },
     {

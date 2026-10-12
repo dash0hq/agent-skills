@@ -278,6 +278,9 @@ spec:
     - tracecontext
     - baggage
   sampler:
+    # Explicit override of the SDK default (parentbased_always_on), so that callers
+    # outside the trust boundary cannot suppress a service's spans through the
+    # incoming traceparent header.
     type: always_on
   resource:
     attributes:

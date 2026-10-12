@@ -14,7 +14,8 @@ tags:
 Sampling reduces the volume of trace data by selectively retaining only a subset of traces.
 It is an unavoidable necessity in large distributed systems, but every sampling strategy involves trade-offs.
 
-Application SDKs should use the `AlwaysOn` sampler (the default) and export every span.
+Application SDKs should set the `AlwaysOn` sampler explicitly and export every span.
+`AlwaysOn` is not the SDK default: the OpenTelemetry default is `ParentBased(root=AlwaysOn)`, which lets an unsampled incoming `traceparent` suppress a service's spans.
 All sampling decisions belong in the Collector or observability pipeline, where they can be changed centrally without redeploying applications.
 See [SDK sampling guidance](../../otel-instrumentation/rules/spans.md#sampling) for why.
 
@@ -259,7 +260,10 @@ See [RED metrics from traces](./red-metrics.md) for connector configuration, his
 
 - **Sampling in the SDK.**
   Configuring `TraceIdRatioBased` or other non-`AlwaysOn` samplers in the application loses traces before their outcome is known.
-  Use `AlwaysOn` in all SDKs and sample in the Collector.
+  Set `AlwaysOn` explicitly in all SDKs and sample in the Collector.
+- **Leaving SDKs on the default `ParentBased(root=AlwaysOn)` sampler.**
+  Callers outside the trust boundary then decide whether a service is traced, by clearing the `sampled` flag of the `traceparent` header they send.
+  The Collector cannot recover spans an SDK never recorded — see [SDK sampling guidance](../../otel-instrumentation/rules/spans.md#why-not-parentbased-the-default-sampler).
 - **Tail sampling without RED metric materialization.**
   Dashboards and alerts that depend on trace-derived metrics show skewed data.
   Always generate metrics from spans before the sampling step — see [RED metrics from traces](./red-metrics.md).

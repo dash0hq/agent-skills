@@ -13,8 +13,8 @@
       "max_score": 10
     },
     {
-      "name": "AlwaysOn sampler preserved",
-      "description": "Does NOT set OTEL_TRACES_SAMPLER to 'traceidratio', 'parentbased_traceidratio', or any other sampler that drops spans — relies on default AlwaysOn",
+      "name": "AlwaysOn sampler set explicitly",
+      "description": "Sets OTEL_TRACES_SAMPLER to 'always_on' (or configures the AlwaysOn sampler in code), and does NOT use 'traceidratio', 'parentbased_traceidratio', 'parentbased_always_on', or any other sampler that can drop spans in the SDK",
       "max_score": 10
     },
     {

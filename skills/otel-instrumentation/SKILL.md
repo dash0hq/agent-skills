@@ -104,14 +104,16 @@ If it doesn't serve one of these purposes, don't emit it.
 
 ### Sample in the pipeline, not the SDK
 
-Use the `AlwaysOn` sampler (the default) in every SDK.
-Do not configure SDK-side samplers — they make irreversible decisions before the outcome of a request is known.
+Set the `AlwaysOn` sampler explicitly in every SDK (`OTEL_TRACES_SAMPLER=always_on`).
+This overrides the OpenTelemetry default, `ParentBased(root=AlwaysOn)`, under which callers outside the trust boundary can silently switch off a service's tracing through the `traceparent` header.
+Do not configure ratio-based SDK samplers either — they make irreversible decisions before the outcome of a request is known.
 Defer all sampling to the [Collector](../otel-collector/rules/sampling.md), where policies can be changed centrally without redeploying applications.
+See [SDK sampling](./rules/spans.md#sampling) for the full rationale and the conditions under which `ParentBased` is acceptable.
 
 <!-- eval:skip -->
 ```
-SDK (AlwaysOn)  →  Collector (sampling)  →  Backend (retention)
-     ↓                    ↓                       ↓
-  All spans         Head or tail            Storage policies
-  exported          sampling applied
+SDK (AlwaysOn, set explicitly)  →  Collector (sampling)  →  Backend (retention)
+             ↓                           ↓                       ↓
+       All spans                   Head or tail            Storage policies
+       exported                    sampling applied
 ```

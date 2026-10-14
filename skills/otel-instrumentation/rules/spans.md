@@ -441,8 +441,8 @@ Verify this rule in integration tests — see [testing trace data](#short-durati
 
 ## Sampling
 
-Configure explicitly the `AlwaysOn` sampler in application SDKs,
-overriding the [specified default](https://opentelemetry.io/docs/specs/otel/trace/sdk/#built-in-samplers) is `ParentBased(root=AlwaysOn)` that is exposed as `parentbased_always_on` in `OTEL_TRACES_SAMPLER`.
+Configure the `AlwaysOn` sampler explicitly in application SDKs.
+This overrides the [specified default](https://opentelemetry.io/docs/specs/otel/trace/sdk/#built-in-samplers), `ParentBased(root=AlwaysOn)`, which is exposed as `parentbased_always_on` in `OTEL_TRACES_SAMPLER`.
 
 ```bash
 # BAD: head sampling in the SDK — loses traces before their outcome is known
@@ -455,6 +455,60 @@ export OTEL_TRACES_SAMPLER=parentbased_always_on
 # GOOD: export every span and sample in the Collector
 export OTEL_TRACES_SAMPLER=always_on
 ```
+
+### Setting the sampler in code
+
+`OTEL_TRACES_SAMPLER=always_on` is enough for every SDK that reads environment variables, and the per-SDK rules list it among the variables to set.
+Set the sampler in code as well whenever the SDK is wired programmatically, so that the sampler does not depend on the deployment environment being configured correctly, and always in the browser, where no environment variables exist.
+
+<!-- eval:fragment -->
+```go
+tp := sdktrace.NewTracerProvider(
+	sdktrace.WithSampler(sdktrace.AlwaysSample()),
+	sdktrace.WithBatcher(traceExporter),
+	sdktrace.WithResource(res),
+)
+```
+
+<!-- eval:fragment -->
+```javascript
+// Node.js
+import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
+
+const sdk = new NodeSDK({
+  sampler: new tracing.AlwaysOnSampler(),
+  traceExporter,
+});
+```
+
+<!-- eval:fragment -->
+```javascript
+// Browser
+import { WebTracerProvider, AlwaysOnSampler } from '@opentelemetry/sdk-trace-web';
+
+const provider = new WebTracerProvider({
+  sampler: new AlwaysOnSampler(),
+});
+```
+
+<!-- eval:fragment -->
+```python
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON
+
+provider = TracerProvider(sampler=ALWAYS_ON)
+```
+
+<!-- eval:fragment -->
+```csharp
+var tracerProvider = Sdk.CreateTracerProviderBuilder()
+    .SetSampler(new AlwaysOnSampler())
+    .AddSource("MyService")
+    .AddOtlpExporter()
+    .Build();
+```
+
+The Java and Scala agents have no programmatic provider to configure: set `OTEL_TRACES_SAMPLER=always_on` as a JVM environment variable or pass `-Dotel.traces.sampler=always_on`.
 
 ### Why not `ParentBased`, the default sampler
 
@@ -471,10 +525,11 @@ The suppression is silent and results in a blind spot for the operator.
 
 Use `ParentBased(root=AlwaysOn)` only when both conditions hold:
 
-1. Every ingress path that reaches the service — API gateway, load balancer, CDN, webhook receiver, message broker — strips or replaces incoming `traceparent` and `tracestate` headers at the trust boundary, so that no externally supplied sampling decision reaches an SDK.
-2. That stripping is explicitly verified per ingress path, not assumed, because a single unreset path reopens the blind spot for the whole service graph behind it.
+1. Every ingress path that reaches the service — API gateway, load balancer, CDN, webhook receiver, message broker — sets the `sampled` flag of the incoming `traceparent` header to `01` at the trust boundary, so that no externally supplied sampling decision reaches an SDK.
+   Override the flag only, and keep the trace id and the parent span id: dropping `traceparent` and `tracestate` outright breaks cross-organization traces and the browser-to-backend correlation described in [browser instrumentation](./sdks/browser.md#browser-to-server-correlation).
+2. That override is explicitly verified per ingress path, not assumed, because a single unhandled path reopens the blind spot for the whole service graph behind it.
 
-Resetting trace context at the edge is the correct fix, but it is hard to get right: a path added later — a new gateway route, a partner webhook, a sidecar that passes headers through — silently restores the problem long after the original configuration was validated.
+Overriding the sampling decision at the edge is the correct fix, but it is hard to get right: a path added later — a new gateway route, a partner webhook, a sidecar that passes headers through — silently restores the problem long after the original configuration was validated.
 Default to `AlwaysOn` unless the trust boundary is demonstrably airtight.
 
 ### Why not ratio-based sampling
@@ -494,6 +549,8 @@ It also produces spans whose remote parent was never exported, when an upstream 
 Accept both costs.
 A missing upstream parent is visible in the trace data and can be investigated; a request that produced no telemetry at all cannot.
 See [no orphan spans](#no-orphan-spans) for distinguishing a parent outside the captured scope from genuinely broken context propagation.
+
+### Materialize RED metrics before sampling
 
 Accurate RED metrics (request rate, error rate, duration) cannot be computed from sampled traces.
 If you sample in the Collector, materialize metrics from spans *before* the sampling step — see [connectors](../../otel-collector/rules/pipelines.md#connectors) and [sampling](../../otel-collector/rules/sampling.md#materialize-red-metrics-before-sampling).

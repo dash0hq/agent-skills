@@ -52,6 +52,7 @@ npm install @opentelemetry/api \
 # Server-side (standard OTEL env vars)
 OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_SERVICE_NAME=my-nextjs-app
+OTEL_TRACES_SAMPLER=always_on
 
 # Client-side (NEXT_PUBLIC_ prefix required)
 NEXT_PUBLIC_OTEL_ENDPOINT=https://<OTLP_ENDPOINT>
@@ -61,7 +62,7 @@ NEXT_PUBLIC_OTEL_AUTH_TOKEN=your-auth-token-here
 ### 3. Create `src/instrumentation.ts` (Server)
 
 ```typescript
-import { NodeSDK } from '@opentelemetry/sdk-node';
+import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
@@ -114,6 +115,8 @@ export async function register() {
     // Initialize NodeSDK for traces and metrics
     const sdk = new NodeSDK({
       resource,
+      // Export every span and sample in the Collector; see ../spans.md#sampling.
+      sampler: new tracing.AlwaysOnSampler(),
       traceExporter: new OTLPTraceExporter({
         url: `${OTEL_ENDPOINT}/v1/traces`,
         headers: exporterHeaders,

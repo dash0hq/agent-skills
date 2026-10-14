@@ -79,6 +79,7 @@ All environment variables that control the SDK behavior:
 | `OTEL_TRACES_EXPORTER` | No | `otlp` | Traces exporter (default is already `otlp`) |
 | `OTEL_METRICS_EXPORTER` | No | `otlp` | Metrics exporter (default is already `otlp`) |
 | `OTEL_LOGS_EXPORTER` | No | `otlp` | Logs exporter (default is already `otlp`) |
+| `OTEL_TRACES_SAMPLER` | Yes | `parentbased_always_on` | **Set to `always_on`** — the default lets callers switch off tracing, see [sampling](../spans.md#sampling) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4318` | OTLP collector endpoint |
 | `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `http/protobuf` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
@@ -172,6 +173,9 @@ export OTEL_SERVICE_NAME="my-service"
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
 
+# Export every span and sample in the Collector
+export OTEL_TRACES_SAMPLER="always_on"
+
 # Run with sbt (requires fork := true and javaOptions configured)
 sbt run
 ```
@@ -185,6 +189,9 @@ export OTEL_SERVICE_NAME="my-service"
 # Configure endpoint
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN"
+
+# Export every span and sample in the Collector
+export OTEL_TRACES_SAMPLER="always_on"
 
 # Activate SDK for all JVM processes
 export JAVA_TOOL_OPTIONS="-javaagent:path/to/opentelemetry-javaagent.jar"
@@ -200,6 +207,7 @@ java \
   -Dotel.service.name=my-service \
   -Dotel.exporter.otlp.endpoint=https://<OTLP_ENDPOINT> \
   -Dotel.exporter.otlp.headers="Authorization=Bearer YOUR_AUTH_TOKEN" \
+  -Dotel.traces.sampler=always_on \
   -jar myapp-assembly.jar
 ```
 

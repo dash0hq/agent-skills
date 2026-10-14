@@ -56,6 +56,7 @@ All environment variables that control the SDK behavior:
 | `OTEL_TRACES_EXPORTER` | No | `otlp` | Trace exporter (defaults to `otlp`, unlike Node.js) |
 | `OTEL_METRICS_EXPORTER` | No | `none` | Set to `otlp` to export metrics |
 | `OTEL_LOGS_EXPORTER` | No | `otlp` | Log exporter (defaults to `otlp`, unlike Node.js) |
+| `OTEL_TRACES_SAMPLER` | Yes | `parentbased_always_on` | **Set to `always_on`** — the default lets callers switch off tracing, see [sampling](../spans.md#sampling) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4317` | OTLP collector endpoint |
 | `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `grpc` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
@@ -130,6 +131,7 @@ export OTEL_SERVICE_NAME="my-service"
 
 # Enable metrics exporter (traces and logs default to otlp)
 export OTEL_METRICS_EXPORTER="otlp"
+export OTEL_TRACES_SAMPLER="always_on"
 
 # Configure endpoint
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>"
@@ -148,6 +150,7 @@ Use a library like [python-dotenv](https://pypi.org/project/python-dotenv/) or e
 ```bash
 OTEL_SERVICE_NAME=my-service
 OTEL_METRICS_EXPORTER=otlp
+OTEL_TRACES_SAMPLER=always_on
 OTEL_EXPORTER_OTLP_ENDPOINT=https://<OTLP_ENDPOINT>
 OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 ```

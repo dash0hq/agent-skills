@@ -130,12 +130,16 @@ Create `instrumentation.js`:
 import {
   WebTracerProvider,
   BatchSpanProcessor,
+  AlwaysOnSampler,
 } from '@opentelemetry/sdk-trace-web';
 import { getWebAutoInstrumentations } from '@opentelemetry/auto-instrumentations-web';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 
 const provider = new WebTracerProvider({
+  // The browser has no environment variables, so the AlwaysOn sampler must be
+  // set in code; see ../spans.md#sampling.
+  sampler: new AlwaysOnSampler(),
   spanProcessors: [
     new BatchSpanProcessor(
       new OTLPTraceExporter({

@@ -50,6 +50,7 @@ var processorSignals = map[string]signalSet{
 	"cumulativetodelta":     {metrics: true},
 	"deltatocumulative":     {metrics: true},
 	"logdedup":              {logs: true},
+	"log_dedup":             {logs: true},
 }
 
 // exporterSignals maps exporter types to the signals they accept.
@@ -61,16 +62,18 @@ var exporterSignals = map[string]signalSet{
 // connectorSignals maps connector types to their (source, target) pipeline
 // signals. Unknown connectors default to traces → metrics.
 var connectorSignals = map[string][2]string{
-	"signaltometrics": {"traces", "metrics"},
-	"spanmetrics":     {"traces", "metrics"},
-	"count":           {"traces", "metrics"},
-	"sum":             {"traces", "metrics"},
-	"servicegraph":    {"traces", "metrics"},
-	"exceptions":      {"traces", "logs"},
-	"routing":         {"traces", "traces"},
-	"forward":         {"traces", "traces"},
-	"failover":        {"traces", "traces"},
-	"roundrobin":      {"traces", "traces"},
+	"signaltometrics":   {"traces", "metrics"},
+	"spanmetrics":       {"traces", "metrics"},
+	"span_metrics":      {"traces", "metrics"},
+	"signal_to_metrics": {"traces", "metrics"},
+	"count":             {"traces", "metrics"},
+	"sum":               {"traces", "metrics"},
+	"servicegraph":      {"traces", "metrics"},
+	"exceptions":        {"traces", "logs"},
+	"routing":           {"traces", "traces"},
+	"forward":           {"traces", "traces"},
+	"failover":          {"traces", "traces"},
+	"roundrobin":        {"traces", "traces"},
 }
 
 func lookupSignals(table map[string]signalSet, id string) signalSet {
@@ -102,6 +105,12 @@ var stubConfigs = map[string]func() any{
 	"exporters/otlp": func() any {
 		return map[string]any{"endpoint": "https://collector.example.invalid:4317"}
 	},
+	"exporters/otlp_grpc": func() any {
+		return map[string]any{"endpoint": "https://collector.example.invalid:4317"}
+	},
+	"exporters/otlp_http": func() any {
+		return map[string]any{"endpoint": "https://collector.example.invalid:4318"}
+	},
 	"exporters/otlphttp": func() any {
 		return map[string]any{"endpoint": "https://collector.example.invalid:4318"}
 	},
@@ -119,6 +128,14 @@ var stubConfigs = map[string]func() any{
 	},
 	"extensions/file_storage": func() any {
 		return map[string]any{"directory": os.TempDir()}
+	},
+	"connectors/signal_to_metrics": func() any {
+		return map[string]any{"spans": []any{map[string]any{
+			"name":        "eval.scaffold.count",
+			"description": "eval scaffold",
+			"unit":        "1",
+			"sum":         map[string]any{"value": "Int(1)"},
+		}}}
 	},
 	"connectors/signaltometrics": func() any {
 		return map[string]any{"spans": []any{map[string]any{

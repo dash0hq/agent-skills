@@ -43,13 +43,13 @@
       "max_score": 10
     },
     {
-      "name": "error_mode set explicitly",
-      "description": "Every transform processor block includes an explicit `error_mode:` key",
+      "name": "error_mode does not propagate statement errors",
+      "description": "No transform processor sets `error_mode: propagate`; each sets `ignore` or `silent`, or omits `error_mode` and relies on the Collector default, which is `ignore` since v0.153.0",
       "max_score": 8
     },
     {
       "name": "error_mode ignore production",
-      "description": "All processor configs use `error_mode: ignore`",
+      "description": "The effective error mode of every processor config is `ignore`: either `error_mode: ignore` is set, or `error_mode` is omitted and the Collector default (`ignore` since v0.153.0) applies. `propagate` and `silent` do not qualify",
       "max_score": 6
     },
     {

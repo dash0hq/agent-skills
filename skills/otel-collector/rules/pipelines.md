@@ -23,15 +23,15 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     logs:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
   telemetry:
     logs:
       level: info
@@ -56,15 +56,15 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     logs:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
 Use named pipelines when you need multiple pipelines for the same signal type (e.g., different processing for different sources):
@@ -74,12 +74,12 @@ service:
   pipelines:
     traces/application:
       receivers: [otlp]
-      processors: [memory_limiter, k8sattributes]
-      exporters: [otlp/dash0]
+      processors: [memory_limiter, k8s_attributes]
+      exporters: [otlp_grpc/dash0]
     traces/infrastructure:
       receivers: [otlp/infra]
       processors: [memory_limiter]
-      exporters: [otlp/dash0]
+      exporters: [otlp_grpc/dash0]
 ```
 
 ## Complete working configuration
@@ -100,7 +100,7 @@ processors:
     check_interval: 1s
     limit_mib: 512
     spike_limit_mib: 128
-  resourcedetection:
+  resource_detection:
     detectors:
       - env
       - system
@@ -112,7 +112,7 @@ processors:
         value: "production"
         action: insert
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -127,6 +127,7 @@ exporters:
       num_consumers: 10
       queue_size: 5000
       storage: file_storage
+      batch: {}
 
 extensions:
   health_check:
@@ -139,16 +140,16 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, resource]
-      exporters: [otlp]
+      processors: [memory_limiter, resource_detection, resource]
+      exporters: [otlp_grpc]
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, resource]
-      exporters: [otlp]
+      processors: [memory_limiter, resource_detection, resource]
+      exporters: [otlp_grpc]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, resource]
-      exporters: [otlp]
+      processors: [memory_limiter, resource_detection, resource]
+      exporters: [otlp_grpc]
   telemetry:
     logs:
       level: info
@@ -171,7 +172,7 @@ Use connectors to generate metrics from spans (e.g., request rate, error rate, d
 
 ```yaml
 connectors:
-  signaltometrics:
+  signal_to_metrics:
     spans:
       - name: http.server.request.duration
         description: "Duration of HTTP server requests."
@@ -198,14 +199,14 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [signaltometrics, otlp]
+      exporters: [signal_to_metrics, otlp_grpc]
     metrics/red:
-      receivers: [signaltometrics]
+      receivers: [signal_to_metrics]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
-The `signaltometrics` connector uses OTTL conditions to select spans and produces metrics with exact semantic convention names.
+The `signal_to_metrics` connector uses OTTL conditions to select spans and produces metrics with exact semantic convention names.
 See [RED metrics from traces](./red-metrics.md) for the complete set of HTTP and RPC metric definitions, resource attributes, and histogram type guidance.
 For complex telemetry transformations within connectors, see the [OTTL skill](../../otel-ottl/SKILL.md).
 
@@ -216,11 +217,11 @@ Each exporter receives an independent copy of the data.
 
 ```yaml
 exporters:
-  otlp/dash0:
+  otlp_grpc/dash0:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
-  otlp/secondary:
+  otlp_grpc/secondary:
     endpoint: secondary-backend:4317
     tls:
       insecure: true
@@ -230,7 +231,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp/dash0, otlp/secondary]
+      exporters: [otlp_grpc/dash0, otlp_grpc/secondary]
 ```
 
 Fan-out doubles memory and network usage per additional exporter.
@@ -295,8 +296,8 @@ For debug exporter configuration and verbosity levels, see [exporters](./exporte
   Pipelines are typed by signal (traces, metrics, logs).
   Attempting to mix signals in one pipeline causes a configuration error.
 - **Unused components in the configuration.**
-  The Collector rejects configurations with declared receivers, processors, or exporters not referenced by any pipeline.
-  Remove unused components or add them to a pipeline.
+  The Collector ignores declared receivers, processors, and exporters that no pipeline references, without an error or warning.
+  Remove unused components or add them to a pipeline, because an unwired component does nothing.
 - **Missing `health_check` extension.**
   Without a health check endpoint, Kubernetes liveness and readiness probes have no target.
   Always include the `health_check` extension in production deployments.

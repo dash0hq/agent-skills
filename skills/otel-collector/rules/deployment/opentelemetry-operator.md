@@ -85,7 +85,7 @@ spec:
         limit_mib: 410
         spike_limit_mib: 100
     exporters:
-      otlp:
+      otlp_grpc:
         endpoint: <OTLP_ENDPOINT>
         headers:
           Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -93,6 +93,7 @@ spec:
           enabled: true
           queue_size: 5000
           storage: file_storage
+          batch: {}
     extensions:
       health_check:
         endpoint: 0.0.0.0:13133
@@ -104,15 +105,15 @@ spec:
         traces:
           receivers: [otlp]
           processors: [memory_limiter]
-          exporters: [otlp]
+          exporters: [otlp_grpc]
         metrics:
           receivers: [otlp]
           processors: [memory_limiter]
-          exporters: [otlp]
+          exporters: [otlp_grpc]
         logs:
           receivers: [otlp]
           processors: [memory_limiter]
-          exporters: [otlp]
+          exporters: [otlp_grpc]
 ```
 
 ### Gateway example (Deployment)
@@ -154,7 +155,7 @@ spec:
         check_interval: 1s
         limit_mib: 1638
         spike_limit_mib: 400
-      k8sattributes:
+      k8s_attributes:
         auth_type: serviceAccount
         passthrough: false
         extract:
@@ -176,7 +177,7 @@ spec:
             value: "<CLUSTER_NAME>"
             action: upsert
     exporters:
-      otlp:
+      otlp_grpc:
         endpoint: <OTLP_ENDPOINT>
         headers:
           Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -186,6 +187,7 @@ spec:
           num_consumers: 10
           queue_size: 5000
           storage: file_storage
+          batch: {}
     extensions:
       health_check:
         endpoint: 0.0.0.0:13133
@@ -196,16 +198,16 @@ spec:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource]
-          exporters: [otlp]
+          processors: [memory_limiter, k8s_attributes, resource]
+          exporters: [otlp_grpc]
         metrics:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource]
-          exporters: [otlp]
+          processors: [memory_limiter, k8s_attributes, resource]
+          exporters: [otlp_grpc]
         logs:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource]
-          exporters: [otlp]
+          processors: [memory_limiter, k8s_attributes, resource]
+          exporters: [otlp_grpc]
 ```
 
 ### Sidecar mode
@@ -227,7 +229,7 @@ spec:
           grpc:
             endpoint: 0.0.0.0:4317
     exporters:
-      otlp:
+      otlp_grpc:
         endpoint: otel-gateway.otel.svc.cluster.local:4317
         tls:
           insecure: true
@@ -235,7 +237,7 @@ spec:
       pipelines:
         traces:
           receivers: [otlp]
-          exporters: [otlp]
+          exporters: [otlp_grpc]
 ```
 
 Annotate the application pod template to trigger injection:
@@ -362,7 +364,7 @@ spec:
     exporters:
       debug:
         verbosity: detailed
-      otlp:
+      otlp_grpc:
         endpoint: <OTLP_ENDPOINT>
         headers:
           Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -370,16 +372,16 @@ spec:
       pipelines:
         traces:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource]
-          exporters: [otlp, debug]
+          processors: [memory_limiter, k8s_attributes, resource]
+          exporters: [otlp_grpc, debug]
         metrics:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource]
-          exporters: [otlp, debug]
+          processors: [memory_limiter, k8s_attributes, resource]
+          exporters: [otlp_grpc, debug]
         logs:
           receivers: [otlp]
-          processors: [memory_limiter, k8sattributes, resource]
-          exporters: [otlp, debug]
+          processors: [memory_limiter, k8s_attributes, resource]
+          exporters: [otlp_grpc, debug]
 ```
 
 Apply the updated CR and inspect the output:
@@ -394,7 +396,7 @@ kubectl logs -n otel -l app.kubernetes.io/managed-by=opentelemetry-operator --ta
 Run through this checklist after adding the `debug` exporter:
 
 1. **Resource attributes are present.**
-   Verify that `resourcedetection` and `k8sattributes` added the expected attributes (e.g., `host.name`, `k8s.namespace.name`, `k8s.deployment.name`).
+   Verify that `resource_detection` and `k8s_attributes` added the expected attributes (e.g., `host.name`, `k8s.namespace.name`, `k8s.deployment.name`).
    If attributes are missing, check detector configuration and RBAC permissions.
 2. **Resource attributes are consistent across signals.**
    Compare the resource attributes on a trace, a metric, and a log record from the same service.
@@ -432,7 +434,7 @@ metadata:
 spec:
   config:
     exporters:
-      otlp:
+      otlp_grpc:
         endpoint: <OTLP_ENDPOINT>
         headers:
           Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"

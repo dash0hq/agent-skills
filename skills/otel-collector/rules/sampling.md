@@ -45,7 +45,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, probabilistic_sampler]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
 Head sampling is simple to deploy and scales horizontally, but it has a fundamental limitation: the decision is made before the outcome of the request is known.
@@ -96,7 +96,7 @@ processors:
     spike_limit_mib: 100
 
 exporters:
-  loadbalancing:
+  load_balancing:
     protocol:
       otlp:
         tls:
@@ -105,7 +105,7 @@ exporters:
       dns:
         hostname: otel-collector-gateway-headless.otel.svc.cluster.local
         port: "4317"
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -115,15 +115,15 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [loadbalancing]
+      exporters: [load_balancing]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     logs:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
 The `loadbalancingexporter` uses DNS to discover gateway instances.
@@ -183,7 +183,7 @@ processors:
           sampling_percentage: 10
 
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -193,6 +193,7 @@ exporters:
       num_consumers: 10
       queue_size: 5000
       storage: file_storage
+      batch: {}
 
 extensions:
   file_storage:
@@ -204,7 +205,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, tail_sampling]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
 ### Policy design

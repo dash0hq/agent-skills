@@ -4,22 +4,22 @@
   "checklist": [
     {
       "name": "Enrichment on all pipelines",
-      "description": "Both k8sattributes (or resourcedetection) AND resource processors appear in the processors list of ALL three pipelines: traces, metrics, AND logs — not just one or two",
+      "description": "Both an enrichment processor (k8sattributes or k8s_attributes, or resourcedetection or resource_detection) AND the resource processor appear in the processors list of ALL three pipelines: traces, metrics, AND logs — not just one or two",
       "max_score": 12
     },
     {
       "name": "k8s.pod.uid first in pod_association",
-      "description": "In the k8sattributes pod_association, the entry using 'from: resource_attribute' with name 'k8s.pod.uid' appears BEFORE the 'from: connection' entry",
+      "description": "In the k8sattributes (k8s_attributes) pod_association, the entry using 'from: resource_attribute' with name 'k8s.pod.uid' appears BEFORE the 'from: connection' entry",
       "max_score": 12
     },
     {
       "name": "Workload name and UID extracted",
-      "description": "The k8sattributes extract.metadata list includes BOTH k8s.deployment.name AND k8s.deployment.uid (both name and UID, not just one)",
+      "description": "The k8sattributes (k8s_attributes) extract.metadata list includes BOTH k8s.deployment.name AND k8s.deployment.uid (both name and UID, not just one)",
       "max_score": 10
     },
     {
       "name": "resourcedetection override false",
-      "description": "The resourcedetection processor has override: false configured (not override: true or missing)",
+      "description": "The resourcedetection (resource_detection) processor has override: false configured (not override: true or missing)",
       "max_score": 9
     },
     {
@@ -29,17 +29,17 @@
     },
     {
       "name": "Processor ordering: enrichment after memory_limiter",
-      "description": "In each pipeline, memory_limiter appears before resourcedetection and/or k8sattributes (enrichment processors come after memory_limiter)",
+      "description": "In each pipeline, memory_limiter appears before resourcedetection (resource_detection) and/or k8sattributes (k8s_attributes) (enrichment processors come after memory_limiter)",
       "max_score": 9
     },
     {
       "name": "Processor ordering: resource after enrichment",
-      "description": "In each pipeline, the resource processor (static attributes) appears AFTER resourcedetection and k8sattributes (not before them)",
+      "description": "In each pipeline, the resource processor (static attributes) appears AFTER resourcedetection (resource_detection) and k8sattributes (k8s_attributes) (not before them)",
       "max_score": 8
     },
     {
       "name": "k8sattributes passthrough: false",
-      "description": "The k8sattributes processor has passthrough: false (appropriate for a Collector that performs the Kubernetes API lookup itself)",
+      "description": "The k8sattributes (k8s_attributes) processor has passthrough: false (appropriate for a Collector that performs the Kubernetes API lookup itself)",
       "max_score": 7
     },
     {
@@ -53,8 +53,8 @@
       "max_score": 8
     },
     {
-      "name": "No batch processor",
-      "description": "The configuration does NOT include a batch processor in any pipeline",
+      "name": "No batch processor, exporter batching enabled",
+      "description": "The configuration does NOT include a batch processor in any pipeline AND every exporter that sends telemetry over the network (not debug) enables batching through sending_queue.batch (for example 'batch: {}'), because exporter batching is disabled unless configured",
       "max_score": 9
     }
   ]

@@ -8,8 +8,8 @@
       "max_score": 12
     },
     {
-      "name": "No batch processor",
-      "description": "The configuration does NOT include a batch processor anywhere (no 'batch:' under processors)",
+      "name": "No batch processor, exporter batching enabled",
+      "description": "The configuration does NOT include a batch processor anywhere (no 'batch:' under processors) AND the Dash0 OTLP exporter enables batching through sending_queue.batch (for example 'batch: {}'), because exporter batching is disabled unless configured",
       "max_score": 12
     },
     {

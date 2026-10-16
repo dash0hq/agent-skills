@@ -4,7 +4,7 @@
   "checklist": [
     {
       "name": "signaltometrics not spanmetrics",
-      "description": "Uses the signaltometricsconnector (signaltometrics connector type), NOT the spanmetricsconnector (span_metrics or spanmetrics connector type)",
+      "description": "Uses the signaltometricsconnector (signaltometrics or signal_to_metrics connector type), NOT the spanmetricsconnector (span_metrics or spanmetrics connector type)",
       "max_score": 12
     },
     {
@@ -14,12 +14,12 @@
     },
     {
       "name": "Connector before sampling in pipeline",
-      "description": "In the traces pipeline, signaltometrics appears in the exporters list BEFORE or alongside the backend OTLP exporter — and the tail_sampling processor runs on the traces pipeline where the connector also exports (not after a separate sampling-only fork)",
+      "description": "In the traces pipeline, signaltometrics (or signal_to_metrics) appears in the exporters list BEFORE or alongside the backend OTLP exporter — and the tail_sampling processor runs on the traces pipeline where the connector also exports (not after a separate sampling-only fork)",
       "max_score": 12
     },
     {
       "name": "Metrics pipeline uses connector as receiver",
-      "description": "A separate metrics pipeline exists with signaltometrics as a receiver (e.g., metrics/red or metrics pipeline with receivers: [signaltometrics])",
+      "description": "A separate metrics pipeline exists with signaltometrics (or signal_to_metrics) as a receiver (e.g., metrics/red or metrics pipeline with receivers: [signaltometrics])",
       "max_score": 10
     },
     {
@@ -53,8 +53,8 @@
       "max_score": 9
     },
     {
-      "name": "No batch processor",
-      "description": "No batch processor is present in any pipeline",
+      "name": "No batch processor, exporter batching enabled",
+      "description": "No batch processor is present in any pipeline AND the Dash0 OTLP exporter enables batching through sending_queue.batch (for example 'batch: {}'), because exporter batching is disabled unless configured",
       "max_score": 9
     }
   ]

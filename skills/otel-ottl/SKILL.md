@@ -11,7 +11,7 @@ metadata:
 ## Components that use OTTL
 
 OTTL is not limited to the transform and filter processors.
-Processors (transform, filter, attributes, span, tailsampling, cumulativetodelta, logdedup, lookup), connectors (routing, count, sum, signaltometrics), and the hostmetrics receiver all accept OTTL expressions.
+Processors (transform, filter, tailsampling, logdedup) and connectors (routing, count, sum, signaltometrics) accept OTTL expressions.
 See [components](./rules/components.md) for the full list with use cases.
 
 ## OTTL syntax
@@ -133,11 +133,14 @@ Occur during telemetry processing:
 
 ### Error mode configuration
 
-Set `error_mode` explicitly for clarity; `ignore` is the default.
+Always set `error_mode` explicitly; the default differs by component.
+The transform and filter processors default to `ignore` since Collector Contrib v0.153.0 and to `propagate` before it.
+The routing and signaltometrics connectors default to `propagate`.
+The count and sum connectors have no `error_mode` key and always propagate errors.
 
 | Mode | Behavior | When to use |
 |------|----------|-------------|
-| `ignore` (default) | Logs the error and continues to the next statement | **Production and general use** — the default for the transform and filter processors |
+| `ignore` | Logs the error and continues to the next statement | **Production and general use** — the default for the transform and filter processors |
 | `propagate` | Returns the error up the pipeline, dropping the payload from the Collector | Development and strict environments where you want to catch every error |
 | `silent` | Ignores errors without logging | High-volume pipelines with known-safe transforms where error logs are noise |
 

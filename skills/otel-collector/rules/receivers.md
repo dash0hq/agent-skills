@@ -254,7 +254,7 @@ The `container` operator auto-detects CRI and Docker log formats.
 #### Production configuration with resource attribute extraction
 
 Extract `k8s.namespace.name`, `k8s.pod.name`, `k8s.pod.uid`, and `k8s.container.name` from the log file path.
-These attributes enable the `k8sattributes` processor to resolve the full set of Kubernetes metadata (deployment, node, labels) without relying on connection IP.
+These attributes enable the `k8s_attributes` processor to resolve the full set of Kubernetes metadata (deployment, node, labels) without relying on connection IP.
 
 ```yaml
 receivers:
@@ -418,13 +418,14 @@ receivers:
 ## Anti-patterns
 
 - **Declaring a receiver without adding it to a pipeline.**
-  The Collector rejects the configuration at startup.
+  The Collector ignores the receiver without an error or warning, so it never receives data.
   Every receiver must appear in at least one pipeline under `service.pipelines`.
 - **Using `localhost` as bind address in Kubernetes.**
   Other pods cannot reach the receiver.
   Use `0.0.0.0` to listen on all interfaces.
-- **Missing `start_at: end` on filelog in production.**
-  The default (`beginning`) causes the Collector to re-ingest all existing log files on restart, creating duplicate logs and a burst of load.
+- **Setting `start_at: beginning` on filelog in production.**
+  The default is `end`.
+  With `beginning`, the Collector reads existing files from the start, creating duplicate logs and a burst of load after a restart, because offsets are kept only in memory unless `storage` is set.
 - **Running hostmetrics as a gateway Deployment.**
   Host metrics are per-node.
   A Deployment sees only the metrics of the node it happens to be scheduled on.

@@ -36,16 +36,19 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 
 - **Processor ordering matters.**
   Place `memory_limiter` first in every pipeline.
-  Use the exporter's `sending_queue` with `file_storage` instead of the `batch` processor.
+  Enable exporter batching with `sending_queue: { batch: {} }` and persist the queue with `file_storage` instead of using the `batch` processor.
   Incorrect ordering causes memory exhaustion or data loss.
 - **One pipeline per signal type.**
   Define separate pipelines for traces, metrics, and logs.
   Mixing signals in a single pipeline breaks processing and causes runtime errors.
 - **Every declared component must appear in a pipeline.**
-  The Collector rejects configurations that declare receivers, processors, or exporters not referenced by any pipeline.
+  The Collector ignores components that no pipeline references, without an error or warning, so an unwired component does nothing.
 - **Consistent resource enrichment across pipelines.**
-  Apply processors that enrich resource attributes like `resourcedetection` and `k8sattributes` to every signal pipeline (traces, metrics, and logs), not just one.
+  Apply processors that enrich resource attributes like `resource_detection` and `k8s_attributes` to every signal pipeline (traces, metrics, and logs), not just one.
   If one pipeline enriches telemetry with `k8s.namespace.name` or `host.name` but another does not, correlation between signals is compromised by incomplete metadata.
+- **Use canonical component names.**
+  Write `otlp_grpc`, `otlp_http`, `load_balancing`, `span_metrics`, `log_dedup`, `signal_to_metrics`, `k8s_attributes`, and `resource_detection` as config keys.
+  The older names `otlp` (exporter only), `otlphttp`, `loadbalancing`, `spanmetrics`, `logdedup`, `signaltometrics`, `k8sattributes`, and `resourcedetection` still work as deprecated aliases and log a deprecation warning at startup.
 - **Memory safety is non-negotiable.**
   Always configure `memory_limiter` in production.
   Without it, a burst of telemetry can cause the Collector to OOM and crash.
@@ -70,29 +73,38 @@ processors:
     spike_limit_mib: 100
 
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: ingress.eu-west-1.aws.dash0.com:4317
     headers:
       Authorization: "Bearer ${env:DASH0_TOKEN}"
     sending_queue:
       enabled: true
       storage: file_storage
+      batch: {}
+
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol/queue
+    create_directory: true
 
 service:
+  extensions: [file_storage]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     logs:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
+
+The Collector user must be able to write to the `file_storage` directory; in a container, mount a persistent volume at `/var/lib/otelcol`.
 
 See [exporters](./rules/exporters.md) for full authentication and queue configuration, and [processors](./rules/processors.md) for adding resource detection.
 

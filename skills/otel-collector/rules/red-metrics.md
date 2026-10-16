@@ -60,14 +60,14 @@ Include the [required and recommended resource attributes](../../otel-instrument
 | `service.namespace` | Scopes services within the same product |
 | `service.instance.id` | Distinguishes individual instances |
 | `deployment.environment.name` | Separates production from staging and development |
-| `k8s.namespace.name` | Kubernetes namespace (set by `k8sattributes` processor) |
-| `k8s.deployment.name` | Kubernetes workload name (set by `k8sattributes` processor) |
+| `k8s.namespace.name` | Kubernetes namespace (set by `k8s_attributes` processor) |
+| `k8s.deployment.name` | Kubernetes workload name (set by `k8s_attributes` processor) |
 
 ### HTTP metrics configuration
 
 ```yaml
 connectors:
-  signaltometrics:
+  signal_to_metrics:
     spans:
       # HTTP server duration — https://opentelemetry.io/docs/specs/semconv/http/http-metrics/
       - name: http.server.request.duration
@@ -148,7 +148,7 @@ connectors:
 
 ```yaml
 connectors:
-  signaltometrics:
+  signal_to_metrics:
     spans:
       # RPC server duration — https://opentelemetry.io/docs/specs/semconv/rpc/rpc-metrics/
       - name: rpc.server.call.duration
@@ -240,7 +240,7 @@ Replace the `exponential_histogram` block with a `histogram` block using the buc
 
 ## Pipeline wiring
 
-The `signaltometrics` connector acts as an exporter in the traces pipeline and a receiver in a metrics pipeline.
+The `signal_to_metrics` connector acts as an exporter in the traces pipeline and a receiver in a metrics pipeline.
 It sees every span before the backend receives the (possibly sampled) subset, producing accurate counts and duration histograms.
 
 ```yaml
@@ -249,14 +249,14 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [signaltometrics, otlp]
+      exporters: [signal_to_metrics, otlp_grpc]
     metrics/red:
-      receivers: [signaltometrics]
+      receivers: [signal_to_metrics]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
-List the `signaltometrics` connector *before* the backend exporter in the traces pipeline's `exporters` list.
+List the `signal_to_metrics` connector *before* the backend exporter in the traces pipeline's `exporters` list.
 The connector receives a copy of every span independently of the backend exporter.
 
 ## Full configuration with tail sampling
@@ -266,7 +266,7 @@ The connector sees all spans; only afterward does the `tailsamplingprocessor` di
 
 ```yaml
 connectors:
-  signaltometrics:
+  signal_to_metrics:
     spans:
       - name: http.server.request.duration
         description: "Duration of HTTP server requests."
@@ -400,11 +400,11 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, tail_sampling]
-      exporters: [signaltometrics, otlp]
+      exporters: [signal_to_metrics, otlp_grpc]
     metrics/red:
-      receivers: [signaltometrics]
+      receivers: [signal_to_metrics]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
 ## Anti-patterns

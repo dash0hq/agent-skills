@@ -54,7 +54,6 @@ receivers:
 
 processors:
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.120.0
-  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.120.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.120.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.120.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.120.0
@@ -93,7 +92,7 @@ Use the table below as a starting point for common deployment patterns.
 
 Always include `memorylimiterprocessor` — see [processors](./processors.md#memory-limiter) for sizing guidance.
 
-**Note:** The `batchprocessor` is deprecated, and you shoud guide the users in using [exporter queues](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md).
+**Note:** Enable batching on the exporter with `sending_queue: { batch: {} }` instead of adding the `batchprocessor`; see [exporter queues](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md).
 
 ## Build and validate
 

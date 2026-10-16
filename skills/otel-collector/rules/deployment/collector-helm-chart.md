@@ -77,7 +77,7 @@ config:
       spike_limit_mib: 100
 
   exporters:
-    otlp:
+    otlp_grpc:
       endpoint: <OTLP_ENDPOINT>
       headers:
         Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -85,6 +85,7 @@ config:
         enabled: true
         queue_size: 5000
         storage: file_storage
+        batch: {}
 
   extensions:
     health_check:
@@ -98,15 +99,15 @@ config:
       traces:
         receivers: [otlp]
         processors: [memory_limiter]
-        exporters: [otlp]
+        exporters: [otlp_grpc]
       metrics:
         receivers: [otlp]
         processors: [memory_limiter]
-        exporters: [otlp]
+        exporters: [otlp_grpc]
       logs:
         receivers: [otlp]
         processors: [memory_limiter]
-        exporters: [otlp]
+        exporters: [otlp_grpc]
 
 extraEnvsFrom:
   - secretRef:
@@ -181,7 +182,7 @@ config:
       check_interval: 1s
       limit_mib: 1638
       spike_limit_mib: 400
-    resourcedetection:
+    resource_detection:
       detectors: [env, system]
       timeout: 5s
       override: false
@@ -192,7 +193,7 @@ config:
           action: upsert
 
   exporters:
-    otlp:
+    otlp_grpc:
       endpoint: <OTLP_ENDPOINT>
       headers:
         Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -202,6 +203,7 @@ config:
         num_consumers: 10
         queue_size: 5000
         storage: file_storage
+        batch: {}
 
   extensions:
     health_check:
@@ -214,16 +216,16 @@ config:
     pipelines:
       traces:
         receivers: [otlp]
-        processors: [memory_limiter, resourcedetection, resource]
-        exporters: [otlp]
+        processors: [memory_limiter, resource_detection, resource]
+        exporters: [otlp_grpc]
       metrics:
         receivers: [otlp]
-        processors: [memory_limiter, resourcedetection, resource]
-        exporters: [otlp]
+        processors: [memory_limiter, resource_detection, resource]
+        exporters: [otlp_grpc]
       logs:
         receivers: [otlp]
-        processors: [memory_limiter, resourcedetection, resource]
-        exporters: [otlp]
+        processors: [memory_limiter, resource_detection, resource]
+        exporters: [otlp_grpc]
 
 extraEnvsFrom:
   - secretRef:
@@ -233,7 +235,7 @@ extraEnvsFrom:
 ### Image selection
 
 Use the `otelcol-k8s` distribution for Kubernetes deployments.
-It includes the Kubernetes-specific components (`k8sattributes`, `kubeletstats`, `k8s_cluster`) that are not in the core distribution.
+It includes the Kubernetes-specific components (`k8s_attributes`, `kubeletstats`, `k8s_cluster`) that are not in the core distribution.
 
 | Distribution | Image | Use when |
 |-------------|-------|----------|
@@ -264,11 +266,11 @@ config:
   service:
     pipelines:
       traces:
-        exporters: [otlp, debug]
+        exporters: [otlp_grpc, debug]
       metrics:
-        exporters: [otlp, debug]
+        exporters: [otlp_grpc, debug]
       logs:
-        exporters: [otlp, debug]
+        exporters: [otlp_grpc, debug]
 ```
 
 Upgrade the release with the debug values:
@@ -291,7 +293,7 @@ kubectl logs -n otel -l app.kubernetes.io/name=opentelemetry-collector --tail=10
 Run through this checklist after adding the `debug` exporter:
 
 1. **Resource attributes are present.**
-   Verify that `resourcedetection` and `k8sattributes` added the expected attributes (e.g., `host.name`, `k8s.namespace.name`, `k8s.deployment.name`).
+   Verify that `resource_detection` and `k8s_attributes` added the expected attributes (e.g., `host.name`, `k8s.namespace.name`, `k8s.deployment.name`).
    If attributes are missing, check detector configuration and RBAC permissions.
 2. **Resource attributes are consistent across signals.**
    Compare the resource attributes on a trace, a metric, and a log record from the same service.
@@ -325,7 +327,7 @@ If the Dash0 organization uses multiple [datasets](https://www.dash0.com/documen
 ```yaml
 config:
   exporters:
-    otlp:
+    otlp_grpc:
       endpoint: <OTLP_ENDPOINT>
       headers:
         Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -344,7 +346,7 @@ The debug exporter shows telemetry data, not outgoing headers — verify the hea
   Preset-injected components cannot be removed via the config overlay.
   Disable the preset and configure the component manually instead.
 - **Using the core image with Kubernetes presets.**
-  The core distribution does not include `k8sattributes`, `kubeletstats`, or `k8s_cluster`.
+  The core distribution does not include `k8s_attributes`, `kubeletstats`, or `k8s_cluster`.
   Use the `otelcol-k8s` or contrib image.
 
 ## References

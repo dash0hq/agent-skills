@@ -22,7 +22,7 @@ Fall back to OTLP/HTTP only when network proxies do not support HTTP/2.
 | Protocol | Exporter key | Default port | When to use |
 |----------|-------------|-------------|-------------|
 | gRPC | `otlp` | 4317 | Default for all Collector-to-backend exports |
-| HTTP | `otlphttp` | 4318 | Network proxies that block HTTP/2 |
+| HTTP | `otlp_http` | 4318 | Network proxies that block HTTP/2 |
 
 ## OTLP/gRPC exporter to Dash0
 
@@ -37,7 +37,7 @@ Use the OTLP/gRPC exporter to send traces, metrics, and logs to Dash0.
 
 ```yaml
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer <AUTH_TOKEN>"
@@ -52,7 +52,7 @@ Configure retry, timeout, compression, and sending queue for reliable delivery.
 
 ```yaml
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer <AUTH_TOKEN>"
@@ -68,17 +68,19 @@ exporters:
       num_consumers: 10
       queue_size: 5000
       storage: file_storage
+      batch: {}
 ```
 
 ### Compression
 
-Enable `gzip` compression to reduce network bandwidth.
+The `otlp_grpc` and `otlp_http` exporters compress with `gzip` by default, which reduces network bandwidth.
 The Dash0 ingress endpoint supports gzip-compressed OTLP/gRPC.
+Do not set `compression: none`.
 
 ```yaml
-# GOOD — reduces bandwidth by 60-80 percent
+# GOOD — gzip (the default) reduces bandwidth by 60-80 percent
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer <AUTH_TOKEN>"
@@ -86,7 +88,7 @@ exporters:
 
 # BAD — uncompressed traffic wastes bandwidth
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer <AUTH_TOKEN>"
@@ -107,11 +109,11 @@ Enable retries to handle transient network errors and backend unavailability.
 ### Sending queue
 
 The sending queue buffers telemetry when the backend is temporarily unavailable.
-Without it, data is dropped during transient failures.
+The `otlp_grpc` and `otlp_http` exporters enable an in-memory queue by default, so the production change is to set `storage` to persist the queue and to set `batch` to enable exporter batching.
 
 ```yaml
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer <AUTH_TOKEN>"
@@ -120,6 +122,7 @@ exporters:
       num_consumers: 10
       queue_size: 5000
       storage: file_storage
+      batch: {}
 ```
 
 | Setting | Default | Recommendation |
@@ -127,6 +130,7 @@ exporters:
 | `num_consumers` | `10` | Increase for high-throughput pipelines |
 | `queue_size` | `1000` | Set to 5000 for production workloads |
 | `storage` | (in-memory) | Set to `file_storage` for persistence across restarts |
+| `batch` | (disabled) | Set to `{}` to enable batching with the defaults (`flush_timeout` of 200 ms, `min_size` of 8192), replacing the `batch` processor |
 
 Use `file_storage` with the [file storage extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/storage/filestorage) to persist the queue to disk.
 In-memory queues lose buffered data when the Collector restarts.
@@ -144,14 +148,14 @@ See [auth tokens](https://www.dash0.com/documentation/dash0/key-concepts/auth-to
 ```yaml
 # GOOD — token from environment variable
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
 
 # BAD — hardcoded token in config
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer dh0_1a2b3c4d5e6f..."
@@ -175,7 +179,7 @@ Use the OTLP/HTTP exporter when gRPC is not available (e.g., network proxies tha
 
 ```yaml
 exporters:
-  otlphttp:
+  otlp_http:
     endpoint: https://<OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -200,7 +204,7 @@ exporters:
 exporters:
   debug:
     verbosity: detailed
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -210,7 +214,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp, debug]  # debug wastes CPU and I/O in production
+      exporters: [otlp_grpc, debug]  # debug wastes CPU and I/O in production
 ```
 
 ### Verbosity levels
@@ -228,11 +232,11 @@ Each exporter receives a copy of the data independently.
 
 ```yaml
 exporters:
-  otlp/dash0:
+  otlp_grpc/dash0:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
-  otlp/secondary:
+  otlp_grpc/secondary:
     endpoint: secondary-backend:4317
     tls:
       insecure: true
@@ -242,7 +246,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp/dash0, otlp/secondary]
+      exporters: [otlp_grpc/dash0, otlp_grpc/secondary]
 ```
 
 Use named instances (`otlp/dash0`, `otlp/secondary`) to configure multiple exporters of the same type.
@@ -256,9 +260,9 @@ Use named instances (`otlp/dash0`, `otlp/secondary`) to configure multiple expor
 - **Hardcoding auth tokens in configuration files.**
   Tokens in config files end up in version control, container images, and logs.
   Use environment variables with `${env:VARIABLE_NAME}` syntax.
-- **Missing `sending_queue` in production.**
-  Without a queue, transient backend failures cause immediate data loss.
-  Always enable the sending queue for production deployments.
+- **Running production exporters on the default in-memory `sending_queue`.**
+  The queue is enabled by default, but its buffered data is lost when the Collector restarts.
+  Set `sending_queue.storage` to a `file_storage` extension, and leave `sending_queue.enabled` at `true`.
 - **Using debug exporter in production.**
   The debug exporter serializes every telemetry item to stdout, consuming CPU and disk I/O.
   Remove it from production pipelines.

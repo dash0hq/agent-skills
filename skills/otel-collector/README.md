@@ -72,7 +72,7 @@ processors:
     spike_limit_mib: 128
 
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer <AUTH_TOKEN>"
@@ -80,10 +80,12 @@ exporters:
       enabled: true
       queue_size: 5000
       storage: file_storage
+      batch: {}
 
 extensions:
   file_storage:
     directory: /var/lib/otelcol/queue
+    create_directory: true
 
 service:
   extensions: [file_storage]
@@ -91,16 +93,18 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
     logs:
       receivers: [otlp]
       processors: [memory_limiter]
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
+
+The Collector user must be able to write to the `file_storage` directory; in a container, mount a persistent volume at `/var/lib/otelcol`.
 
 Replace the placeholders with values from your Dash0 account:
 - `<OTLP_ENDPOINT>`: copy the gRPC endpoint from [Settings → Endpoints → OTLP via gRPC](https://app.dash0.com/goto/settings/endpoints?endpoint_type=otlp_grpc) (e.g., `ingress.eu-west-1.aws.dash0.com:4317`).
@@ -111,7 +115,7 @@ Replace the placeholders with values from your Dash0 account:
 - **Processor ordering matters** — `memory_limiter` first in every pipeline.
 - **One pipeline per signal** — separate pipelines for traces, metrics, and logs.
 - **Memory safety is non-negotiable** — always configure `memory_limiter` in production.
-- **Every component must be in a pipeline** — declared but unused components cause startup failure.
+- **Every component must be in a pipeline** — declared but unused components are ignored without an error or warning.
 
 ## Resources
 

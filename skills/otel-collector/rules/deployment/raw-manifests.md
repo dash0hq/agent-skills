@@ -45,7 +45,7 @@ If you also need [RED metrics from traces](../red-metrics.md), place the `signal
 
 ## Configuring application pods for Collector enrichment
 
-For the `k8sattributes` processor to reliably identify which pod sent the telemetry, application pods must set `k8s.pod.uid` as a resource attribute.
+For the `k8s_attributes` processor to reliably identify which pod sent the telemetry, application pods must set `k8s.pod.uid` as a resource attribute.
 Use the Kubernetes downward API to expose pod metadata as environment variables, then pass them to the OpenTelemetry SDK via `OTEL_RESOURCE_ATTRIBUTES`.
 
 ```yaml
@@ -81,7 +81,7 @@ spec:
 ```
 
 `k8s.pod.uid` is the most critical attribute.
-The `k8sattributes` processor uses it to resolve all other Kubernetes metadata (namespace, deployment, labels) from the Kubernetes API.
+The `k8s_attributes` processor uses it to resolve all other Kubernetes metadata (namespace, deployment, labels) from the Kubernetes API.
 Without it, the processor falls back to connection IP matching, which is unreliable with service meshes.
 
 Set `k8s.container.name` manually — there is no downward API field for the container name.
@@ -327,7 +327,7 @@ Scale based on CPU utilization — the Collector is CPU-bound during serializati
 
 ### RBAC for Kubernetes attributes processor
 
-The `k8sattributes` processor needs read access to the Kubernetes API.
+The `k8s_attributes` processor needs read access to the Kubernetes API.
 Apply this RBAC configuration for both agent and gateway deployments.
 
 ```yaml
@@ -427,7 +427,7 @@ Add the `debug` exporter to the Collector ConfigMap to verify that the pipeline 
 exporters:
   debug:
     verbosity: detailed
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -436,16 +436,16 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, k8sattributes, resource]
-      exporters: [otlp, debug]
+      processors: [memory_limiter, resource_detection, k8s_attributes, resource]
+      exporters: [otlp_grpc, debug]
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, k8sattributes, resource]
-      exporters: [otlp, debug]
+      processors: [memory_limiter, resource_detection, k8s_attributes, resource]
+      exporters: [otlp_grpc, debug]
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, k8sattributes, resource]
-      exporters: [otlp, debug]
+      processors: [memory_limiter, resource_detection, k8s_attributes, resource]
+      exporters: [otlp_grpc, debug]
 ```
 
 Apply the updated ConfigMap, restart the Collector pods, and inspect the output:
@@ -467,7 +467,7 @@ docker compose logs -f otel-collector
 Run through this checklist after adding the `debug` exporter:
 
 1. **Resource attributes are present.**
-   Verify that `resourcedetection` and `k8sattributes` added the expected attributes (e.g., `host.name`, `k8s.namespace.name`, `k8s.deployment.name`).
+   Verify that `resource_detection` and `k8s_attributes` added the expected attributes (e.g., `host.name`, `k8s.namespace.name`, `k8s.deployment.name`).
    If attributes are missing, check detector configuration and RBAC permissions.
 2. **Resource attributes are consistent across signals.**
    Compare the resource attributes on a trace, a metric, and a log record from the same service.
@@ -499,7 +499,7 @@ If the Dash0 organization uses multiple [datasets](https://www.dash0.com/documen
 
 ```yaml
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -514,10 +514,10 @@ The debug exporter shows telemetry data, not outgoing headers — verify the hea
 - **Gateway without horizontal scaling.**
   A single gateway instance is a single point of failure.
   Always deploy gateways with at least 2 replicas and a HorizontalPodAutoscaler.
-- **DaemonSet with heavy processing (transforms, k8sattributes lookups).**
+- **DaemonSet with heavy processing (transforms, k8s_attributes lookups).**
   Heavy processing on every node wastes resources.
   Offload enrichment and transformation to a gateway Deployment.
-- **Missing RBAC for `k8sattributes`.**
+- **Missing RBAC for `k8s_attributes`.**
   The processor fails silently and does not enrich telemetry.
   Apply the ClusterRole and ClusterRoleBinding before deploying.
 - **No resource limits on Collector containers.**

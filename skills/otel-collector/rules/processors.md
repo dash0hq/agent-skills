@@ -35,8 +35,9 @@ processors:
 | `limit_mib` | Hard memory limit in MiB | Set to 80 percent of the container's memory limit |
 | `spike_limit_mib` | Soft limit margin for spike absorption | Set to 25 percent of `limit_mib` |
 
-When memory usage exceeds `limit_mib - spike_limit_mib`, the processor starts refusing data.
-When it exceeds `limit_mib`, the processor drops data to protect the process.
+When memory usage exceeds `limit_mib - spike_limit_mib`, the processor starts refusing data and returns a retryable error to the receiver.
+When it exceeds `limit_mib`, the processor also forces garbage collection.
+Refused data is lost only when the sender does not retry it.
 
 ```yaml
 # GOOD — memory_limiter first
@@ -44,22 +45,23 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection]
-      exporters: [otlp]
+      processors: [memory_limiter, resource_detection]
+      exporters: [otlp_grpc]
 
 # BAD — memory_limiter after other processors
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [resourcedetection, memory_limiter]
-      exporters: [otlp]
+      processors: [resource_detection, memory_limiter]
+      exporters: [otlp_grpc]
 ```
 
 ## Batching and the sending queue
 
 Do not use the `batch` processor.
-Configure batching at the exporter level using the `sending_queue` with persistent storage instead.
+The exporter does not batch unless you set `batch` in its `sending_queue`.
+Enable batching at the exporter level with `sending_queue: { batch: {} }`, and use persistent storage for the queue.
 
 The `batch` processor buffers telemetry in memory before export.
 When the Collector crashes or restarts, all buffered data is lost — there is no recovery mechanism.
@@ -70,7 +72,7 @@ See [exporters](./exporters.md#sending-queue) for `sending_queue` configuration 
 ```yaml
 # GOOD — exporter-level batching with persistent storage
 exporters:
-  otlp:
+  otlp_grpc:
     endpoint: <OTLP_ENDPOINT>
     headers:
       Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
@@ -79,6 +81,7 @@ exporters:
       num_consumers: 10
       queue_size: 5000
       storage: file_storage
+      batch: {}
 
 extensions:
   file_storage:
@@ -89,8 +92,8 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection]
-      exporters: [otlp]
+      processors: [memory_limiter, resource_detection]
+      exporters: [otlp_grpc]
 
 # BAD — batch processor loses all buffered data on crash
 processors:
@@ -102,20 +105,20 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, resourcedetection, batch]
-      exporters: [otlp]
+      processors: [memory_limiter, resource_detection, batch]
+      exporters: [otlp_grpc]
 ```
 
 ## Recommended processors
 
 ### Resource detection
 
-The `resourcedetection` processor auto-detects environment attributes (host, cloud provider, container runtime).
+The `resource_detection` processor auto-detects environment attributes (host, cloud provider, container runtime).
 Use it to enrich telemetry with infrastructure metadata without manual configuration.
 
 ```yaml
 processors:
-  resourcedetection:
+  resource_detection:
     detectors:
       - env
       - system
@@ -150,14 +153,14 @@ Only include detectors for your actual environment — unnecessary detectors add
 
 ### Kubernetes attributes
 
-The `k8sattributes` processor enriches telemetry with Kubernetes metadata by querying the Kubernetes API.
+The `k8s_attributes` processor enriches telemetry with Kubernetes metadata by querying the Kubernetes API.
 It matches incoming telemetry to a pod, then resolves namespace, deployment, node, labels, and other metadata automatically.
 
 For guidance on setting the `k8s.pod.uid` resource attribute in application SDKs, see [resource attributes](../../otel-instrumentation/rules/resources.md).
 
 ```yaml
 processors:
-  k8sattributes:
+  k8s_attributes:
     auth_type: serviceAccount
     passthrough: false
     extract:
@@ -232,14 +235,14 @@ See [raw manifests](./deployment/raw-manifests.md) for the required pod spec con
 | Passthrough | `passthrough: true` | A downstream Collector (e.g., a gateway) performs the lookup |
 
 Use `passthrough: false` for gateway deployments and for standalone agent deployments that export directly to a backend.
-Use `passthrough: true` only for agent (DaemonSet) deployments that forward to a downstream gateway where `k8sattributes` runs with `passthrough: false`.
+Use `passthrough: true` only for agent (DaemonSet) deployments that forward to a downstream gateway where `k8s_attributes` runs with `passthrough: false`.
 
 In passthrough mode, the processor adds the pod's IP to the telemetry resource without performing any API lookup.
 The downstream gateway then uses that IP (or `k8s.pod.uid`) to resolve the full Kubernetes metadata.
 
 ### RBAC requirements
 
-The `k8sattributes` processor requires a `ServiceAccount` with read access to pods, namespaces, replicasets, and other workload resources.
+The `k8s_attributes` processor requires a `ServiceAccount` with read access to pods, namespaces, replicasets, and other workload resources.
 Without the correct RBAC, the processor fails silently and telemetry is not enriched.
 See [raw manifests](./deployment/raw-manifests.md) for the required ClusterRole and ClusterRoleBinding.
 
@@ -323,7 +326,7 @@ Common redaction tasks:
 
 Use the `filter` processor to drop entire telemetry records that contain data which cannot be safely redacted (e.g., private keys in log bodies).
 
-Place redaction processors **after** enrichment processors (`resourcedetection`, `k8sattributes`, `resource`) and **before** exporters in the pipeline.
+Place redaction processors **after** enrichment processors (`resource_detection`, `k8s_attributes`, `resource`) and **before** exporters in the pipeline.
 Redaction must run after all attributes have been set.
 
 For OTTL expressions and complete configuration examples, see the [redacting sensitive data](../../otel-ottl/rules/redaction.md) rule in the `otel-ottl` skill.
@@ -334,12 +337,12 @@ For application-level prevention (the first line of defence), see [sensitive dat
 Follow this numbered decision process to determine processor order in a pipeline:
 
 1. **First**: `memory_limiter` — always first to apply backpressure before memory is allocated.
-2. **Second**: `resourcedetection` and `k8sattributes` — enrich telemetry with metadata early so downstream processors can use it.
+2. **Second**: `resource_detection` and `k8s_attributes` — enrich telemetry with metadata early so downstream processors can use it.
 3. **Third**: `resource` — set static attributes after auto-detection to override or supplement detected values.
 4. **Fourth**: Redaction processors (`transform/redact-*`, `filter/drop-sensitive-*`) — remove or mask sensitive data before export.
 5. **Fifth**: Other transform and filter processors — modify or drop telemetry based on enriched attributes.
 
-Batching is handled by the exporter's `sending_queue`, not by a processor.
+Batching is handled by the exporter's `sending_queue` (`batch: {}`), not by a processor.
 See [batching and the sending queue](#batching-and-the-sending-queue).
 
 ```yaml
@@ -350,13 +353,13 @@ service:
       receivers: [otlp]
       processors:
         - memory_limiter
-        - resourcedetection
-        - k8sattributes
+        - resource_detection
+        - k8s_attributes
         - resource
         - transform/redact-headers
         - filter/drop-outdated-http-metrics
         - transform
-      exporters: [otlp]
+      exporters: [otlp_grpc]
 ```
 
 ## Anti-patterns
@@ -367,8 +370,8 @@ service:
 - **Using the `batch` processor in production.**
   The batch processor buffers data in memory with no persistence.
   A Collector crash or restart loses all buffered telemetry.
-  Use the exporter's `sending_queue` with `storage: file_storage` instead.
-- **`k8sattributes` without RBAC.**
+  Use `sending_queue: { batch: {} }` with `storage: file_storage` on the exporter instead.
+- **`k8s_attributes` without RBAC.**
   The processor fails silently and telemetry is not enriched.
   Ensure the Collector's ServiceAccount has the required ClusterRole.
 - **Relying solely on connection IP for pod association.**
@@ -380,7 +383,7 @@ service:
 - **Missing `k8s.cluster.name` in multi-cluster deployments.**
   Identical workloads across clusters produce indistinguishable telemetry.
   Set `k8s.cluster.name` (and `k8s.cluster.uid`) in the `resource` processor.
-- **`resourcedetection` with `override: true` overwriting SDK attributes.**
+- **`resource_detection` with `override: true` overwriting SDK attributes.**
   Application-set attributes like `service.name` get replaced with auto-detected values (often `unknown_service`).
   Set `override: false` unless you intentionally want to replace SDK-set attributes.
 - **Overwriting service identity in the `resource` processor.**

@@ -33,6 +33,7 @@
   <properties>
     <java.version>21</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <tomcat.version>11.0.27</tomcat.version>
   </properties>
 
   <dependencies>

@@ -49,6 +49,10 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 - **Use canonical component names.**
   Write `otlp_grpc`, `otlp_http`, `load_balancing`, `span_metrics`, `log_dedup`, `signal_to_metrics`, `k8s_attributes`, and `resource_detection` as config keys.
   The older names `otlp` (exporter only), `otlphttp`, `loadbalancing`, `spanmetrics`, `logdedup`, `signaltometrics`, `k8sattributes`, and `resourcedetection` still work as deprecated aliases and log a deprecation warning at startup.
+- **Run Collector v0.153.0 or later.**
+  The configs in this skill need it: `load_balancing` and `resource_detection` exist only from v0.153.0, and `sending_queue.batch: {}` only from v0.138.0.
+  An older Collector rejects them at startup with `unknown type` or `'sending_queue' has invalid keys: batch`.
+  When you pin an image, pin the version the examples are written against, v0.156.0.
 - **Memory safety is non-negotiable.**
   Always configure `memory_limiter` in production.
   Without it, a burst of telemetry can cause the Collector to OOM and crash.

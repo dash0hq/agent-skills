@@ -56,7 +56,7 @@ metadata:
   namespace: otel
 spec:
   mode: daemonset
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:0.120.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:0.156.0
   resources:
     limits:
       cpu: 500m
@@ -127,7 +127,7 @@ metadata:
 spec:
   mode: deployment
   replicas: 2
-  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:0.120.0
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:0.156.0
   resources:
     limits:
       cpu: "2"

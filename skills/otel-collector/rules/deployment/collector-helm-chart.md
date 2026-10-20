@@ -243,7 +243,7 @@ It includes the Kubernetes-specific components (`k8s_attributes`, `kubeletstats`
 | Contrib | `otel/opentelemetry-collector-contrib` | You need components not in the K8s distribution |
 | Core | `otel/opentelemetry-collector` | Minimal footprint, no contrib components needed |
 
-Pin the image tag to a specific version in production (e.g., `tag: "0.120.0"`).
+Pin the image tag to a specific version in production (e.g., `tag: "0.156.0"`).
 Do not use `latest`.
 
 ### Memory management

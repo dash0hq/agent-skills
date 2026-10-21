@@ -52,7 +52,7 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 - **Run Collector v0.153.0 or later.**
   The configs in this skill need it: `load_balancing` and `resource_detection` exist only from v0.153.0, and `sending_queue.batch: {}` only from v0.138.0.
   An older Collector rejects them at startup: `unknown type` for a new name, and for `batch: {}` either `'sending_queue' has invalid keys: batch` or `` `batch` supports only `items` or `bytes` sizer ``.
-  When you pin an image, pin the version the examples are written against, v0.156.0.
+  When you pin an image, pin the version the examples are written against, v0.163.1.
 - **Memory safety is non-negotiable.**
   Always configure `memory_limiter` in production.
   Without it, a burst of telemetry can cause the Collector to OOM and crash.

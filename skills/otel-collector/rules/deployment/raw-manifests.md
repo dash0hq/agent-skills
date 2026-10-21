@@ -524,7 +524,7 @@ The debug exporter shows telemetry data, not outgoing headers — verify the hea
   Without limits, a misbehaving Collector consumes all node resources.
   Always set CPU and memory requests and limits.
 - **Using `latest` image tag in production.**
-  Pin the Collector image to a specific version (e.g., `otel/opentelemetry-collector-contrib:0.156.0`) for reproducible deployments.
+  Pin the Collector image to a specific version (e.g., `otel/opentelemetry-collector-contrib:0.163.1`) for reproducible deployments.
 
 ## References
 

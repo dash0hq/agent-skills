@@ -81,6 +81,7 @@ All environment variables that control the SDK behavior:
 | `OTEL_TRACES_EXPORTER` | Yes | `none` | **Must set to `otlp`** to export traces |
 | `OTEL_METRICS_EXPORTER` | No | `none` | Set to `otlp` to export metrics |
 | `OTEL_LOGS_EXPORTER` | No | `none` | Set to `otlp` to export logs |
+| `OTEL_TRACES_SAMPLER` | Yes | `parentbased_always_on` | **Set to `always_on`** — the default lets callers switch off tracing, see [sampling](../spans.md#sampling) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4318` | OTLP collector endpoint |
 | `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `http/protobuf` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
@@ -153,6 +154,7 @@ export OTEL_SERVICE_NAME="my-service"
 
 # Enable exporters (required!)
 export OTEL_TRACES_EXPORTER="otlp"
+export OTEL_TRACES_SAMPLER="always_on"
 export OTEL_METRICS_EXPORTER="otlp"
 export OTEL_LOGS_EXPORTER="otlp"
 
@@ -173,6 +175,7 @@ Many PHP frameworks (e.g., Laravel, Symfony) support `.env` files natively.
 OTEL_PHP_AUTOLOAD_ENABLED=true
 OTEL_SERVICE_NAME=my-service
 OTEL_TRACES_EXPORTER=otlp
+OTEL_TRACES_SAMPLER=always_on
 OTEL_METRICS_EXPORTER=otlp
 OTEL_LOGS_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
@@ -188,6 +191,7 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_AUTH_TOKEN
 OTEL_PHP_AUTOLOAD_ENABLED=true \
 OTEL_SERVICE_NAME="my-service" \
 OTEL_TRACES_EXPORTER="otlp" \
+OTEL_TRACES_SAMPLER="always_on" \
 OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf" \
 OTEL_EXPORTER_OTLP_ENDPOINT="https://<OTLP_ENDPOINT>" \
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_AUTH_TOKEN" \

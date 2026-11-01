@@ -1,0 +1,71 @@
+{
+  "context": "Tests whether the agent produces a correct OpenTelemetry Collector configuration for the upstream Collector Lambda layer, rather than carrying over the long-lived Kubernetes Collector shape. The agent is expected to use the telemetryapi receiver and the decouple processor, omit memory_limiter and the persistent sending queue, package the configuration as a layer with the file at the archive root, and set the Python-specific wrapper and config URI variables on the function.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "decouple processor in every pipeline",
+      "description": "The decouple processor is declared under processors AND appears in the traces, metrics, and logs pipelines; this is what stops the export from being billed inside the invocation and is the fix for the 400 ms latency regression described in the task",
+      "max_score": 12
+    },
+    {
+      "name": "No memory_limiter, sending_queue, or file_storage",
+      "description": "The configuration does NOT include a memory_limiter processor, a sending_queue block, or a file_storage extension; none of these belong in the Lambda Collector build, where there is no durable filesystem and a queue not drained before the freeze is lost",
+      "max_score": 12
+    },
+    {
+      "name": "telemetryapi receiver for traces and logs",
+      "description": "The telemetryapi receiver is declared and wired into the traces and logs pipelines so Lambda platform events and function logs are collected",
+      "max_score": 11
+    },
+    {
+      "name": "Python wrapper path",
+      "description": "AWS_LAMBDA_EXEC_WRAPPER is set to /opt/otel-instrument, the Python value; /opt/otel-handler (Node.js, Java, Ruby) or /opt/wrapper (the Dash0 extension) is wrong for this runtime",
+      "max_score": 11
+    },
+    {
+      "name": "OPENTELEMETRY_COLLECTOR_CONFIG_URI points at the layer path",
+      "description": "OPENTELEMETRY_COLLECTOR_CONFIG_URI is set, and its value matches where the configuration is actually placed — /opt/otel-collector-config.yaml when published as a layer, /var/task/... when bundled, or an s3:// URI when loaded from S3",
+      "max_score": 10
+    },
+    {
+      "name": "Configuration zipped at archive root",
+      "description": "deploy.sh zips otel-collector-config.yaml at the root of the archive, not inside a subdirectory, so it unpacks to /opt/otel-collector-config.yaml rather than /opt/<subdir>/otel-collector-config.yaml",
+      "max_score": 10
+    },
+    {
+      "name": "Both instrumentation and collector layers attached",
+      "description": "README.md and deploy.sh show the function receiving the upstream Python instrumentation layer, the upstream Collector layer, AND the configuration layer; omitting the Collector layer or the instrumentation layer does not count",
+      "max_score": 10
+    },
+    {
+      "name": "Collector layer matches x86_64",
+      "description": "The Collector layer ARN names the amd64 build (opentelemetry-collector-amd64-...), matching the function's x86_64 architecture, rather than arm64",
+      "max_score": 8
+    },
+    {
+      "name": "No hardcoded token",
+      "description": "The Authorization header references the token through ${env:DASH0_AUTH_TOKEN} rather than a literal value, and no literal token appears in any produced file",
+      "max_score": 8
+    },
+    {
+      "name": "Dash0-Dataset header set",
+      "description": "The OTLP exporter sets a Dash0-Dataset header with the value media-pipeline, so telemetry does not land in the default dataset",
+      "max_score": 8
+    },
+    {
+      "name": "Three separate signal pipelines",
+      "description": "service.pipelines defines distinct traces, metrics, and logs pipelines, all exporting to the Dash0 OTLP exporter at ingress.eu-west-1.aws.dash0.com:4317",
+      "max_score": 7
+    },
+    {
+      "name": "No Dash0-specific Lambda layer",
+      "description": "The solution does not substitute the Dash0 Lambda Extension (account 115813213817) for the upstream layers, since the task requires the vendor-neutral upstream path with a Collector the second team can fan out from",
+      "max_score": 6
+    },
+    {
+      "name": "No handler code instrumentation",
+      "description": "The solution does not add OpenTelemetry SDK bootstrap code or any import hook to the function source; the layers do the instrumentation",
+      "max_score": 6
+    }
+  ]
+}

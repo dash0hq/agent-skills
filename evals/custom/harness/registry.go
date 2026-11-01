@@ -39,19 +39,21 @@ type RuleClassification struct {
 // skill. The registry test enforces that this map stays complete against the
 // real skills/ tree.
 var defaultRuleClassification = map[string]RuleClassification{
-	// otel-instrumentation — dedicated: the 10 SDK files and the Kubernetes
-	// platform file.
-	"skills/otel-instrumentation/rules/sdks/browser.md":  {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/dotnet.md":   {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/go.md":       {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/java.md":     {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/nextjs.md":   {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/nodejs.md":   {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/php.md":      {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/python.md":   {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/ruby.md":     {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/sdks/scala.md":    {Class: ClassificationDedicated},
-	"skills/otel-instrumentation/rules/platforms/k8s.md": {Class: ClassificationDedicated},
+	// otel-instrumentation — dedicated: the 10 SDK files and the platform files.
+	"skills/otel-instrumentation/rules/sdks/browser.md":                      {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/dotnet.md":                       {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/go.md":                           {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/java.md":                         {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/nextjs.md":                       {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/nodejs.md":                       {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/php.md":                          {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/python.md":                       {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/ruby.md":                         {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/scala.md":                        {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/platforms/k8s.md":                     {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/platforms/aws-lambda.md":              {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md":  {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md": {Class: ClassificationDedicated},
 	// otel-instrumentation — shared: cross-cutting files affect every SDK
 	// scenario.
 	"skills/otel-instrumentation/rules/capture-database-query-parameters.md": {Class: ClassificationShared},
@@ -65,9 +67,9 @@ var defaultRuleClassification = map[string]RuleClassification{
 	"skills/otel-instrumentation/rules/verify-dependencies.md":               {Class: ClassificationShared},
 	"skills/otel-instrumentation/rules/validation.md":                        {Class: ClassificationShared},
 
-	// otel-collector — dedicated: the pipeline file and the 4 deployment
-	// paths.
+	// otel-collector — dedicated: the pipeline file and the 5 deployment paths.
 	"skills/otel-collector/rules/pipelines.md":                         {Class: ClassificationDedicated},
+	"skills/otel-collector/rules/deployment/aws-lambda.md":             {Class: ClassificationDedicated},
 	"skills/otel-collector/rules/deployment/collector-helm-chart.md":   {Class: ClassificationDedicated},
 	"skills/otel-collector/rules/deployment/dash0-operator.md":         {Class: ClassificationDedicated},
 	"skills/otel-collector/rules/deployment/opentelemetry-operator.md": {Class: ClassificationDedicated},
@@ -103,9 +105,15 @@ var defaultRuleClassification = map[string]RuleClassification{
 // covered by a registered scenario nor listed here, so entries must be
 // removed as the scenarios land.
 var pendingScenarios = map[string]string{
-	// All dedicated rule files are covered by registered scenarios (U3-U6
-	// delivered the full matrix); the allowlist is empty and stays so unless
-	// a new dedicated rule file lands ahead of its scenario.
+	// The AWS Lambda rule files are covered by Tessl scenarios, which the Go
+	// harness does not run. A Go scenario needs a fixture that can deploy and
+	// invoke a real Lambda function; until that lands, these four are pending.
+	// The CDK projects under examples/lambda/ are the live check in the
+	// meantime, run by hand per CONTRIBUTING.md.
+	"skills/otel-instrumentation/rules/platforms/aws-lambda.md":              "lambda-fixture",
+	"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md":  "lambda-fixture",
+	"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md": "lambda-fixture",
+	"skills/otel-collector/rules/deployment/aws-lambda.md":                   "lambda-fixture",
 }
 
 // Paths that trigger a full-matrix run when changed: the plugin manifest

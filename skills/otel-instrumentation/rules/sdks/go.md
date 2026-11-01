@@ -17,6 +17,8 @@ Instrument Go applications to generate traces, logs, and metrics for deep insigh
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
+For Go functions running on AWS Lambda, follow this file for the provider setup and [AWS Lambda deployment](../platforms/aws-lambda.md#go) for the handler wrapping and end-of-invocation flush.
+
 ## Installation
 
 Go does not have a single auto-instrumentation package.

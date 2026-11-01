@@ -16,10 +16,11 @@ otel-collector/
     ├── pipelines.md      # Service section, per-signal config, connectors
     ├── deployment.md     # Agent vs gateway patterns, deployment method selection
     ├── deployment/
+    │   ├── aws-lambda.md              # Collector Lambda layer, decouple processor
     │   ├── collector-helm-chart.md    # Collector Helm chart
     │   ├── opentelemetry-operator.md  # OTel Operator and auto-instrumentation
-    │   ├── dash0-operator.md         # Dash0 Kubernetes Operator
-    │   └── raw-manifests.md         # DaemonSet, Deployment, RBAC, Docker Compose
+    │   ├── dash0-operator.md          # Dash0 Kubernetes Operator
+    │   └── raw-manifests.md           # DaemonSet, Deployment, RBAC, Docker Compose
     ├── sampling.md       # Head sampling, tail sampling, load balancing
     └── red-metrics.md    # Semconv-aligned RED metrics from traces
 ```
@@ -45,6 +46,7 @@ The skill activates automatically when working on Collector configuration tasks.
 | [deployment](./rules/deployment.md) | HIGH | Agent vs gateway patterns, deployment method selection |
 | [raw-manifests](./rules/deployment/raw-manifests.md) | HIGH | Raw Kubernetes manifests — DaemonSet, Deployment, RBAC, Docker Compose |
 | [dash0-operator](./rules/deployment/dash0-operator.md) | HIGH | Dash0 Kubernetes Operator — automated instrumentation and Collector management |
+| [aws-lambda](./rules/deployment/aws-lambda.md) | HIGH | AWS Lambda Collector layer — configuration layer, `telemetryapi` receiver, `decouple` processor |
 | [sampling](./rules/sampling.md) | HIGH | Head sampling, tail sampling, load balancing |
 | [red-metrics](./rules/red-metrics.md) | HIGH | Semconv-aligned RED metrics from traces |
 

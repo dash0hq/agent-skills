@@ -4,3 +4,4 @@
 # Older tessl CLI versions read .tileignore instead; keep both files in sync.
 evals/
 docs/
+examples/

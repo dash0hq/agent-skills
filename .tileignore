@@ -2,3 +2,4 @@
 # tile-to-plugin rename; keep both files in sync.
 evals/
 docs/
+examples/

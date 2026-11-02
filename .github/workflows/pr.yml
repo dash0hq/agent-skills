@@ -56,6 +56,16 @@ jobs:
           done
           exit $exit_code
 
+  validate-manifest-versions:
+    name: Validate manifest versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check that every manifest carries the same version
+        run: .github/scripts/manifest-versions.sh check
+
   validate-commits:
     name: Validate commit messages
     runs-on: ubuntu-latest

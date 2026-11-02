@@ -44,7 +44,7 @@ Update with `git -C ~/.agents/skills/dash0-agent-skills pull`.
 
 ## Copilot
 
-Copy skills into the cross-client discovery directory:
+Install the plugin, or copy the skills into the cross-client discovery directory:
 
 ```bash
 /plugin install https://github.com/dash0hq/agent-skills
@@ -52,10 +52,9 @@ Copy skills into the cross-client discovery directory:
 git clone https://github.com/dash0hq/agent-skills.git ~/.copilot/skills/dash0-agent-skills
 ```
 
-Copilot auto-discovers skills from `.copilot/skills/`.
-
-`plugin.json` at the repository root is the same plugin in the portable [Agent Plugins](https://agent-plugins.org/) format, which Copilot CLI and marketplaces in that format read.
+The `/plugin install` form reads `plugin.json` at the repository root, the portable [Agent Plugins](https://agent-plugins.org/) 1.0.0 manifest that Copilot CLI and marketplaces in that format consume; Copilot discovers the skills from `skills/` next to it.
 Its version follows the release tag.
+The `git clone` form skips the manifest: Copilot auto-discovers skills from `.copilot/skills/`.
 
 ## Cursor
 

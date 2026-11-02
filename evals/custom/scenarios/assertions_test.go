@@ -148,6 +148,20 @@ func TestNodeHTTPIncomingParents(t *testing.T) {
 		{name: "another service cannot supply the remote client", otherService: true, change: func(spans []spanSpec) []spanSpec {
 			return append(spans[:2], spans[3:]...)
 		}, wantError: "no outbound CLIENT"},
+		{name: "unsampled parent dropped by parentbased_always_on", change: func(spans []spanSpec) []spanSpec {
+			return spans[:4]
+		}, wantError: "continuing the unsampled remote parent"},
+		{name: "unsampled parent recorded under another trace", change: func(spans []spanSpec) []spanSpec {
+			spans[4].traceID = decode("99999999999999999999999999999999")
+			return spans
+		}, wantError: "continuing the unsampled remote parent"},
+		{name: "unsampled parent recorded with the wrong parent", change: func(spans []spanSpec) []spanSpec {
+			spans[4].parentSpanID = decode("9999999999999999")
+			return spans
+		}, wantError: "has parent"},
+		{name: "another service cannot supply the unsampled server", otherService: true, change: func(spans []spanSpec) []spanSpec {
+			return spans[:4]
+		}, wantError: "continuing the unsampled remote parent"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sink := otelsink.Start(t)
@@ -159,13 +173,15 @@ func TestNodeHTTPIncomingParents(t *testing.T) {
 			outbound.traceID, outbound.spanID, outbound.parentSpanID = remote.traceID, decode("8888888888888888"), remote.spanID
 			rootClient := clientSpan(map[string]string{"http.request.method": "GET"})
 			rootClient.traceID, rootClient.spanID, rootClient.parentSpanID = root.traceID, decode("1111111111111111"), root.spanID
-			spans := []spanSpec{root, remote, outbound, rootClient}
+			unsampled := serverSpan(map[string]string{"http.request.method": "GET", "url.path": "/checkout"})
+			unsampled.traceID, unsampled.spanID, unsampled.parentSpanID = decode(unsampledTraceID), decode("2222222222222222"), decode(unsampledParentID)
+			spans := []spanSpec{root, remote, outbound, rootClient, unsampled}
 			if tc.change != nil {
 				spans = tc.change(spans)
 			}
 			feedSpans(t, sink, map[string]string{"service.name": NodeServiceName}, spans...)
 			if tc.otherService {
-				feedSpans(t, sink, map[string]string{"service.name": "TEST-other-service"}, remote, outbound)
+				feedSpans(t, sink, map[string]string{"service.name": "TEST-other-service"}, remote, outbound, unsampled)
 			}
 			err := NodeHTTP().Assert(t, sink)
 			if tc.wantError == "" {

@@ -39,6 +39,8 @@ When memory usage exceeds `limit_mib - spike_limit_mib`, the processor starts re
 When it exceeds `limit_mib`, the processor also forces garbage collection.
 Refused data is lost only when the sender does not retry it.
 
+AWS Lambda is the one exception: omit `memory_limiter` there and use `decouple` instead — see [AWS Lambda Collector layer](./deployment/aws-lambda.md#how-this-differs-from-the-standard-collector-guidance).
+
 ```yaml
 # GOOD — memory_limiter first
 service:

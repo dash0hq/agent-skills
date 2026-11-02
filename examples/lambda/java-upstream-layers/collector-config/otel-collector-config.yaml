@@ -1,0 +1,48 @@
+# Configuration for the opentelemetry-lambda Collector layer.
+#
+# This file must sit at the ROOT of the layer archive. AWS unpacks layers into /opt, so a file
+# zipped inside a subdirectory lands at /opt/<subdir>/otel-collector-config.yaml and the Collector
+# silently falls back to its default configuration. CDK zips the *contents* of the asset directory,
+# and this directory contains nothing but this file, so the archive has it at the root.
+#
+# Values are injected through the Collector's ${env:...} expansion from environment variables set on
+# the function, so no endpoint, dataset, or token is baked into the layer.
+receivers:
+  telemetryapi:
+  otlp:
+    protocols:
+      grpc:
+        # localhost, never 0.0.0.0: only the instrumentation layer in the same execution
+        # environment connects to this receiver.
+        endpoint: "localhost:4317"
+      http:
+        endpoint: "localhost:4318"
+
+processors:
+  # Returns control to the function immediately and lets the export finish before the extension
+  # signals that the execution environment can freeze. Required in every pipeline.
+  decouple:
+
+exporters:
+  # The exporter type is `otlp_grpc` -- the OTLP/gRPC exporter. `/dash0` is just the instance name.
+  otlp_grpc/dash0:
+    endpoint: ${env:DASH0_OTLP_GRPC_ENDPOINT}
+    headers:
+      Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
+      Dash0-Dataset: ${env:DASH0_DATASET}
+
+service:
+  pipelines:
+    traces:
+      receivers: [telemetryapi, otlp]
+      processors: [decouple]
+      exporters: [otlp_grpc/dash0]
+    metrics:
+      # telemetryapi metrics are at Development stability, so this pipeline takes otlp only.
+      receivers: [otlp]
+      processors: [decouple]
+      exporters: [otlp_grpc/dash0]
+    logs:
+      receivers: [telemetryapi, otlp]
+      processors: [decouple]
+      exporters: [otlp_grpc/dash0]

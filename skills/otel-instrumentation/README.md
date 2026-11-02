@@ -14,6 +14,11 @@ otel-instrumentation/
     ├── resources.md      # Resource attributes
     ├── metrics.md        # Instrument types, naming, cardinality
     ├── logs.md           # Structured logging, severity, trace correlation
+    ├── platforms/
+    │   ├── k8s.md                      # Kubernetes deployment — downward API, pod spec
+    │   ├── aws-lambda.md               # AWS Lambda — decision process, Go/.NET, shared rules
+    │   ├── aws-lambda-otel-layers.md   # Path A — upstream OTel layers
+    │   └── aws-lambda-dash0-layers.md  # Path B — Dash0 Lambda Extension
     └── sdks/
         ├── nodejs.md     # Node.js instrumentation
         ├── go.md         # Go instrumentation
@@ -44,6 +49,10 @@ The skill activates automatically when working on observability tasks.
 | [resources](./rules/resources.md) | CRITICAL | Resource attributes - service identity, environment, Kubernetes |
 | [metrics](./rules/metrics.md) | CRITICAL | Instrument types, naming, units, cardinality |
 | [logs](./rules/logs.md) | CRITICAL | Structured logging, severity, trace correlation |
+| [k8s](./rules/platforms/k8s.md) | HIGH | Kubernetes deployment — downward API, pod spec |
+| [aws-lambda](./rules/platforms/aws-lambda.md) | HIGH | AWS Lambda deployment — decision process, manual SDK for Go and .NET, resource attributes, validation |
+| [aws-lambda-otel-layers](./rules/platforms/aws-lambda-otel-layers.md) | HIGH | Path A — upstream OTel layers, wrapper paths, per-runtime instrumentation tuning |
+| [aws-lambda-dash0-layers](./rules/platforms/aws-lambda-dash0-layers.md) | HIGH | Path B — Dash0 Lambda Extension, `DASH0_*` variables, collection modes |
 | [nodejs](./rules/sdks/nodejs.md) | HIGH | Node.js auto-instrumentation setup |
 | [go](./rules/sdks/go.md) | HIGH | Go instrumentation setup |
 | [python](./rules/sdks/python.md) | HIGH | Python auto-instrumentation setup |

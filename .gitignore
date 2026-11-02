@@ -22,5 +22,12 @@ evals/custom/fixtures/*/obj/
 evals/custom/fixtures/*/target/
 evals/custom/fixtures/*/vendor/
 
+# CDK and build artifacts of the AWS Lambda example projects.
+examples/lambda/*/cdk.out/
+examples/lambda/*/build/
+examples/lambda/*/**/obj/
+examples/lambda/*/**/target/
+examples/lambda/*/*.zip
+
 # npm: the package has no dependencies; a stray npm install must not commit a lockfile.
 package-lock.json

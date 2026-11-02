@@ -1,0 +1,27 @@
+{
+  "name": "java-dash0-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AWS CDK example: Java Lambda instrumented with the Dash0 Lambda Extension layer",
+  "bin": {
+    "java-dash0-extension": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "aws-cdk": "^2.1146.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.275.0",
+    "constructs": "^10.8.1"
+  }
+}

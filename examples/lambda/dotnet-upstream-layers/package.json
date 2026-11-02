@@ -1,0 +1,25 @@
+{
+  "name": "dotnet-upstream-layers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK example: a .NET Lambda function instrumented with the OpenTelemetry .NET SDK, exporting to the upstream OpenTelemetry Collector Lambda layer.",
+  "bin": {
+    "dotnet-upstream-layers": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "publish:function": "dotnet publish lambda/Dash0DotnetDemo/Dash0DotnetDemo.csproj -c Release -r linux-arm64 --self-contained false -o lambda/Dash0DotnetDemo/publish"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "aws-cdk": "^2.1146.1",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.9.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.275.0",
+    "constructs": "^10.0.0"
+  }
+}

@@ -32,6 +32,56 @@ const (
 	sampledTraceparent = "00-" + sampledTraceID + "-" + sampledParentID + "-01"
 )
 
+// The same W3C identifiers for the unsampled probe: identical shape, sampled
+// flag cleared. A default `parentbased_always_on` sampler drops the resulting
+// server span; the `always_on` sampler the skill prescribes records it.
+const (
+	unsampledTraceID     = "cccccccccccccccccccccccccccccccc"
+	unsampledParentID    = "dddddddddddddddd"
+	unsampledTraceparent = "00-" + unsampledTraceID + "-" + unsampledParentID + "-00"
+)
+
+// assertUnsampledParentRecorded requires a SERVER span for GET /checkout that
+// continues the unsampled remote parent. This is the only assertion in the
+// suite that distinguishes the samplers: it fails under the SDK default
+// (`parentbased_always_on`, which honors the cleared sampled flag and drops
+// the span) and passes only when the application overrides the sampler to
+// `always_on` as skills/otel-instrumentation/rules/spans.md prescribes.
+func assertUnsampledParentRecorded(serviceName string) harness.Assertion {
+	return func(t *testing.T, sink *otelsink.Sink) error {
+		spans := sink.Traces(t).WithResourceAttribute("service.name", serviceName).Spans()
+		for _, sv := range spans {
+			span := sv.Span
+			if span.GetKind() != tracepb.Span_SPAN_KIND_SERVER ||
+				fmt.Sprintf("%x", span.GetTraceId()) != unsampledTraceID ||
+				attrValue(span.GetAttributes(), httpMethodAttributes...) != "GET" ||
+				!spanReferencesPath(span, "/checkout") {
+				continue
+			}
+			if parent := fmt.Sprintf("%x", span.GetParentSpanId()); parent != unsampledParentID {
+				return fmt.Errorf("SERVER span in unsampled trace has parent %q, want %q", parent, unsampledParentID)
+			}
+			return nil
+		}
+		return fmt.Errorf("no SERVER span for GET /checkout continuing the unsampled remote parent %s: "+
+			"the application honored the incoming sampled=0 flag instead of overriding the sampler to always_on",
+			unsampledTraceID)
+	}
+}
+
+// assertAll runs assertions in order and returns the first failure, so a
+// scenario can carry more than 1 independent requirement.
+func assertAll(assertions ...harness.Assertion) harness.Assertion {
+	return func(t *testing.T, sink *otelsink.Sink) error {
+		for _, assert := range assertions {
+			if err := assert(t, sink); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 // assertInboundParentHTTPTraces preserves the root-request check while also
 // requiring the exact sampled remote parent. Both cases are independent of
 // whether the application uses AlwaysOn or ParentBased(root=AlwaysOn).

@@ -53,6 +53,7 @@ All environment variables that control the SDK behavior:
 | `OTEL_TRACES_EXPORTER` | Yes | `none` | **Must set to `otlp`** to export traces |
 | `OTEL_METRICS_EXPORTER` | No | `none` | Set to `otlp` to export metrics |
 | `OTEL_LOGS_EXPORTER` | No | `none` | Set to `otlp` to export logs |
+| `OTEL_TRACES_SAMPLER` | Yes | `parentbased_always_on` | **Set to `always_on`** — the default lets callers switch off tracing, see [sampling](../spans.md#sampling) |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Yes | `http://localhost:4318` | OTLP collector endpoint |
 | `OTEL_EXPORTER_OTLP_HEADERS` | No | - | Headers for authentication (e.g., `Authorization=Bearer TOKEN`) |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `http/protobuf` | Protocol: `grpc`, `http/protobuf`, or `http/json` |
@@ -68,6 +69,7 @@ On the NuGet SDK path (programmatic setup), code wiring wins: the SDK packages d
 | Variable | Zero-code path | NuGet path |
 |----------|----------------|------------|
 | `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER` | Select exporters | Inert — exporters are selected in code |
+| `OTEL_TRACES_SAMPLER` | Selects the sampler | Set the sampler in code with `.SetSampler(new AlwaysOnSampler())` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_EXPORTER_OTLP_PROTOCOL` | Apply | Apply — the OTLP exporter reads them |
 | `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | Apply | Apply — the SDK default resource reads them |
 
@@ -140,6 +142,7 @@ export OTEL_SERVICE_NAME="my-service"
 
 # Enable exporters (required!)
 export OTEL_TRACES_EXPORTER="otlp"
+export OTEL_TRACES_SAMPLER="always_on"
 export OTEL_METRICS_EXPORTER="otlp"
 export OTEL_LOGS_EXPORTER="otlp"
 
@@ -211,6 +214,7 @@ using OpenTelemetry;
 using OpenTelemetry.Trace;
 
 var builder = Sdk.CreateTracerProviderBuilder()
+    .SetSampler(new AlwaysOnSampler())
     .AddSource("MyService");
 
 // OTEL_TRACES_EXPORTER cannot switch exporters here; use your own variable.
@@ -518,6 +522,7 @@ For non-host applications (console apps, workers), dispose the providers explici
 
 ```csharp
 var tracerProvider = Sdk.CreateTracerProviderBuilder()
+    .SetSampler(new AlwaysOnSampler())
     .AddOtlpExporter()
     .Build();
 

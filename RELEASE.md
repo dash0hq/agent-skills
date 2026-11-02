@@ -36,6 +36,8 @@ The release workflow re-checks this and publishes with `npm publish --provenance
 The trusted publisher configured on npmjs.com for `@dash0/agent-skills` is pinned to `publish-npm.yml` in this repository.
 npm allows one trusted publisher per package and validates the top-level workflow's filename, so `release.yml` dispatches `publish-npm.yml` (rather than calling it as a reusable workflow) to keep it the single entry point for both the release path and the manual-retry path.
 The workflow also bumps the `version` field in `package.json` and in the root `plugin.json`, the Agent Plugins manifest (bare semver, no `v` prefix), alongside the plugin manifests.
+Both the bump and that rule live in [.github/scripts/manifest-versions.sh](.github/scripts/manifest-versions.sh), which owns the manifest list: the release workflow runs `manifest-versions.sh set <tag>`, and the `Validate manifest versions` job in `pr.yml` runs `manifest-versions.sh check` to fail a pull request whose manifests disagree.
+Run `.github/scripts/manifest-versions.sh check` locally after editing a manifest by hand, and add new manifests to the lists at the top of that script rather than to the workflows.
 
 The Claude Code plugin, the Cursor plugin, and the Gemini CLI extension install by cloning this repository.
 Neither `.claude-plugin/plugin.json` nor `gemini-extension.json` supports an include or exclude field, and no ignore-file mechanism exists for those installers (verified against the [Claude Code plugin reference](https://code.claude.com/docs/en/plugins-reference) and the [Gemini CLI extension reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md) as of 2026-07).

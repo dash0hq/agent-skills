@@ -125,19 +125,11 @@ jobs:
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          for manifest in ".claude-plugin/plugin.json" ".cursor-plugin/plugin.json" "gemini-extension.json" ".tessl-plugin/plugin.json"; do
-            jq ".version = \"${TAG}\"" "${manifest}" > "${manifest}.tmp"
-            mv "${manifest}.tmp" "${manifest}"
-            git add "${manifest}"
-          done
-
-          # npm requires bare semver (no leading v); the Agent Plugins manifest
-          # (plugin.json at the root) follows the same convention.
-          for manifest in "package.json" "plugin.json"; do
-            jq ".version = \"${TAG#v}\"" "${manifest}" > "${manifest}.tmp"
-            mv "${manifest}.tmp" "${manifest}"
-            git add "${manifest}"
-          done
+          # The script owns the manifest list and the per-manifest spelling of
+          # the version; the "Validate manifest versions" job in pr.yml checks
+          # the same list.
+          .github/scripts/manifest-versions.sh set "${TAG}"
+          .github/scripts/manifest-versions.sh paths | xargs git add --
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

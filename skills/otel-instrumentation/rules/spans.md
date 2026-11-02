@@ -473,10 +473,11 @@ tp := sdktrace.NewTracerProvider(
 <!-- eval:fragment -->
 ```javascript
 // Node.js
-import { NodeSDK, tracing } from '@opentelemetry/sdk-node';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { AlwaysOnSampler } from '@opentelemetry/sdk-trace';
 
 const sdk = new NodeSDK({
-  sampler: new tracing.AlwaysOnSampler(),
+  sampler: new AlwaysOnSampler(),
   traceExporter,
 });
 ```

@@ -157,22 +157,25 @@ init({
 ### Customization
 
 ```javascript
-// Add custom attributes
-import { addAttributes } from '@dash0/sdk-web';
-addAttributes({ 'user.tier': 'premium' });
+// Add custom attributes, one name and value per call
+import { addSignalAttribute } from '@dash0/sdk-web';
+addSignalAttribute('user.tier', 'premium');
 
 // Identify users
-import { setUser } from '@dash0/sdk-web';
-setUser({ id: 'user-123' });
+import { identify } from '@dash0/sdk-web';
+identify('user-123');
 
 // Report custom errors
 import { reportError } from '@dash0/sdk-web';
 reportError(new Error('Custom error'));
 
-// Send custom events
+// Send custom events, with attributes nested under `attributes`
 import { sendEvent } from '@dash0/sdk-web';
-sendEvent('checkout.completed', { order_id: '123' });
+sendEvent('checkout.completed', { attributes: { 'order.id': '123' } });
 ```
+
+`addSignalAttribute` applies to signals transmitted after the call.
+To attach attributes to the signals of the initial page load, pass `additionalSignalAttributes` to `init()` instead.
 
 ### Resources
 

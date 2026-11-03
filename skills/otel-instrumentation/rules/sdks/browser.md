@@ -71,25 +71,111 @@ Auto-instrumentation captures without code modifications:
 - User sessions
 - JavaScript errors and promise rejections
 
+### Session replay
+
+Session replay is opt-in.
+The `init()` call shown above does not start it, because the `@dash0/sdk-web` bundle contains no recorder: the recorder ships as the separate `@dash0/sdk-web/session-recording` entry point.
+
+Session replay records the DOM of every page a visitor sees, so turning it on widens what the site collects about its visitors beyond what browser instrumentation alone collects.
+Decide whether to enable it from the request:
+
+| The request | Do this |
+| --- | --- |
+| Asks for session replay, session recording, or replay by name | Enable it, following the snippet below. |
+| Asks for browser instrumentation without mentioning session replay, and the user can be asked | Ask whether to enable session replay, and leave it off until the user answers. |
+| Asks for browser instrumentation without mentioning session replay, and the user cannot be asked | Leave it off, and report that it was left off and which snippet below enables it. |
+
+Never add a recorder as an unrequested extra while making an unrelated change to the SDK setup.
+
+Recording starts as soon as a recorder reaches the SDK through any one of these three routes:
+
+1. `sessionRecording.recorder` passed to `init()`.
+2. A `startSessionRecording(recorder)` call.
+3. A `dash0-session-recording.iife.js` script tag, which sets `window.dash0Recorder`.
+   `init()` picks that global up on its own, whatever the order in which the two scripts execute.
+
+To keep session replay off, use none of the three routes.
+Route 3 is the one that turns replay on without any `sessionRecording` configuration being visible in the `init()` call, so check the page's script tags, not just the SDK setup code.
+
+To verify which state a site is in, call `setActiveLogLevel('debug')` before `init()` and load the page.
+A running recorder logs `Session recording started` to the browser console.
+A configured recorder whose session fell outside `samplingRate` logs `Session recording will not start` instead, so treat that message as replay being enabled, not disabled.
+
+To enable session replay, pass the recorder to `init()`:
+
+```javascript
+import { init } from '@dash0/sdk-web';
+import { recorder } from '@dash0/sdk-web/session-recording';
+
+init({
+  serviceName: 'my-frontend',
+  endpoint: {
+    url: 'https://<OTLP_ENDPOINT>',
+    authToken: 'YOUR_AUTH_TOKEN',
+  },
+  sessionRecording: { recorder },
+});
+```
+
+Stop a running recording with `stopSessionRecording()`.
+Recording does not resume until `startSessionRecording()` is called again.
+
+#### Sampling and masking
+
+The `sessionRecording` settings below take effect only when a recorder is provided.
+Set them in the same `init()` call.
+
+| Setting | Default | Change it when |
+| --- | --- | --- |
+| `samplingRate` | `100` | Recording every session produces more replay data than the dataset should hold. Recorded sessions are always a subset of the sessions that transmit telemetry. |
+| `maskAllInputs` | `true` | Never set this to `false` unless no form on the page accepts personal or sensitive data. |
+| `maskTextSelector` | unset | The page renders personal data as text rather than in inputs. Use `"*"` to mask all text. |
+| `maskTextClass` | `"dash0-mask"` | The page already uses that class name for something else. |
+| `blockClass` | `"dash0-block"` | The page already uses that class name for something else. |
+| `blockSelector` | unset | Elements must not be recorded at all, including `<input type="hidden">` values, which `maskAllInputs` does not mask because they are element attributes. |
+| `recordCanvas` | `false` | The replay is useless without canvas content, and the added payload size is acceptable. |
+
+```javascript
+import { init } from '@dash0/sdk-web';
+import { recorder } from '@dash0/sdk-web/session-recording';
+
+init({
+  serviceName: 'my-frontend',
+  endpoint: {
+    url: 'https://<OTLP_ENDPOINT>',
+    authToken: 'YOUR_AUTH_TOKEN',
+  },
+  sessionRecording: {
+    recorder,
+    samplingRate: 10,
+    maskTextSelector: '.customer-name, .order-total',
+    blockSelector: '[data-pii]',
+  },
+});
+```
+
 ### Customization
 
 ```javascript
-// Add custom attributes
-import { addAttributes } from '@dash0/sdk-web';
-addAttributes({ 'user.tier': 'premium' });
+// Add custom attributes, one name and value per call
+import { addSignalAttribute } from '@dash0/sdk-web';
+addSignalAttribute('user.tier', 'premium');
 
 // Identify users
-import { setUser } from '@dash0/sdk-web';
-setUser({ id: 'user-123' });
+import { identify } from '@dash0/sdk-web';
+identify('user-123');
 
 // Report custom errors
 import { reportError } from '@dash0/sdk-web';
 reportError(new Error('Custom error'));
 
-// Send custom events
+// Send custom events, with attributes nested under `attributes`
 import { sendEvent } from '@dash0/sdk-web';
-sendEvent('checkout.completed', { order_id: '123' });
+sendEvent('checkout.completed', { attributes: { 'order.id': '123' } });
 ```
+
+`addSignalAttribute` applies to signals transmitted after the call.
+To attach attributes to the signals of the initial page load, pass `additionalSignalAttributes` to `init()` instead.
 
 ### Resources
 

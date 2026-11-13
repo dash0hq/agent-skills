@@ -17,6 +17,8 @@ Instrument .NET applications to generate traces, logs, and metrics for deep insi
 - **Database Performance**: Observe which database statements execute and measure their duration for optimization
 - **Error Detection**: Reveal uncaught errors and the context in which they happened
 
+For .NET functions running on AWS Lambda, there is no auto-instrumentation layer — follow this file for the SDK setup and [AWS Lambda deployment](../platforms/aws-lambda.md#net) for the Lambda-specific export path.
+
 ## Installation
 
 Download and run the auto-instrumentation install script:

@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether the agent instruments a ZIP-packaged Node.js AWS Lambda function for Dash0 using the Dash0 Lambda Extension layer, rather than reaching for SDK bootstrap code or the upstream OpenTelemetry collector layers. The agent is expected to edit a SAM template so the function gains the extension layer, the activating wrapper variable, dataset routing, a Secrets Manager based token, and a service identity distinct from the function name, while removing the conflicting X-Ray Active tracing mode.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Dash0 extension layer attached",
+      "description": "The function's Layers list includes a Dash0 Lambda Extension layer ARN for the Node.js runtime, of the shape arn:aws:lambda:<region>:115813213817:layer:dash0-extension-node:<version>, with a concrete version number",
+      "max_score": 12
+    },
+    {
+      "name": "AWS_LAMBDA_EXEC_WRAPPER set to /opt/wrapper",
+      "description": "The environment variables include AWS_LAMBDA_EXEC_WRAPPER with the exact value /opt/wrapper, which is what activates auto-instrumentation; a missing or different value (for example /opt/otel-handler, which belongs to the upstream layer) does not count",
+      "max_score": 12
+    },
+    {
+      "name": "Token supplied via Secrets Manager, never literal",
+      "description": "The token is supplied through DASH0_TOKEN_SECRET_ARN referencing the existing Dash0TokenSecret resource, and no literal token value and no DASH0_TOKEN variable holding a literal appears anywhere in the template",
+      "max_score": 12
+    },
+    {
+      "name": "No upstream collector or config layer",
+      "description": "The function does NOT additionally attach the upstream OpenTelemetry collector layer (account 184161586896) or a collector configuration layer, and does not set OPENTELEMETRY_COLLECTOR_CONFIG_URI, because the Dash0 extension exports directly",
+      "max_score": 10
+    },
+    {
+      "name": "X-Ray tracing changed to PassThrough",
+      "description": "The function's Tracing property is changed from Active to PassThrough, so the X-Ray SDK does not compete with OpenTelemetry for the trace context",
+      "max_score": 10
+    },
+    {
+      "name": "Service name is the service, not the function",
+      "description": "OTEL_SERVICE_NAME (or an equivalent service.name resource attribute) is set to parcel-tracking, NOT to TrackingLookupFunction or the Lambda function name",
+      "max_score": 10
+    },
+    {
+      "name": "DASH0_ENDPOINT set to an OTLP/HTTP ingress endpoint",
+      "description": "DASH0_ENDPOINT is set to a Dash0 OTLP/HTTP ingress URL such as https://ingress.eu-west-1.aws.dash0.com:4318, consistent with the eu-west-1 deployment region",
+      "max_score": 9
+    },
+    {
+      "name": "DASH0_DATASET set to production",
+      "description": "DASH0_DATASET is set to production, so telemetry does not land in the default dataset",
+      "max_score": 9
+    },
+    {
+      "name": "Secrets Manager read permission granted",
+      "description": "The function is granted permission to read the secret, for example through an AWSSecretsManagerGetSecretValuePolicy entry under Policies or an equivalent IAM statement scoped to the Dash0TokenSecret ARN",
+      "max_score": 8
+    },
+    {
+      "name": "Region-consistent layer ARN",
+      "description": "The layer ARN resolves to the function's deployment region, either through eu-west-1 written literally or through a substitution such as ${AWS::Region}; a hardcoded different region does not count",
+      "max_score": 7
+    },
+    {
+      "name": "No handler code instrumentation",
+      "description": "The solution does not add OpenTelemetry SDK bootstrap code, a tracer provider, a NodeSDK initialisation, or an --import/--require flag to the function source; the layer does the instrumentation",
+      "max_score": 7
+    },
+    {
+      "name": "Verification steps are invocation-based",
+      "description": "INSTRUMENTATION.md describes verifying by invoking the function and then checking the CloudWatch log group for extension output and/or confirming spans in Dash0, rather than only asserting that the template is correct",
+      "max_score": 6
+    }
+  ]
+}

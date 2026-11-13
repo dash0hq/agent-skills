@@ -108,6 +108,8 @@ Covers backend and browser instrumentation across multiple languages.
 **Rules covered:**
 - Telemetry (signal overview and correlation)
 - Resources (service identity, environment, Kubernetes attributes)
+- Kubernetes (downward API, pod spec, Collector enrichment)
+- AWS Lambda (upstream OTel layers, Dash0 Lambda Extension, wrappers, manual SDK)
 - Metrics (instrument types, naming, units, cardinality)
 - Logs (structured logging, severity, trace correlation)
 - Node.js (auto-instrumentation, environment variables, Kubernetes)
@@ -157,7 +159,7 @@ Covers pipeline configuration, deployment patterns, and forwarding to any OTLP-c
 **Use when:**
 - Setting up an OpenTelemetry Collector pipeline
 - Configuring receivers, processors, or exporters
-- Deploying the Collector to Kubernetes or Docker
+- Deploying the Collector to Kubernetes, Docker, or AWS Lambda
 - Forwarding telemetry to any OTLP-compatible backend
 - Tuning Collector performance (memory, batching, queuing)
 
@@ -167,6 +169,7 @@ Covers pipeline configuration, deployment patterns, and forwarding to any OTLP-c
 - Processors (memory limiter, batch, resource detection, Kubernetes attributes, ordering)
 - Pipelines (service section, per-signal configuration, connectors, fan-out)
 - Deployment (agent vs gateway, DaemonSet, Deployment, Docker Compose, health checks)
+- AWS Lambda (Collector layer, configuration layer, `telemetryapi` receiver, `decouple` processor)
 
 ### [otel-ottl](./skills/otel-ottl/SKILL.md)
 

@@ -28,6 +28,7 @@ Expert guidance for configuring and deploying the OpenTelemetry Collector to rec
 | [collector-helm-chart](./rules/deployment/collector-helm-chart.md) | Collector Helm chart — presets, modes, image selection |
 | [opentelemetry-operator](./rules/deployment/opentelemetry-operator.md) | OpenTelemetry Operator — Collector CRD, auto-instrumentation, sidecar |
 | [raw-manifests](./rules/deployment/raw-manifests.md) | Raw Kubernetes manifests — DaemonSet, Deployment, RBAC, Docker Compose |
+| [aws-lambda](./rules/deployment/aws-lambda.md) | AWS Lambda Collector layer — configuration layer, `telemetryapi` receiver, `decouple` processor |
 | [sampling](./rules/sampling.md) | Sampling — head, tail, load balancing |
 | [red-metrics](./rules/red-metrics.md) | RED metrics — span-derived request rate, error rate, duration histograms |
 | [custom-distributions](./rules/custom-distributions.md) | Custom distributions — building a stripped-down Collector binary with OCB |
@@ -139,6 +140,7 @@ See [exporters](./rules/exporters.md) for full authentication and queue configur
 | Deploy with the Dash0 Operator | [dash0-operator](./rules/deployment/dash0-operator.md) |
 | Auto-instrument applications in Kubernetes | [opentelemetry-operator](./rules/deployment/opentelemetry-operator.md) or [dash0-operator](./rules/deployment/dash0-operator.md) |
 | Local development with Docker Compose | [raw-manifests](./rules/deployment/raw-manifests.md) |
+| Run a Collector inside an AWS Lambda function | [aws-lambda](./rules/deployment/aws-lambda.md) |
 | Reduce trace volume | [sampling](./rules/sampling.md) |
 | Keep errors and slow traces, drop the rest | [sampling](./rules/sampling.md) |
 | Redact sensitive data in the pipeline | [processors](./rules/processors.md#sensitive-data-redaction) |

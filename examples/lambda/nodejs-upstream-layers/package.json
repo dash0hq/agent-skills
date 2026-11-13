@@ -1,0 +1,23 @@
+{
+  "name": "nodejs-upstream-layers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runnable AWS CDK example exercising the AWS Lambda OpenTelemetry guidance",
+  "bin": {
+    "app": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "aws-cdk": "^2.1146.0",
+    "aws-cdk-lib": "^2.275.0",
+    "constructs": "^10.4.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0"
+  }
+}

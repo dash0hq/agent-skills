@@ -41,6 +41,7 @@ Link signals through shared context (trace IDs, span IDs) so you can navigate fr
 | Platform   | Reference |
 | ---------- | --------- |
 | Kubernetes | [Kubernetes deployment](./platforms/k8s.md) |
+| AWS Lambda | [AWS Lambda deployment](./platforms/aws-lambda.md) — then [upstream layers](./platforms/aws-lambda-otel-layers.md) or [Dash0 extension](./platforms/aws-lambda-dash0-layers.md) |
 
 ## References
 

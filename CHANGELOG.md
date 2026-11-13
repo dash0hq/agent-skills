@@ -1,5 +1,44 @@
 # Changelog
 
+## v1.4.0 (2026-11-13)
+
+### Added
+
+- add AWS Lambda instrumentation guidance (#162)
+- add the portable Agent Plugins manifest
+
+### Fixed
+
+- require exporter batching in the Collector Tessl rubrics (#155)
+- skill configs batch, start, and use the real defaults
+- state per-component error_mode defaults and drop components without OTTL
+- stop scoring omitted error_mode as propagating in OTTL rubrics
+- override Jackson to 3.1.7 in the Java fixture
+- override Tomcat to 11.0.27 in the Java fixture (#152)
+- update SDK 2.x examples and parent validation
+
+### Changed
+
+- update plugin manifests for v1.4.0
+- session replay is documented as opt-in
+- validate manifest versions and extract the bump into a script
+- bump org.springframework.boot:spring-boot-starter-parent
+- make the AlwaysOn sampler rule actionable per SDK (#151)
+- bump the fixtures group across 1 directory with 3 updates
+- bump the fixtures group across 1 directory with 2 updates
+- bump helm/kind-action from 1.15.0 to 1.15.1
+- bump the fixtures group across 1 directory with 4 updates
+- explain why we deviate from the default sampler
+- bump the fixtures group across 1 directory with 3 updates
+- bump the fixtures group across 1 directory with 3 updates
+- bump org.scala-sbt:sbt
+- bump helm/kind-action from 1.14.0 to 1.15.0
+- bump the fixtures group across 1 directory with 2 updates
+- bump next
+- bump the fixtures group across 1 directory with 5 updates
+- bump org.springframework.boot:spring-boot-starter-parent
+
+
 ## v1.3.6 (2026-08-07)
 
 ### Fixed

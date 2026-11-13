@@ -351,14 +351,25 @@ func substituteTokens(content string, subst map[string]string) string {
 	return content
 }
 
-// waitForDeployments waits until every Deployment in the namespace is
-// available.
+// waitForDeployments waits until every Deployment in the namespace has
+// finished rolling out its current pod template: all replicas updated and
+// available, and no old replica left serving. Waiting for the Available
+// condition is not enough after a rollout restart or an operator patching
+// the pod template: the Deployment stays Available on the old ReplicaSet,
+// so a probe would hit the old, uninstrumented pod.
 func waitForDeployments(ctx context.Context, c *KindCluster, namespace string, timeout time.Duration) error {
-	out, err := c.Kubectl(ctx, "-n", namespace, "wait", "--for=condition=Available",
-		"deployment", "--all", "--timeout", timeout.String())
+	names, err := c.Kubectl(ctx, "-n", namespace, "get", "deployments",
+		"-o", "jsonpath={.items[*].metadata.name}")
 	if err != nil {
-		diag, _ := c.Kubectl(context.Background(), "-n", namespace, "get", "pods", "-o", "wide")
-		return fmt.Errorf("deployments in %s not available: %w\n%s\npods:\n%s", namespace, err, out, diag)
+		return fmt.Errorf("list deployments in %s: %w\n%s", namespace, err, names)
+	}
+	for _, name := range strings.Fields(names) {
+		out, err := c.Kubectl(ctx, "-n", namespace, "rollout", "status", "deployment/"+name,
+			"--timeout", timeout.String())
+		if err != nil {
+			diag, _ := c.Kubectl(context.Background(), "-n", namespace, "get", "pods", "-o", "wide")
+			return fmt.Errorf("deployment %s/%s did not finish rolling out: %w\n%s\npods:\n%s", namespace, name, err, out, diag)
+		}
 	}
 	return nil
 }

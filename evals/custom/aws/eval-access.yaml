@@ -1,0 +1,193 @@
+# One-time access setup for the AWS Lambda eval scenarios.
+#
+# Deploy once per account and region, then bootstrap CDK with a dedicated
+# qualifier whose CloudFormation execution role is limited to the policy
+# below (see evals/custom/README.md, "AWS Lambda scenarios"):
+#
+#   aws cloudformation deploy --stack-name AgentSkillsEvalsAccess \
+#     --template-file evals/custom/aws/eval-access.yaml \
+#     --capabilities CAPABILITY_NAMED_IAM
+#   npx cdk bootstrap aws://<account>/<region> --qualifier agskeval \
+#     --toolkit-stack-name CDKToolkit-agskeval \
+#     --cloudformation-execution-policies arn:aws:iam::<account>:policy/AgentSkillsEvalCfnExecution
+#
+# The stacks the evals deploy are written by the agent under test, so the
+# default CDK bootstrap (an AdministratorAccess execution role) is not used:
+# every stack deploys through AgentSkillsEvalCfnExecution, which can only
+# manage Lambda functions, log groups, and IAM roles named AgentSkillsEval*,
+# and every role it creates must carry AgentSkillsEvalFunctionBoundary.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Access for the dash0hq/agent-skills AWS Lambda eval scenarios
+
+Parameters:
+  GitHubRepository:
+    Type: String
+    Default: dash0hq/agent-skills
+  TokenSecretName:
+    Type: String
+    Default: agent-skills-evals/dash0-token
+  CdkQualifier:
+    Type: String
+    Default: agskeval
+
+Resources:
+  # Upper bound for every role an eval stack creates (the function execution
+  # roles): write its own logs and read the Dash0 token, nothing else.
+  FunctionBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AgentSkillsEvalFunctionBoundary
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: OwnLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/AgentSkillsEval*
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/AgentSkillsEval*:*
+          - Sid: ReadDash0Token
+            Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${TokenSecretName}-*
+          - Sid: XRay
+            Effect: Allow
+            Action:
+              - xray:PutTraceSegments
+              - xray:PutTelemetryRecords
+            Resource: "*"
+
+  # What CloudFormation may do on behalf of an eval stack.
+  CfnExecution:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AgentSkillsEvalCfnExecution
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EvalFunctions
+            Effect: Allow
+            Action: lambda:*
+            Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:AgentSkillsEval*
+          - Sid: ReadPublishedLayers
+            Effect: Allow
+            Action: lambda:GetLayerVersion
+            Resource: "*"
+          - Sid: CreateBoundedRoles
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:PutRolePolicy
+              - iam:AttachRolePolicy
+            Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/AgentSkillsEval*
+            Condition:
+              StringEquals:
+                iam:PermissionsBoundary: !Ref FunctionBoundary
+          - Sid: ManageEvalRoles
+            Effect: Allow
+            Action:
+              - iam:GetRole
+              - iam:GetRolePolicy
+              - iam:ListRolePolicies
+              - iam:ListAttachedRolePolicies
+              - iam:DeleteRole
+              - iam:DeleteRolePolicy
+              - iam:DetachRolePolicy
+              - iam:TagRole
+              - iam:UntagRole
+            Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/AgentSkillsEval*
+          - Sid: PassEvalRolesToLambda
+            Effect: Allow
+            Action: iam:PassRole
+            Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/AgentSkillsEval*
+            Condition:
+              StringEquals:
+                iam:PassedToService: lambda.amazonaws.com
+          - Sid: KeepTheBoundary
+            Effect: Deny
+            Action:
+              - iam:DeleteRolePermissionsBoundary
+              - iam:PutRolePermissionsBoundary
+            Resource: "*"
+          - Sid: EvalLogGroups
+            Effect: Allow
+            Action: logs:*
+            Resource:
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/AgentSkillsEval*
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/AgentSkillsEval*:*
+          - Sid: ReadCdkAssets
+            Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub arn:aws:s3:::cdk-${CdkQualifier}-assets-${AWS::AccountId}-${AWS::Region}/*
+          - Sid: ReadBootstrapVersion
+            Effect: Allow
+            Action: ssm:GetParameters
+            Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/cdk-bootstrap/${CdkQualifier}/version
+
+  # Assumed by the eval workflows through GitHub OIDC. Only same-repo jobs
+  # get here: the PR gate binds the "evals" environment (same-repo PRs only),
+  # and release and dispatch runs present a branch ref, which needs write
+  # access to the repository. Fork PRs present a pull_request subject and are
+  # not trusted.
+  GitHubRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: agent-skills-evals-github
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub:
+                  - !Sub repo:${GitHubRepository}:environment:evals
+                  - !Sub repo:${GitHubRepository}:ref:refs/heads/*
+      Policies:
+        - PolicyName: agent-skills-evals
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # cdk deploy and destroy go through the qualified bootstrap
+              # roles, whose execution role is CfnExecution above.
+              - Sid: UseEvalCdkBootstrap
+                Effect: Allow
+                Action: sts:AssumeRole
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/cdk-${CdkQualifier}-*-${AWS::AccountId}-${AWS::Region}
+              - Sid: InvokeEvalFunctions
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:GetFunction
+                Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:AgentSkillsEval*
+              - Sid: ReadEvalLogs
+                Effect: Allow
+                Action:
+                  - logs:FilterLogEvents
+                  - logs:GetLogEvents
+                  - logs:DescribeLogStreams
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/AgentSkillsEval*
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/AgentSkillsEval*:*
+              - Sid: FindLeftoverStacks
+                Effect: Allow
+                Action: cloudformation:ListStacks
+                Resource: "*"
+              - Sid: DescribeEvalStacks
+                Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/AgentSkillsEval*/*
+
+Outputs:
+  GitHubRoleArn:
+    Value: !GetAtt GitHubRole.Arn
+  CfnExecutionPolicyArn:
+    Value: !Ref CfnExecution

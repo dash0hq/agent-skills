@@ -51,6 +51,12 @@ const (
 	// otelOperatorNamespace is where the OpenTelemetry operator Helm chart
 	// installs (once per cluster, reused across attempts).
 	otelOperatorNamespace = "opentelemetry-operator-system"
+	// otelInjectionMarker prefixes the init container the OpenTelemetry
+	// operator injects into auto-instrumented pods.
+	otelInjectionMarker = "opentelemetry-auto-instrumentation"
+	// dash0InjectionMarker names the volume the Dash0 operator adds to
+	// instrumented pods, for both init-container and image-volume delivery.
+	dash0InjectionMarker = "dash0-instrumentation"
 )
 
 // deploymentTimeout bounds waiting for Deployments to become available.
@@ -208,9 +214,7 @@ func (f *KindFixture) run(ctx context.Context, workdir string, env map[string]st
 // telemetry failure (ClassAgentAssert), so the uploaded evidence shows which
 // hop dropped the telemetry. It is best-effort: every step tolerates errors,
 // because the point is to capture whatever is reachable while the cluster is
-// still up. The flaky operator scenarios are the motivating case — test.id
-// survives the operator's OTEL_RESOURCE_ATTRIBUTES merge locally, yet CI
-// intermittently sees no telemetry — but the dump is scenario-agnostic.
+// still up.
 func (f *KindFixture) diagnose(ctx context.Context, class harness.FailureClass, detail string) {
 	ns := f.namespace
 	if ns == "" {
@@ -228,7 +232,13 @@ func (f *KindFixture) diagnose(ctx context.Context, class harness.FailureClass, 
 	}
 
 	// Cluster-side resource state and recent events.
-	dump("resources", "-n", ns, "get", "pods,deployments,opentelemetrycollectors,instrumentations", "-o", "wide")
+	// The OpenTelemetry operator CRDs exist only on clusters running that
+	// scenario; asking for them elsewhere fails the whole get, so they are
+	// dumped separately.
+	dump("resources", "-n", ns, "get", "pods,replicasets,deployments", "-o", "wide")
+	if f.scenarioID == K8sOTelOperatorID {
+		dump("operator-resources", "-n", ns, "get", "opentelemetrycollectors,instrumentations", "-o", "wide")
+	}
 	dump("events", "-n", ns, "get", "events", "--sort-by=.lastTimestamp")
 
 	// Per pod: the injected OTEL_RESOURCE_ATTRIBUTES (confirms test.id survived
@@ -347,7 +357,7 @@ func (f *KindFixture) runOTelOperator(ctx context.Context, namespace, workdir, r
 	}
 	// Fail precisely if the operator did not inject instrumentation, rather
 	// than letting the run drift into a silent telemetry timeout.
-	if err := f.verifyInstrumentationInjected(ctx, namespace); err != nil {
+	if err := f.verifyInstrumentationInjected(ctx, namespace, otelInjectionMarker); err != nil {
 		return err
 	}
 	return runProbe(ctx, f.cluster, namespace, checkoutURL(checkoutService), 3)
@@ -371,24 +381,36 @@ func (f *KindFixture) waitForInstrumentation(ctx context.Context, namespace stri
 	}
 }
 
-// verifyInstrumentationInjected confirms the operator mutated the workload
-// pod: auto-instrumentation adds an init container (opentelemetry-auto-
-// instrumentation-*) that copies the SDK into the app container. Its absence
-// means the pod is running uninstrumented and no telemetry will flow, so this
-// returns a precise error instead of deferring to the telemetry timeout.
-func (f *KindFixture) verifyInstrumentationInjected(ctx context.Context, namespace string) error {
+// verifyInstrumentationInjected confirms the operator mutated every serving
+// workload pod: auto-instrumentation adds an init container or volume whose
+// name contains marker (otelInjectionMarker, dash0InjectionMarker). Its
+// absence means the pod is running uninstrumented and no spans will flow, so
+// this returns a precise error instead of deferring to the telemetry timeout.
+func (f *KindFixture) verifyInstrumentationInjected(ctx context.Context, namespace, marker string) error {
 	out, err := f.cluster.Kubectl(ctx, "-n", namespace, "get", "pods",
 		"-l", "app.kubernetes.io/name="+checkoutService,
-		"-o", "jsonpath={range .items[*]}{.metadata.name}{\"|\"}{range .spec.initContainers[*]}{.name}{\" \"}{end}{\"\\n\"}{end}")
+		"-o", "jsonpath={range .items[*]}{.metadata.name}{\"|\"}{.metadata.deletionTimestamp}{\"|\"}{range .spec.initContainers[*]}{.name}{\" \"}{end}{\"|\"}{range .spec.volumes[*]}{.name}{\" \"}{end}{\"\\n\"}{end}")
 	if err != nil {
-		return fmt.Errorf("inspect workload pods for injected init container: %w\n%s", err, out)
+		return fmt.Errorf("inspect workload pods for injected instrumentation: %w\n%s", err, out)
 	}
+	// Every pod still serving must be instrumented: the probe's requests go
+	// to whichever Ready pod the Service picks, and a single uninstrumented
+	// pod (left over from before injection) swallows them without spans.
+	serving := 0
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if strings.Contains(line, "opentelemetry-auto-instrumentation") {
-			return nil
+		fields := strings.SplitN(line, "|", 3)
+		if len(fields) < 3 || fields[1] != "" {
+			continue // malformed, or terminating and already out of the Service endpoints
+		}
+		serving++
+		if !strings.Contains(fields[2], marker) {
+			return fmt.Errorf("operator did not inject instrumentation into %s pod %s (%s init container or volume absent); the probe would hit an uninstrumented pod and no spans would flow.\npods (name|deletionTimestamp|initContainers|volumes):\n%s", checkoutService, fields[0], marker, out)
 		}
 	}
-	return fmt.Errorf("operator did not inject instrumentation into the %s workload (opentelemetry-auto-instrumentation init container absent); the pod is uninstrumented so no telemetry will flow.\npod init containers:\n%s", checkoutService, out)
+	if serving == 0 {
+		return fmt.Errorf("no serving %s pod found to verify instrumentation injection.\npods (name|deletionTimestamp|initContainers|volumes):\n%s", checkoutService, out)
+	}
+	return nil
 }
 
 // wrapWorkloadFailure augments a deployment-availability error with a
@@ -454,7 +476,20 @@ func (f *KindFixture) runDash0Operator(ctx context.Context, relay *kindRelay, na
 	if err := applyWorkspace(ctx, f.cluster, namespace, workdir); err != nil {
 		return err
 	}
+	// The operator's controller instruments the workload asynchronously by
+	// patching its pod template, which starts a second rollout. Wait for that
+	// patch before waiting on the rollout, or the probe hits the original,
+	// uninstrumented pod.
+	if out, err := f.cluster.Kubectl(ctx, "-n", namespace, "wait",
+		"--for=jsonpath={.metadata.labels.dash0\\.com/instrumented}=true",
+		"deployment/"+checkoutService, "--timeout", deploymentTimeout.String()); err != nil {
+		labels, _ := f.cluster.Kubectl(context.Background(), "-n", namespace, "get", "deployment", checkoutService, "--show-labels")
+		return fmt.Errorf("dash0 operator did not instrument deployment %s/%s: %w\n%s\n%s", namespace, checkoutService, err, out, labels)
+	}
 	if err := waitForDeployments(ctx, f.cluster, namespace, deploymentTimeout); err != nil {
+		return err
+	}
+	if err := f.verifyInstrumentationInjected(ctx, namespace, dash0InjectionMarker); err != nil {
 		return err
 	}
 	return runProbe(ctx, f.cluster, namespace, checkoutURL(checkoutService), 3)

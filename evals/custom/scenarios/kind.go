@@ -351,16 +351,57 @@ func substituteTokens(content string, subst map[string]string) string {
 	return content
 }
 
-// waitForDeployments waits until every Deployment in the namespace is
-// available.
+// waitForDeployments waits until every Deployment in the namespace has
+// finished rolling out its current pod template (all replicas updated and
+// available) and every replaced pod is gone. Waiting for the Available
+// condition is not enough after a rollout restart or an operator patching
+// the pod template: the Deployment stays Available on the old ReplicaSet,
+// so a probe would hit the old, uninstrumented pod. Rollout status alone is
+// not enough either: it returns once old pods are marked for deletion, but a
+// terminating pod keeps serving (a Node.js PID 1 ignores SIGTERM and runs
+// out the grace period) while Service routing catches up.
 func waitForDeployments(ctx context.Context, c *KindCluster, namespace string, timeout time.Duration) error {
-	out, err := c.Kubectl(ctx, "-n", namespace, "wait", "--for=condition=Available",
-		"deployment", "--all", "--timeout", timeout.String())
+	if err := waitForRollouts(ctx, c, namespace, timeout); err != nil {
+		return err
+	}
+	return waitForTerminatingPods(ctx, c, namespace, timeout)
+}
+
+// waitForRollouts runs `kubectl rollout status` for every Deployment in the
+// namespace.
+func waitForRollouts(ctx context.Context, c *KindCluster, namespace string, timeout time.Duration) error {
+	names, err := c.Kubectl(ctx, "-n", namespace, "get", "deployments",
+		"-o", "jsonpath={.items[*].metadata.name}")
 	if err != nil {
-		diag, _ := c.Kubectl(context.Background(), "-n", namespace, "get", "pods", "-o", "wide")
-		return fmt.Errorf("deployments in %s not available: %w\n%s\npods:\n%s", namespace, err, out, diag)
+		return fmt.Errorf("list deployments in %s: %w\n%s", namespace, err, names)
+	}
+	for _, name := range strings.Fields(names) {
+		out, err := c.Kubectl(ctx, "-n", namespace, "rollout", "status", "deployment/"+name,
+			"--timeout", timeout.String())
+		if err != nil {
+			diag, _ := c.Kubectl(context.Background(), "-n", namespace, "get", "pods", "-o", "wide")
+			return fmt.Errorf("deployment %s/%s did not finish rolling out: %w\n%s\npods:\n%s", namespace, name, err, out, diag)
+		}
 	}
 	return nil
+}
+
+// waitForTerminatingPods polls until no pod in the namespace carries a
+// deletionTimestamp.
+func waitForTerminatingPods(ctx context.Context, c *KindCluster, namespace string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		out, err := c.Kubectl(ctx, "-n", namespace, "get", "pods",
+			"-o", "jsonpath={range .items[?(@.metadata.deletionTimestamp)]}{.metadata.name}{\" \"}{end}")
+		if err == nil && strings.TrimSpace(out) == "" {
+			return nil
+		}
+		if time.Now().After(deadline) || ctx.Err() != nil {
+			diag, _ := c.Kubectl(context.Background(), "-n", namespace, "get", "pods", "-o", "wide")
+			return fmt.Errorf("pods in %s still terminating after %s: %v\n%s\npods:\n%s", namespace, timeout, err, out, diag)
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 // runProbe drives traffic at an in-cluster URL from a helper pod

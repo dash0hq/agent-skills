@@ -22,12 +22,9 @@
 #     gap for the .NET NuGet install path is tracked in TODO.md separately.
 #
 #   - k8s-deploy-otel-operator and k8s-deploy-dash0-operator were quarantined
-#     on 2026-07-27: flaky telemetry delivery through operator injection in CI
-#     (the agent config is correct; not reproducible locally). See the issue.
-quarantine:
-  - id: k8s-deploy-otel-operator
-    since: 2026-07-27
-    issue: https://github.com/dash0hq/agent-skills/issues/41
-  - id: k8s-deploy-dash0-operator
-    since: 2026-07-27
-    issue: https://github.com/dash0hq/agent-skills/issues/41
+#     on 2026-07-27 (issue #41) and un-quarantined on 2026-11-14. They failed
+#     every release, not intermittently: the harness probed right after the
+#     operator-triggered rollout started, while the old, uninstrumented pod
+#     still served, so no SERVER span reached the sink. The harness now waits
+#     for `kubectl rollout status` and checks every serving pod is injected.
+quarantine: []

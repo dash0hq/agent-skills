@@ -160,8 +160,11 @@ type LambdaFixture struct {
 	cleanups  []func()
 }
 
-// NewLambdaFixture returns a LambdaFixture whose stacks are destroyed when
-// the test finishes.
+// NewLambdaFixture returns a LambdaFixture whose stacks are destroyed by
+// Close. Defer Close right after creating the fixture: cdk destroy runs from
+// the attempt workspace, which the runner creates with t.TempDir after this
+// t.Cleanup fallback is registered, so the cleanup alone would run after the
+// workspace is gone.
 func NewLambdaFixture(t testingT, cfg LambdaConfig) *LambdaFixture {
 	f := &LambdaFixture{t: t, cfg: cfg}
 	t.Cleanup(f.Close)
@@ -235,7 +238,7 @@ func (f *LambdaFixture) run(ctx context.Context, workdir string, env map[string]
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 		if out, err := runIn(ctx, workdir, creds, "npx", "cdk", "destroy", "--app", "cdk.out", "--force"); err != nil {
-			f.t.Logf("cdk destroy %s failed (the stale-stack sweeper removes it later): %v\n%s", stack, err, out)
+			f.t.Errorf("cdk destroy %s failed; delete the stack by hand: %v\n%s", stack, err, out)
 		}
 	})
 

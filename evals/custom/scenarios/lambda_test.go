@@ -160,6 +160,7 @@ func TestLambdaScenarios(t *testing.T) {
 				t.Skip("skipped by the EVAL_SCENARIOS filter")
 			}
 			fix := NewLambdaFixture(t, cfg)
+			defer fix.Close()
 			runner := &harness.Runner{
 				RepoRoot: root,
 				Agent:    &harness.Agent{Binary: binary, PluginDir: root, Model: versions.EvalModel},

@@ -87,6 +87,7 @@ type DockerFixture struct {
 type testingT interface {
 	Cleanup(func())
 	Logf(format string, args ...any)
+	Errorf(format string, args ...any)
 	Fatalf(format string, args ...any)
 	Helper()
 }

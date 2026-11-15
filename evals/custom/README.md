@@ -119,6 +119,47 @@ Add an entry with the scenario ID, the date, and a link to the tracking issue; r
 Bump pins only through a PR: `evals/custom/versions.env` is a full-matrix trigger in the registry, so the PR runs every scenario (requirement R19) and behavior drift surfaces before merge.
 When bumping `OTELCOL_CONTRIB_VERSION`, update all 3 checksum keys from the new release's checksums file in the same PR.
 
+## AWS Lambda scenarios
+
+Lambda scenarios (`RequiresAWS: true`) deploy the agent's work to a real AWS account and judge the spans that reach a Dash0 dataset, instead of the local relay and sink.
+They run in a dedicated `aws-scenarios` job in both workflows, never in the plain agent matrix.
+The fixture contract lives in [`fixtures/lambda/README.md`](./fixtures/lambda/README.md).
+
+### One-time account setup
+
+1. Deploy [`aws/eval-access.yaml`](./aws/eval-access.yaml) as stack `AgentSkillsEvalsAccess`.
+   It creates the function permissions boundary, the CloudFormation execution policy scoped to `AgentSkillsEval*` resources, and the `agent-skills-evals-github` role that GitHub OIDC assumes.
+2. Bootstrap CDK with the scoped qualifier and execution policy:
+
+   ```bash
+   npx cdk bootstrap aws://<account>/<region> \
+     --qualifier agskeval --toolkit-stack-name CDKToolkit-agskeval \
+     --cloudformation-execution-policies arn:aws:iam::<account>:policy/AgentSkillsEvalCfnExecution
+   ```
+
+3. Store the Dash0 auth token as a plain-string secret named `agent-skills-evals/dash0-token`.
+4. Set the repository variables `AWS_EVALS_ROLE_ARN`, `AWS_EVALS_REGION`, `DASH0_EVAL_OTLP_HTTP_ENDPOINT`, `DASH0_EVAL_API_ENDPOINT`, `DASH0_EVAL_DATASET`, and `DASH0_EVAL_TOKEN_SECRET_ARN`.
+5. Set the secret `DASH0_EVAL_AUTH_TOKEN` twice, like `ANTHROPIC_API_KEY`: as a repository secret for the release matrix, and on the `evals` environment for the PR gate.
+   The harness uses it only for the read-back query and removes it from the agent's environment.
+
+### Running locally
+
+You need AWS credentials for the account (for example `AWS_PROFILE`), plus `npx`, `aws`, and the [Dash0 CLI](https://github.com/dash0hq/dash0-cli) on `PATH`.
+Run from `evals/custom/`:
+
+```bash
+EVAL_AWS_REGION=eu-west-1 \
+EVAL_DASH0_OTLP_ENDPOINT=https://ingress.eu-west-1.aws.dash0-dev.com \
+EVAL_DASH0_API_URL=https://api.eu-west-1.aws.dash0-dev.com \
+EVAL_DASH0_DATASET=agent-skills-test \
+EVAL_DASH0_TOKEN_SECRET_ARN=<secret ARN> \
+DASH0_AUTH_TOKEN=<token> \
+go test ./scenarios -run 'TestLambdaScenarios/lambda-nodejs-dash0-layer' -v -timeout 40m
+```
+
+The test skips when any of these variables or tools is missing.
+Each run deploys a stack named `AgentSkillsEval-<runtime>-<suffix>` and destroys it when the test finishes; delete leftover `AgentSkillsEval-*` stacks by hand after an interrupted run.
+
 ## Fork PRs and secrets
 
 The deterministic layers — `go test ./evals/custom/...`, example validation, and fixture builds — need no secrets and run on every PR, including forks and Dependabot, so those PRs still smoke the eval harness itself.

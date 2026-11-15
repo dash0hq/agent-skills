@@ -66,10 +66,11 @@ func TestBuildSelectionNightlyIsTheFullMatrix(t *testing.T) {
 
 	all := reg.Scenarios()
 	require.Len(t, out.Scenarios, len(all))
-	require.Equal(t, len(all), out.Count+out.KindCount)
+	require.Equal(t, len(all), out.Count+out.KindCount+out.AWSCount)
 	require.Contains(t, ids(out, boolPtr(true)), scenarios.K8sDownwardAPIID,
 		"nightly must include every RequiresKind scenario")
 	require.Equal(t, 5, out.KindCount, "the 5 Kubernetes scenarios form the kind matrix")
+	require.Equal(t, 1, out.AWSCount, "the Lambda scenario forms the AWS matrix")
 }
 
 func TestBuildSelectionKindSplitting(t *testing.T) {
@@ -226,7 +227,7 @@ func TestRunNightlyGate(t *testing.T) {
 
 	var out output
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
-	require.Equal(t, len(scenarios.Default().Scenarios()), out.Count+out.KindCount)
+	require.Equal(t, len(scenarios.Default().Scenarios()), out.Count+out.KindCount+out.AWSCount)
 }
 
 func TestLoadQuarantine(t *testing.T) {

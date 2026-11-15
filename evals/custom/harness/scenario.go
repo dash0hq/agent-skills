@@ -146,6 +146,14 @@ type Scenario struct {
 	// that provisions the cluster.
 	RequiresKind bool
 
+	// RequiresAWS marks the scenario as deploying to a real AWS account (the
+	// AWS Lambda scenarios). Like RequiresKind it is excluded from skill-wide
+	// selection and the smoke set, and stays selectable through dedicated
+	// rule files, fixture paths, and full-matrix triggers. CI places
+	// RequiresAWS scenarios in a dedicated job that holds the AWS
+	// credentials, which the agent under test never sees.
+	RequiresAWS bool
+
 	// Assert judges the telemetry received by the sink. A returned error
 	// classifies the attempt ClassAgentAssert.
 	Assert Assertion

@@ -105,15 +105,11 @@ var defaultRuleClassification = map[string]RuleClassification{
 // covered by a registered scenario nor listed here, so entries must be
 // removed as the scenarios land.
 var pendingScenarios = map[string]string{
-	// The AWS Lambda rule files are covered by Tessl scenarios, which the Go
-	// harness does not run. A Go scenario needs a fixture that can deploy and
-	// invoke a real Lambda function; until that lands, these four are pending.
-	// The CDK projects under examples/lambda/ are the live check in the
-	// meantime, run by hand per CONTRIBUTING.md.
-	"skills/otel-instrumentation/rules/platforms/aws-lambda.md":              "lambda-fixture",
-	"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md":  "lambda-fixture",
-	"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md": "lambda-fixture",
-	"skills/otel-collector/rules/deployment/aws-lambda.md":                   "lambda-fixture",
+	// The upstream-layer path (path A) and its Collector layer are covered by
+	// the Python AWS Lambda scenario, which lands after the Node.js one
+	// (lambda-nodejs-dash0-layer) proved the AWS topology.
+	"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md": "lambda-python-upstream-layers",
+	"skills/otel-collector/rules/deployment/aws-lambda.md":                  "lambda-python-upstream-layers",
 }
 
 // Paths that trigger a full-matrix run when changed: the plugin manifest
@@ -290,12 +286,13 @@ func (r *Registry) selectForSkillFile(selected map[string]bool, skill Skill, res
 	r.selectSkill(selected, skill)
 }
 
-// selectSkill selects all scenarios of the skill, except RequiresKind
-// scenarios: those run only via their dedicated rule files, their fixture
-// paths, and full-matrix triggers (see Scenario.RequiresKind).
+// selectSkill selects all scenarios of the skill, except RequiresKind and
+// RequiresAWS scenarios: those run only via their dedicated rule files, their
+// fixture paths, and full-matrix triggers (see Scenario.RequiresKind and
+// Scenario.RequiresAWS).
 func (r *Registry) selectSkill(selected map[string]bool, skill Skill) {
 	for _, sc := range r.scenarios {
-		if sc.Skill == skill && !sc.RequiresKind {
+		if sc.Skill == skill && !sc.RequiresKind && !sc.RequiresAWS {
 			selected[sc.ID] = true
 		}
 	}
@@ -303,8 +300,9 @@ func (r *Registry) selectSkill(selected map[string]bool, skill Skill) {
 
 // smokeSet returns one smoke scenario per skill: the first Smoke-flagged
 // scenario of the skill, falling back to the skill's first scenario.
-// RequiresKind scenarios never join the smoke set: smoke runs must stay
-// cheap, and harness-code changes must not force cluster provisioning.
+// RequiresKind and RequiresAWS scenarios never join the smoke set: smoke runs
+// must stay cheap, and harness-code changes must not force cluster
+// provisioning or cloud deployments.
 func (r *Registry) smokeSet() []Scenario {
 	var out []Scenario
 	for _, skill := range Skills {
@@ -312,7 +310,7 @@ func (r *Registry) smokeSet() []Scenario {
 		var picked *Scenario
 		for i := range r.scenarios {
 			sc := &r.scenarios[i]
-			if sc.Skill != skill || sc.FullMatrixOnly || sc.RequiresKind {
+			if sc.Skill != skill || sc.FullMatrixOnly || sc.RequiresKind || sc.RequiresAWS {
 				continue
 			}
 			if fallback == nil {

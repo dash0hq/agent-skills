@@ -43,6 +43,10 @@ const LambdaNodejsUpstreamLayersID = "lambda-nodejs-upstream-layers"
 // LambdaPythonDash0LayerID is LambdaNodejsDash0LayerID for a Python function.
 const LambdaPythonDash0LayerID = "lambda-python-dash0-layer"
 
+// LambdaPythonUpstreamLayersID is LambdaNodejsUpstreamLayersID for a Python
+// function.
+const LambdaPythonUpstreamLayersID = "lambda-python-upstream-layers"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -90,43 +94,41 @@ func init() { registerScenarios(LambdaScenarios()...) }
 func LambdaScenarios() []harness.Scenario {
 	var out []harness.Scenario
 	for _, rt := range lambdaRuntimes {
-		out = append(out, harness.Scenario{
-			ID:    rt.dash0LayerID,
-			Skill: harness.SkillInstrumentation,
-			RuleFiles: []string{
-				"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
-				"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md",
+		out = append(out,
+			harness.Scenario{
+				ID:    rt.dash0LayerID,
+				Skill: harness.SkillInstrumentation,
+				RuleFiles: []string{
+					"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
+					"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md",
+				},
+				RequiresAWS: true,
+				FixturePath: rt.fixture,
+				Prompt: rt.prompt(
+					"Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation).",
+					"Dash0 is the only telemetry backend."),
+				Timeout:          lambdaScenarioTimeout,
+				TelemetryTimeout: lambdaTelemetryTimeout,
+				Assert:           assertLambdaInvocation(lambdaServiceName),
 			},
-			RequiresAWS: true,
-			FixturePath: rt.fixture,
-			Prompt: rt.prompt(
-				"Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation).",
-				"Dash0 is the only telemetry backend."),
-			Timeout:          lambdaScenarioTimeout,
-			TelemetryTimeout: lambdaTelemetryTimeout,
-			Assert:           assertLambdaInvocation(lambdaServiceName),
-		})
-		// The upstream-layer path is enabled per runtime once it is verified.
-		if rt.upstreamLayersID == "" {
-			continue
-		}
-		out = append(out, harness.Scenario{
-			ID:    rt.upstreamLayersID,
-			Skill: harness.SkillInstrumentation,
-			RuleFiles: []string{
-				"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
-				"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md",
-				"skills/otel-collector/rules/deployment/aws-lambda.md",
+			harness.Scenario{
+				ID:    rt.upstreamLayersID,
+				Skill: harness.SkillInstrumentation,
+				RuleFiles: []string{
+					"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
+					"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md",
+					"skills/otel-collector/rules/deployment/aws-lambda.md",
+				},
+				RequiresAWS: true,
+				FixturePath: rt.fixture,
+				Prompt: rt.prompt(
+					"Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector).",
+					"The platform team requires the upstream OpenTelemetry Lambda layers with the OpenTelemetry Collector layer, so the same setup can later fan out to a second backend; do not use the Dash0 Lambda extension."),
+				Timeout:          lambdaScenarioTimeout,
+				TelemetryTimeout: lambdaTelemetryTimeout,
+				Assert:           assertLambdaInvocation(lambdaServiceName),
 			},
-			RequiresAWS: true,
-			FixturePath: rt.fixture,
-			Prompt: rt.prompt(
-				"Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector).",
-				"The platform team requires the upstream OpenTelemetry Lambda layers with the OpenTelemetry Collector layer, so the same setup can later fan out to a second backend; do not use the Dash0 Lambda extension."),
-			Timeout:          lambdaScenarioTimeout,
-			TelemetryTimeout: lambdaTelemetryTimeout,
-			Assert:           assertLambdaInvocation(lambdaServiceName),
-		})
+		)
 	}
 	return out
 }
@@ -152,10 +154,11 @@ var lambdaRuntimes = []lambdaRuntime{
 		handler:          "lambda/index.js",
 	},
 	{
-		dash0LayerID: LambdaPythonDash0LayerID,
-		fixture:      "evals/custom/fixtures/lambda/python-function",
-		runtime:      "Python 3.13",
-		handler:      "lambda/index.py",
+		dash0LayerID:     LambdaPythonDash0LayerID,
+		upstreamLayersID: LambdaPythonUpstreamLayersID,
+		fixture:          "evals/custom/fixtures/lambda/python-function",
+		runtime:          "Python 3.13",
+		handler:          "lambda/index.py",
 	},
 }
 
@@ -178,6 +181,7 @@ Requirements:
 // cloud assembly, run after the checks every Lambda scenario shares.
 var lambdaAssemblyChecks = map[string][]func(assemblyDir string) error{
 	LambdaNodejsUpstreamLayersID: {checkCollectorConfig},
+	LambdaPythonUpstreamLayersID: {checkCollectorConfig},
 }
 
 // LambdaConfig is the account and Dash0 configuration of a Lambda run.

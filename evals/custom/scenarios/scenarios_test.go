@@ -31,6 +31,7 @@ var allScenarioIDs = []string{
 	LambdaJavaUpstreamJavaagentID,
 	LambdaJavaUpstreamJavawrapperID,
 	LambdaDotnetDash0LayerID,
+	LambdaDotnetUpstreamLayersID,
 }
 
 // instrumentationSelectable is every otel-instrumentation scenario reachable
@@ -98,7 +99,7 @@ func TestSelection(t *testing.T) {
 		{
 			name:    "dotnet rule file selects the .NET scenarios, Lambda included",
 			changed: []string{"skills/otel-instrumentation/rules/sdks/dotnet.md"},
-			want:    []string{DotnetHTTPID, DotnetNuGetID, DotnetEnrichmentID, LambdaDotnetDash0LayerID},
+			want:    []string{DotnetHTTPID, DotnetNuGetID, DotnetEnrichmentID, LambdaDotnetDash0LayerID, LambdaDotnetUpstreamLayersID},
 		},
 		{
 			name:    "browser rule file selects the browser scenario",

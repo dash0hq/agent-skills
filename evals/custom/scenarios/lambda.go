@@ -66,6 +66,10 @@ const LambdaJavaUpstreamJavawrapperID = "lambda-java-upstream-javawrapper"
 // and exports through the dash0-extension-manual layer.
 const LambdaDotnetDash0LayerID = "lambda-dotnet-dash0-layer"
 
+// LambdaDotnetUpstreamLayersID is LambdaDotnetDash0LayerID exporting through
+// the upstream Collector layer instead.
+const LambdaDotnetUpstreamLayersID = "lambda-dotnet-upstream-layers"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -225,6 +229,7 @@ var lambdaSpecs = []lambdaSpec{
 		checks: []func(string) error{checkJavaLayer("javawrapper", "javaagent")},
 	},
 	{id: LambdaDotnetDash0LayerID, fixture: lambdaDotnetFunction, path: lambdaPathDash0},
+	{id: LambdaDotnetUpstreamLayersID, fixture: lambdaDotnetFunction, path: lambdaPathUpstream},
 }
 
 // lambdaSpecFor returns the spec of a registered Lambda scenario.

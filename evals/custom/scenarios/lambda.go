@@ -40,6 +40,9 @@ const LambdaNodejsDash0LayerID = "lambda-nodejs-dash0-layer"
 // layer and its configuration (path A).
 const LambdaNodejsUpstreamLayersID = "lambda-nodejs-upstream-layers"
 
+// LambdaPythonDash0LayerID is LambdaNodejsDash0LayerID for a Python function.
+const LambdaPythonDash0LayerID = "lambda-python-dash0-layer"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -81,27 +84,34 @@ const (
 
 func init() { registerScenarios(LambdaScenarios()...) }
 
-// LambdaScenarios returns the AWS Lambda scenario set.
+// LambdaScenarios returns the AWS Lambda scenario set: for every runtime,
+// path B (the Dash0 Lambda extension layer) and path A (the upstream
+// OpenTelemetry layers with the Collector layer).
 func LambdaScenarios() []harness.Scenario {
-	return []harness.Scenario{
-		{
-			ID:    LambdaNodejsDash0LayerID,
+	var out []harness.Scenario
+	for _, rt := range lambdaRuntimes {
+		out = append(out, harness.Scenario{
+			ID:    rt.dash0LayerID,
 			Skill: harness.SkillInstrumentation,
 			RuleFiles: []string{
 				"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
 				"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md",
 			},
 			RequiresAWS: true,
-			FixturePath: lambdaNodejsFixture,
-			Prompt: lambdaNodejsPrompt(
+			FixturePath: rt.fixture,
+			Prompt: rt.prompt(
 				"Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation).",
 				"Dash0 is the only telemetry backend."),
 			Timeout:          lambdaScenarioTimeout,
 			TelemetryTimeout: lambdaTelemetryTimeout,
 			Assert:           assertLambdaInvocation(lambdaServiceName),
-		},
-		{
-			ID:    LambdaNodejsUpstreamLayersID,
+		})
+		// The upstream-layer path is enabled per runtime once it is verified.
+		if rt.upstreamLayersID == "" {
+			continue
+		}
+		out = append(out, harness.Scenario{
+			ID:    rt.upstreamLayersID,
 			Skill: harness.SkillInstrumentation,
 			RuleFiles: []string{
 				"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
@@ -109,27 +119,53 @@ func LambdaScenarios() []harness.Scenario {
 				"skills/otel-collector/rules/deployment/aws-lambda.md",
 			},
 			RequiresAWS: true,
-			FixturePath: lambdaNodejsFixture,
-			Prompt: lambdaNodejsPrompt(
+			FixturePath: rt.fixture,
+			Prompt: rt.prompt(
 				"Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector).",
 				"The platform team requires the upstream OpenTelemetry Lambda layers with the OpenTelemetry Collector layer, so the same setup can later fan out to a second backend; do not use the Dash0 Lambda extension."),
 			Timeout:          lambdaScenarioTimeout,
 			TelemetryTimeout: lambdaTelemetryTimeout,
 			Assert:           assertLambdaInvocation(lambdaServiceName),
-		},
+		})
 	}
+	return out
 }
 
-// lambdaNodejsFixture is the CDK app both Node.js scenarios start from.
-const lambdaNodejsFixture = "evals/custom/fixtures/lambda/nodejs-function"
+// lambdaRuntime is one Lambda runtime the scenarios cover: a CDK fixture
+// whose handler makes 1 outbound call that both layer paths trace.
+type lambdaRuntime struct {
+	dash0LayerID     string
+	upstreamLayersID string
+	fixture          string
+	// runtime and handler name the function's runtime and handler file in
+	// the prompt.
+	runtime string
+	handler string
+}
 
-// lambdaNodejsPrompt is the prompt of a Node.js Lambda scenario: task names
-// the goal and the skills, and path the scenario-specific constraint.
-func lambdaNodejsPrompt(task, path string) string {
-	return `The current directory contains an AWS CDK app (TypeScript) that deploys the Node.js 22 AWS Lambda function CheckoutFunction (lib/checkout-stack.ts; the handler is lambda/index.js) as a ZIP archive. It emits no telemetry. ` + task + `
+var lambdaRuntimes = []lambdaRuntime{
+	{
+		dash0LayerID:     LambdaNodejsDash0LayerID,
+		upstreamLayersID: LambdaNodejsUpstreamLayersID,
+		fixture:          "evals/custom/fixtures/lambda/nodejs-function",
+		runtime:          "Node.js 22",
+		handler:          "lambda/index.js",
+	},
+	{
+		dash0LayerID: LambdaPythonDash0LayerID,
+		fixture:      "evals/custom/fixtures/lambda/python-function",
+		runtime:      "Python 3.13",
+		handler:      "lambda/index.py",
+	},
+}
+
+// prompt is the prompt of a Lambda scenario: task names the goal and the
+// skills, and path the scenario-specific constraint.
+func (rt lambdaRuntime) prompt(task, path string) string {
+	return `The current directory contains an AWS CDK app (TypeScript) that deploys the ` + rt.runtime + ` AWS Lambda function CheckoutFunction (lib/checkout-stack.ts; the handler is ` + rt.handler + `) as a ZIP archive. It emits no telemetry. ` + task + `
 
 Requirements:
-- Do not change the handler code in lambda/index.js.
+- Do not change the handler code in ` + rt.handler + `.
 - ` + path + `
 - The stack props already carry the Dash0 OTLP/HTTP endpoint (dash0OtlpHttpEndpoint), the Dash0 OTLP/gRPC endpoint (dash0OtlpGrpcEndpoint), the dataset (dash0Dataset), and the ARN of the AWS Secrets Manager secret holding the Dash0 auth token as a plain string (dash0TokenSecretArn). Use them; never write the token, an endpoint, or the dataset as literals.
 - Attribute the telemetry to the service checkout-service, not to the function name.

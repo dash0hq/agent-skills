@@ -8,7 +8,8 @@ Lambda fixtures are not HTTP services, so the service contract in [`../README.md
 
 Each Lambda fixture is a CDK app with exactly this behavior:
 
-- 1 function whose handler makes 1 outbound HTTPS `GET` call and returns synthetic data (`TEST-`-prefixed identifiers, `example.test` addresses).
+- 1 function whose handler makes 1 outbound call that both layer paths trace, and returns synthetic data (`TEST-`-prefixed identifiers, `example.test` addresses).
+  `nodejs-function` uses global `fetch`; `python-function` uses `boto3` (STS `GetCallerIdentity`), because neither Python layer instruments `urllib`.
 - No OpenTelemetry or Dash0 layers, wrappers, environment variables, or dependencies.
 - X-Ray tracing set to `Active`. The skill tells the agent to resolve this conflict, and the harness rejects a synthesized template that still carries it.
 - Exact dependency pins in `package.json`, with a committed `package-lock.json`.

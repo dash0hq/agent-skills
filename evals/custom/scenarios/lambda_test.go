@@ -238,3 +238,27 @@ func TestLambdaScenarios(t *testing.T) {
 		})
 	}
 }
+
+// TestLambdaSpecsMatchTheirFixtures guards the contract between a spec and its
+// fixture: the fixture exists, and a compiled fixture's stack deploys the
+// artifact its build produces, which the prompt names.
+func TestLambdaSpecsMatchTheirFixtures(t *testing.T) {
+	root := testutil.RepoRoot(t)
+	for _, spec := range lambdaSpecs {
+		t.Run(spec.id, func(t *testing.T) {
+			dir := filepath.Join(root, spec.fixture.dir)
+			require.FileExists(t, filepath.Join(dir, "lib", "checkout-stack.ts"))
+			require.FileExists(t, filepath.Join(dir, spec.fixture.handler))
+			sc := spec.scenario()
+			if b := spec.fixture.build; b != nil {
+				stack, err := os.ReadFile(filepath.Join(dir, "lib", "checkout-stack.ts"))
+				require.NoError(t, err)
+				for _, part := range strings.Split(b.output, "/") {
+					require.Contains(t, string(stack), "'"+part+"'", "the stack must deploy %s", b.output)
+				}
+				require.Contains(t, sc.Prompt, strings.Join(b.args, " "))
+				require.Contains(t, sc.Prompt, b.output)
+			}
+		})
+	}
+}

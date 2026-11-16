@@ -47,6 +47,10 @@ const LambdaPythonDash0LayerID = "lambda-python-dash0-layer"
 // function.
 const LambdaPythonUpstreamLayersID = "lambda-python-upstream-layers"
 
+// LambdaJavaDash0LayerID is LambdaNodejsDash0LayerID for a Java function
+// whose outbound call is an HTTP request.
+const LambdaJavaDash0LayerID = "lambda-java-dash0-layer"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -88,100 +92,159 @@ const (
 
 func init() { registerScenarios(LambdaScenarios()...) }
 
-// LambdaScenarios returns the AWS Lambda scenario set: for every runtime,
-// path B (the Dash0 Lambda extension layer) and path A (the upstream
-// OpenTelemetry layers with the Collector layer).
+// LambdaScenarios returns the AWS Lambda scenario set.
 func LambdaScenarios() []harness.Scenario {
-	var out []harness.Scenario
-	for _, rt := range lambdaRuntimes {
-		out = append(out,
-			harness.Scenario{
-				ID:    rt.dash0LayerID,
-				Skill: harness.SkillInstrumentation,
-				RuleFiles: []string{
-					"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
-					"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md",
-				},
-				RequiresAWS: true,
-				FixturePath: rt.fixture,
-				Prompt: rt.prompt(
-					"Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation).",
-					"Dash0 is the only telemetry backend."),
-				Timeout:          lambdaScenarioTimeout,
-				TelemetryTimeout: lambdaTelemetryTimeout,
-				Assert:           assertLambdaInvocation(lambdaServiceName),
-			},
-			harness.Scenario{
-				ID:    rt.upstreamLayersID,
-				Skill: harness.SkillInstrumentation,
-				RuleFiles: []string{
-					"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
-					"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md",
-					"skills/otel-collector/rules/deployment/aws-lambda.md",
-				},
-				RequiresAWS: true,
-				FixturePath: rt.fixture,
-				Prompt: rt.prompt(
-					"Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector).",
-					"The platform team requires the upstream OpenTelemetry Lambda layers with the OpenTelemetry Collector layer, so the same setup can later fan out to a second backend; do not use the Dash0 Lambda extension."),
-				Timeout:          lambdaScenarioTimeout,
-				TelemetryTimeout: lambdaTelemetryTimeout,
-				Assert:           assertLambdaInvocation(lambdaServiceName),
-			},
-		)
+	out := make([]harness.Scenario, 0, len(lambdaSpecs))
+	for _, spec := range lambdaSpecs {
+		out = append(out, spec.scenario())
 	}
 	return out
 }
 
-// lambdaRuntime is one Lambda runtime the scenarios cover: a CDK fixture
-// whose handler makes 1 outbound call that both layer paths trace.
-type lambdaRuntime struct {
-	dash0LayerID     string
-	upstreamLayersID string
-	fixture          string
+// lambdaPath is the way telemetry leaves the function.
+type lambdaPath int
+
+const (
+	// lambdaPathDash0 exports through a Dash0 Lambda extension layer: the
+	// runtime's auto-instrumentation layer (path B), or dash0-extension-manual
+	// behind in-code instrumentation.
+	lambdaPathDash0 lambdaPath = iota
+	// lambdaPathUpstream exports through the upstream OpenTelemetry Collector
+	// layer: with the runtime's upstream instrumentation layer (path A), or
+	// behind in-code instrumentation.
+	lambdaPathUpstream
+)
+
+// lambdaFixture is a CDK app whose handler makes 1 outbound call that every
+// path of its scenarios traces.
+type lambdaFixture struct {
+	dir string
 	// runtime and handler name the function's runtime and handler file in
 	// the prompt.
 	runtime string
 	handler string
+	// build compiles the function before synthesis; nil for interpreted
+	// runtimes.
+	build *lambdaBuild
 }
 
-var lambdaRuntimes = []lambdaRuntime{
-	{
-		dash0LayerID:     LambdaNodejsDash0LayerID,
-		upstreamLayersID: LambdaNodejsUpstreamLayersID,
-		fixture:          "evals/custom/fixtures/lambda/nodejs-function",
-		runtime:          "Node.js 22",
-		handler:          "lambda/index.js",
-	},
-	{
-		dash0LayerID:     LambdaPythonDash0LayerID,
-		upstreamLayersID: LambdaPythonUpstreamLayersID,
-		fixture:          "evals/custom/fixtures/lambda/python-function",
-		runtime:          "Python 3.13",
-		handler:          "lambda/index.py",
-	},
+// lambdaBuild is the command the harness compiles a fixture's function with.
+// It runs in the fixture's lambda/ directory on the scrubbed environment
+// plus env, because it executes agent-edited build files.
+type lambdaBuild struct {
+	env  []string
+	args []string
+	// output is the build artifact the stack deploys, for the prompt.
+	output string
+}
+
+// lambdaSpec declares one Lambda scenario.
+type lambdaSpec struct {
+	id      string
+	fixture lambdaFixture
+	path    lambdaPath
+	// checks run on the synthesized cloud assembly after the checks every
+	// Lambda scenario shares.
+	checks []func(assemblyDir string) error
+}
+
+var (
+	lambdaNodejsFunction = lambdaFixture{
+		dir:     "evals/custom/fixtures/lambda/nodejs-function",
+		runtime: "Node.js 22",
+		handler: "lambda/index.js",
+	}
+	lambdaPythonFunction = lambdaFixture{
+		dir:     "evals/custom/fixtures/lambda/python-function",
+		runtime: "Python 3.13",
+		handler: "lambda/index.py",
+	}
+	// lambdaJavaFunction's outbound call is a java.net.http request.
+	lambdaJavaFunction = lambdaFixture{
+		dir:     "evals/custom/fixtures/lambda/java-function",
+		runtime: "Java 21",
+		handler: "lambda/src/main/java/com/example/checkout/CheckoutHandler.java",
+		build:   lambdaMavenBuild,
+	}
+)
+
+var lambdaMavenBuild = &lambdaBuild{
+	args:   []string{"mvn", "-B", "-q", "-DskipTests", "package"},
+	output: "lambda/target/function.jar",
+}
+
+var lambdaSpecs = []lambdaSpec{
+	{id: LambdaNodejsDash0LayerID, fixture: lambdaNodejsFunction, path: lambdaPathDash0},
+	{id: LambdaNodejsUpstreamLayersID, fixture: lambdaNodejsFunction, path: lambdaPathUpstream},
+	{id: LambdaPythonDash0LayerID, fixture: lambdaPythonFunction, path: lambdaPathDash0},
+	{id: LambdaPythonUpstreamLayersID, fixture: lambdaPythonFunction, path: lambdaPathUpstream},
+	{id: LambdaJavaDash0LayerID, fixture: lambdaJavaFunction, path: lambdaPathDash0},
+}
+
+// lambdaSpecFor returns the spec of a registered Lambda scenario.
+func lambdaSpecFor(id string) (lambdaSpec, bool) {
+	for _, spec := range lambdaSpecs {
+		if spec.id == id {
+			return spec, true
+		}
+	}
+	return lambdaSpec{}, false
+}
+
+// assemblyChecks are every check of the synthesized cloud assembly beyond
+// checkLambdaTemplates: the Collector configuration on the upstream path, and
+// the scenario's own.
+func (s lambdaSpec) assemblyChecks() []func(assemblyDir string) error {
+	var checks []func(string) error
+	if s.path == lambdaPathUpstream {
+		checks = append(checks, checkCollectorConfig)
+	}
+	return append(checks, s.checks...)
+}
+
+func (s lambdaSpec) scenario() harness.Scenario {
+	ruleFiles := []string{"skills/otel-instrumentation/rules/platforms/aws-lambda.md"}
+	task := "Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation)."
+	path := "Dash0 is the only telemetry backend."
+	if s.path == lambdaPathUpstream {
+		ruleFiles = append(ruleFiles,
+			"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md",
+			"skills/otel-collector/rules/deployment/aws-lambda.md")
+		task = "Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector)."
+		path = "The platform team requires the upstream OpenTelemetry Lambda layers with the OpenTelemetry Collector layer, so the same setup can later fan out to a second backend; do not use the Dash0 Lambda extension."
+	} else {
+		ruleFiles = append(ruleFiles, "skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md")
+	}
+	return harness.Scenario{
+		ID:               s.id,
+		Skill:            harness.SkillInstrumentation,
+		RuleFiles:        ruleFiles,
+		RequiresAWS:      true,
+		FixturePath:      s.fixture.dir,
+		Prompt:           s.fixture.prompt(task, path),
+		Timeout:          lambdaScenarioTimeout,
+		TelemetryTimeout: lambdaTelemetryTimeout,
+		Assert:           assertLambdaInvocation(lambdaServiceName),
+	}
 }
 
 // prompt is the prompt of a Lambda scenario: task names the goal and the
-// skills, and path the scenario-specific constraint.
-func (rt lambdaRuntime) prompt(task, path string) string {
-	return `The current directory contains an AWS CDK app (TypeScript) that deploys the ` + rt.runtime + ` AWS Lambda function CheckoutFunction (lib/checkout-stack.ts; the handler is ` + rt.handler + `) as a ZIP archive. It emits no telemetry. ` + task + `
+// skills, and path the path-specific constraint.
+func (f lambdaFixture) prompt(task, path string) string {
+	build := ""
+	if f.build != nil {
+		build = "\n- Before synthesizing, the harness builds the function by running `" + strings.Join(append(append([]string(nil), f.build.env...), f.build.args...), " ") + "` in lambda/, and the stack deploys " + f.build.output + ". Keep that command and that path working."
+	}
+	return `The current directory contains an AWS CDK app (TypeScript) that deploys the ` + f.runtime + ` AWS Lambda function CheckoutFunction (lib/checkout-stack.ts; the handler is ` + f.handler + `) as a ZIP archive. It emits no telemetry. ` + task + `
 
 Requirements:
-- Do not change the handler code in ` + rt.handler + `.
+- Do not change the handler code in ` + f.handler + `.
 - ` + path + `
 - The stack props already carry the Dash0 OTLP/HTTP endpoint (dash0OtlpHttpEndpoint), the Dash0 OTLP/gRPC endpoint (dash0OtlpGrpcEndpoint), the dataset (dash0Dataset), and the ARN of the AWS Secrets Manager secret holding the Dash0 auth token as a plain string (dash0TokenSecretArn). Use them; never write the token, an endpoint, or the dataset as literals.
 - Attribute the telemetry to the service checkout-service, not to the function name.
-- Keep everything marked harness-owned unchanged: the function name, the handling of the EVAL_* and DASH0_* variables in bin/app.ts, and the OTEL_RESOURCE_ATTRIBUTES value (append further attributes after a comma). Name every function or Lambda layer you add with the stack name as prefix.
+- Keep everything marked harness-owned unchanged: the function name, the handling of the EVAL_* and DASH0_* variables in bin/app.ts, and the OTEL_RESOURCE_ATTRIBUTES value (append further attributes after a comma). Name every function or Lambda layer you add with the stack name as prefix.` + build + `
 - Do not add a function URL, an API, or any other trigger.
 - Do not deploy or synthesize against AWS; the harness deploys and invokes the function.`
-}
-
-// lambdaAssemblyChecks are the scenario-specific checks of the synthesized
-// cloud assembly, run after the checks every Lambda scenario shares.
-var lambdaAssemblyChecks = map[string][]func(assemblyDir string) error{
-	LambdaNodejsUpstreamLayersID: {checkCollectorConfig},
-	LambdaPythonUpstreamLayersID: {checkCollectorConfig},
 }
 
 // LambdaConfig is the account and Dash0 configuration of a Lambda run.
@@ -308,12 +371,22 @@ func (f *LambdaFixture) cdkEnv(base []string, resourceAttrs string) []string {
 	)
 }
 
-// build installs the app's dependencies, synthesizes it into cdk.out against
-// the eval bootstrap qualifier, and checks the synthesized template for the
-// properties telemetry cannot show.
+// build compiles the function when the runtime needs it, installs the app's
+// dependencies, synthesizes it into cdk.out against the eval bootstrap
+// qualifier, and checks the synthesized assembly for the properties
+// telemetry cannot show.
 func (f *LambdaFixture) build(ctx context.Context, workdir string, env map[string]string) error {
+	spec, ok := lambdaSpecFor(f.scenarioID)
+	if !ok {
+		return fmt.Errorf("no Lambda scenario %q", f.scenarioID)
+	}
 	f.stackName = lambdaStackPrefix + strings.TrimPrefix(f.scenarioID, "lambda-") + "-" + randomSuffix()
 	scrubbed := harness.ScrubbedEnviron()
+	if b := spec.fixture.build; b != nil {
+		if out, err := runIn(ctx, filepath.Join(workdir, "lambda"), append(scrubbed, b.env...), b.args[0], b.args[1:]...); err != nil {
+			return fmt.Errorf("build the function (%s): %w\n%s", strings.Join(b.args, " "), err, truncate(out, 8000))
+		}
+	}
 	if out, err := runIn(ctx, workdir, scrubbed, "npm", "install", "--no-audit", "--no-fund"); err != nil {
 		return fmt.Errorf("npm install: %w\n%s", err, out)
 	}
@@ -326,7 +399,7 @@ func (f *LambdaFixture) build(ctx context.Context, workdir string, env map[strin
 	if err := checkLambdaTemplates(assembly); err != nil {
 		return err
 	}
-	for _, check := range lambdaAssemblyChecks[f.scenarioID] {
+	for _, check := range spec.assemblyChecks() {
 		if err := check(assembly); err != nil {
 			return err
 		}

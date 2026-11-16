@@ -106,7 +106,8 @@ func (d *DockerFixture) Hooks() harness.FixtureHooks {
 	return harness.FixtureHooks{Build: d.build, Run: d.run, AppOutput: d.appOutput}
 }
 
-// ParentTrafficHooks adds parent-context traffic for the Node.js scenario.
+// ParentTrafficHooks adds parent-context traffic for the Node.js and Rust HTTP
+// scenarios.
 // Probe a sampled and an unsampled remote parent as well as the existing root
 // requests; the unsampled probe is what separates the `always_on` sampler the
 // skill prescribes from the SDK default.

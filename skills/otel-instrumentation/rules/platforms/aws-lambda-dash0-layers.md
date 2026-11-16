@@ -38,6 +38,7 @@ arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:<version>
 ```
 
 Use the `manual` layer when the function is instrumented with the OpenTelemetry SDK in code — Go and .NET, or any runtime where you want to own the instrumentation — and only needs the extension's exporter and Lambda lifecycle handling.
+Point the SDK's OTLP/HTTP exporter at the extension on loopback, `http://127.0.0.1:9009`.
 See [runtimes without an auto-instrumentation layer](./aws-lambda.md#runtimes-without-an-auto-instrumentation-layer) for the in-code setup that pairs with it.
 
 Layers are region-scoped: the ARN must name the same region as the function.

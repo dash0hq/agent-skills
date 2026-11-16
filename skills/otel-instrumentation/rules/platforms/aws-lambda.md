@@ -63,7 +63,16 @@ Both run as external Lambda extensions — separate processes in the execution e
 
 Do not set `AWS_LAMBDA_EXEC_WRAPPER` on this path, there is no wrapper script to run.
 
-Setting `OTEL_EXPORTER_OTLP_ENDPOINT` **is** required here: nothing configures the SDK for you, so point it at the Collector layer on loopback explicitly and ensure the SDK flushes the telemetry before returning the response.
+Setting `OTEL_EXPORTER_OTLP_ENDPOINT` **is** required here: nothing configures the SDK for you, so point it at the exporter layer on loopback explicitly and ensure the SDK flushes the telemetry before returning the response.
+Pick the endpoint by the layer the function attaches:
+
+| Exporter layer | `OTEL_EXPORTER_OTLP_PROTOCOL` | `OTEL_EXPORTER_OTLP_ENDPOINT` |
+| --- | --- | --- |
+| `dash0-extension-manual` | `http/protobuf` | `http://127.0.0.1:9009` |
+| Upstream Collector layer | `http/protobuf` | `http://localhost:4318` |
+| Upstream Collector layer | `grpc` | `http://localhost:4317` |
+
+`dash0-extension-manual` accepts only OTLP/HTTP on port 9009, and nothing listens on ports 4317 or 4318 when it is the only exporter layer: an SDK pointed there exports nothing, without an error in the function logs.
 
 ### Go
 
@@ -134,8 +143,9 @@ Omitting any of them produces a function that succeeds while exporting nothing.
    Set `options.DisableAwsXRayContextExtraction = true` on `AddAWSLambdaConfigurations`.
 3. **Set the OTLP protocol explicitly.**
    The .NET OTLP exporter defaults to gRPC.
-   Pointing it at port 4318 without `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` gives a gRPC client talking to an HTTP receiver and no telemetry.
-   Either set that variable and use `http://localhost:4318`, or leave the default gRPC protocol and use `http://localhost:4317`.
+   Pointing it at an OTLP/HTTP endpoint without `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` gives a gRPC client talking to an HTTP receiver and no telemetry.
+   With `dash0-extension-manual`, set that variable and use `http://127.0.0.1:9009`.
+   With the upstream Collector layer, either set that variable and use `http://localhost:4318`, or leave the default gRPC protocol and use `http://localhost:4317`.
 4. **Force a flush before the handler returns**, in a `finally` block: `tracerProvider.ForceFlush()` and `meterProvider.ForceFlush()`.
    The execution environment freezes on return and anything still buffered is lost.
 

@@ -24,6 +24,7 @@ var allScenarioIDs = []string{
 	K8sDownwardAPIID, K8sOTelOperatorID, K8sHelmChartID, K8sRawManifestsID, K8sDash0OperatorID,
 	PythonRetiredInstrumentationUpgradeID,
 	LambdaNodejsDash0LayerID,
+	LambdaNodejsUpstreamLayersID,
 }
 
 // instrumentationSelectable is every otel-instrumentation scenario reachable

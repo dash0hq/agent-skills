@@ -19,7 +19,8 @@ const app = new cdk.App();
 const stack = new CheckoutStack(app, 'CheckoutStack', {
   stackName: required('EVAL_STACK_NAME'),
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: required('CDK_DEFAULT_REGION') },
-  dash0Endpoint: required('DASH0_ENDPOINT'),
+  dash0OtlpHttpEndpoint: required('DASH0_OTLP_HTTP_ENDPOINT'),
+  dash0OtlpGrpcEndpoint: required('DASH0_OTLP_GRPC_ENDPOINT'),
   dash0Dataset: required('DASH0_DATASET'),
   dash0TokenSecretArn: required('DASH0_TOKEN_SECRET_ARN'),
   evalResourceAttributes: required('EVAL_RESOURCE_ATTRIBUTES'),

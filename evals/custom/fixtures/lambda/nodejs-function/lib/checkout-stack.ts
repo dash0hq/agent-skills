@@ -6,8 +6,10 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 
 export interface CheckoutStackProps extends cdk.StackProps {
-  /** Dash0 OTLP/HTTP ingress endpoint, for example `https://ingress.eu-west-1.aws.dash0.com`. */
-  readonly dash0Endpoint: string;
+  /** Dash0 OTLP/HTTP ingress endpoint URL, for example `https://ingress.eu-west-1.aws.dash0.com`. */
+  readonly dash0OtlpHttpEndpoint: string;
+  /** Dash0 OTLP/gRPC ingress endpoint, host and port without a scheme, for example `ingress.eu-west-1.aws.dash0.com:4317`. */
+  readonly dash0OtlpGrpcEndpoint: string;
   /** Dash0 dataset the telemetry must be routed to. */
   readonly dash0Dataset: string;
   /** ARN of the Secrets Manager secret holding the Dash0 auth token as a plain string. */
@@ -19,6 +21,9 @@ export interface CheckoutStackProps extends cdk.StackProps {
   readonly evalResourceAttributes: string;
 }
 
+// Harness-owned naming: the eval deployment role can only create resources
+// whose names start with the stack name. Name every function or layer you add
+// `${this.stackName}-<suffix>`.
 export class CheckoutStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: CheckoutStackProps) {
     super(scope, id, props);

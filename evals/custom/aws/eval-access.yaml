@@ -76,6 +76,24 @@ Resources:
             Effect: Allow
             Action: lambda:GetLayerVersion
             Resource: "*"
+          # The upstream-layer path ships the Collector configuration as a
+          # layer of the stack's own.
+          - Sid: EvalLayers
+            Effect: Allow
+            Action:
+              - lambda:PublishLayerVersion
+              - lambda:DeleteLayerVersion
+              - lambda:GetLayerVersion
+            Resource:
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:AgentSkillsEval*
+              - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:AgentSkillsEval*:*
+          # The upstream Collector layer reads the token only from the function
+          # environment, so the upstream-layer path resolves it at deploy time
+          # with a {{resolve:secretsmanager:...}} dynamic reference.
+          - Sid: ResolveDash0Token
+            Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${TokenSecretName}-*
           - Sid: CreateBoundedRoles
             Effect: Allow
             Action:

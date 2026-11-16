@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
+	"gopkg.in/yaml.v3"
 
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -32,6 +33,12 @@ import (
 // platforms/aws-lambda-dash0-layers.md: the agent instruments a Node.js
 // function with the Dash0 Lambda extension layer (path B).
 const LambdaNodejsDash0LayerID = "lambda-nodejs-dash0-layer"
+
+// LambdaNodejsUpstreamLayersID covers platforms/aws-lambda-otel-layers.md and
+// the Collector skill's deployment/aws-lambda.md: the agent instruments a
+// Node.js function with the upstream OpenTelemetry layers plus the Collector
+// layer and its configuration (path A).
+const LambdaNodejsUpstreamLayersID = "lambda-nodejs-upstream-layers"
 
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
@@ -76,29 +83,65 @@ func init() { registerScenarios(LambdaScenarios()...) }
 
 // LambdaScenarios returns the AWS Lambda scenario set.
 func LambdaScenarios() []harness.Scenario {
-	return []harness.Scenario{{
-		ID:    LambdaNodejsDash0LayerID,
-		Skill: harness.SkillInstrumentation,
-		RuleFiles: []string{
-			"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
-			"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md",
+	return []harness.Scenario{
+		{
+			ID:    LambdaNodejsDash0LayerID,
+			Skill: harness.SkillInstrumentation,
+			RuleFiles: []string{
+				"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
+				"skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md",
+			},
+			RequiresAWS: true,
+			FixturePath: lambdaNodejsFixture,
+			Prompt: lambdaNodejsPrompt(
+				"Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation).",
+				"Dash0 is the only telemetry backend."),
+			Timeout:          lambdaScenarioTimeout,
+			TelemetryTimeout: lambdaTelemetryTimeout,
+			Assert:           assertLambdaInvocation(lambdaServiceName),
 		},
-		RequiresAWS: true,
-		FixturePath: "evals/custom/fixtures/lambda/nodejs-function",
-		Prompt: `The current directory contains an AWS CDK app (TypeScript) that deploys the Node.js 22 AWS Lambda function CheckoutFunction (lib/checkout-stack.ts; the handler is lambda/index.js) as a ZIP archive. It emits no telemetry. Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation).
+		{
+			ID:    LambdaNodejsUpstreamLayersID,
+			Skill: harness.SkillInstrumentation,
+			RuleFiles: []string{
+				"skills/otel-instrumentation/rules/platforms/aws-lambda.md",
+				"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md",
+				"skills/otel-collector/rules/deployment/aws-lambda.md",
+			},
+			RequiresAWS: true,
+			FixturePath: lambdaNodejsFixture,
+			Prompt: lambdaNodejsPrompt(
+				"Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector).",
+				"The platform team requires the upstream OpenTelemetry Lambda layers with the OpenTelemetry Collector layer, so the same setup can later fan out to a second backend; do not use the Dash0 Lambda extension."),
+			Timeout:          lambdaScenarioTimeout,
+			TelemetryTimeout: lambdaTelemetryTimeout,
+			Assert:           assertLambdaInvocation(lambdaServiceName),
+		},
+	}
+}
+
+// lambdaNodejsFixture is the CDK app both Node.js scenarios start from.
+const lambdaNodejsFixture = "evals/custom/fixtures/lambda/nodejs-function"
+
+// lambdaNodejsPrompt is the prompt of a Node.js Lambda scenario: task names
+// the goal and the skills, and path the scenario-specific constraint.
+func lambdaNodejsPrompt(task, path string) string {
+	return `The current directory contains an AWS CDK app (TypeScript) that deploys the Node.js 22 AWS Lambda function CheckoutFunction (lib/checkout-stack.ts; the handler is lambda/index.js) as a ZIP archive. It emits no telemetry. ` + task + `
 
 Requirements:
 - Do not change the handler code in lambda/index.js.
-- Dash0 is the only telemetry backend.
-- The stack props already carry the Dash0 OTLP/HTTP endpoint (dash0Endpoint), the dataset (dash0Dataset), and the ARN of the AWS Secrets Manager secret holding the Dash0 auth token as a plain string (dash0TokenSecretArn). Use them; never write the token, the endpoint, or the dataset as literals.
+- ` + path + `
+- The stack props already carry the Dash0 OTLP/HTTP endpoint (dash0OtlpHttpEndpoint), the Dash0 OTLP/gRPC endpoint (dash0OtlpGrpcEndpoint), the dataset (dash0Dataset), and the ARN of the AWS Secrets Manager secret holding the Dash0 auth token as a plain string (dash0TokenSecretArn). Use them; never write the token, an endpoint, or the dataset as literals.
 - Attribute the telemetry to the service checkout-service, not to the function name.
-- Keep everything marked harness-owned unchanged: the function name, the handling of the EVAL_* and DASH0_* variables in bin/app.ts, and the OTEL_RESOURCE_ATTRIBUTES value (append further attributes after a comma).
+- Keep everything marked harness-owned unchanged: the function name, the handling of the EVAL_* and DASH0_* variables in bin/app.ts, and the OTEL_RESOURCE_ATTRIBUTES value (append further attributes after a comma). Name every function or Lambda layer you add with the stack name as prefix.
 - Do not add a function URL, an API, or any other trigger.
-- Do not deploy or synthesize against AWS; the harness deploys and invokes the function.`,
-		Timeout:          lambdaScenarioTimeout,
-		TelemetryTimeout: lambdaTelemetryTimeout,
-		Assert:           assertLambdaInvocation(lambdaServiceName),
-	}}
+- Do not deploy or synthesize against AWS; the harness deploys and invokes the function.`
+}
+
+// lambdaAssemblyChecks are the scenario-specific checks of the synthesized
+// cloud assembly, run after the checks every Lambda scenario shares.
+var lambdaAssemblyChecks = map[string][]func(assemblyDir string) error{
+	LambdaNodejsUpstreamLayersID: {checkCollectorConfig},
 }
 
 // LambdaConfig is the account and Dash0 configuration of a Lambda run.
@@ -139,6 +182,17 @@ func LambdaConfigFromEnv() (LambdaConfig, []string) {
 	return cfg, missing
 }
 
+// grpcEndpoint derives the OTLP/gRPC endpoint (host:4317, no scheme) from
+// the OTLP/HTTP endpoint URL: Dash0 serves both protocols on the same host.
+func (c LambdaConfig) grpcEndpoint() string {
+	host := strings.TrimSuffix(c.OTLPEndpoint, "/")
+	host = strings.TrimPrefix(strings.TrimPrefix(host, "https://"), "http://")
+	if h, _, ok := strings.Cut(host, ":"); ok {
+		host = h
+	}
+	return host + ":4317"
+}
+
 // account returns the AWS account ID embedded in the token secret ARN.
 func (c LambdaConfig) account() string {
 	parts := strings.Split(c.TokenSecretARN, ":")
@@ -152,8 +206,9 @@ func (c LambdaConfig) account() string {
 // scenario. Every attempt deploys its own stack; every stack is destroyed
 // when the test finishes.
 type LambdaFixture struct {
-	t   testingT
-	cfg LambdaConfig
+	t          testingT
+	cfg        LambdaConfig
+	scenarioID string
 
 	mu        sync.Mutex
 	stackName string
@@ -165,8 +220,8 @@ type LambdaFixture struct {
 // the attempt workspace, which the runner creates with t.TempDir after this
 // t.Cleanup fallback is registered, so the cleanup alone would run after the
 // workspace is gone.
-func NewLambdaFixture(t testingT, cfg LambdaConfig) *LambdaFixture {
-	f := &LambdaFixture{t: t, cfg: cfg}
+func NewLambdaFixture(t testingT, cfg LambdaConfig, scenarioID string) *LambdaFixture {
+	f := &LambdaFixture{t: t, cfg: cfg, scenarioID: scenarioID}
 	t.Cleanup(f.Close)
 	return f
 }
@@ -206,7 +261,8 @@ func (f *LambdaFixture) cdkEnv(base []string, resourceAttrs string) []string {
 		"CDK_DEFAULT_REGION="+f.cfg.Region,
 		"CDK_DEFAULT_ACCOUNT="+f.cfg.account(),
 		"AWS_REGION="+f.cfg.Region,
-		"DASH0_ENDPOINT="+f.cfg.OTLPEndpoint,
+		"DASH0_OTLP_HTTP_ENDPOINT="+f.cfg.OTLPEndpoint,
+		"DASH0_OTLP_GRPC_ENDPOINT="+f.cfg.grpcEndpoint(),
 		"DASH0_DATASET="+f.cfg.Dataset,
 		"DASH0_TOKEN_SECRET_ARN="+f.cfg.TokenSecretARN,
 	)
@@ -216,7 +272,7 @@ func (f *LambdaFixture) cdkEnv(base []string, resourceAttrs string) []string {
 // the eval bootstrap qualifier, and checks the synthesized template for the
 // properties telemetry cannot show.
 func (f *LambdaFixture) build(ctx context.Context, workdir string, env map[string]string) error {
-	f.stackName = lambdaStackPrefix + "nodejs-" + randomSuffix()
+	f.stackName = lambdaStackPrefix + strings.TrimPrefix(f.scenarioID, "lambda-") + "-" + randomSuffix()
 	scrubbed := harness.ScrubbedEnviron()
 	if out, err := runIn(ctx, workdir, scrubbed, "npm", "install", "--no-audit", "--no-fund"); err != nil {
 		return fmt.Errorf("npm install: %w\n%s", err, out)
@@ -226,7 +282,16 @@ func (f *LambdaFixture) build(ctx context.Context, workdir string, env map[strin
 		"--context", "@aws-cdk/core:bootstrapQualifier="+lambdaCDKQualifier); err != nil {
 		return fmt.Errorf("cdk synth: %w\n%s", err, out)
 	}
-	return checkLambdaTemplates(filepath.Join(workdir, "cdk.out"))
+	assembly := filepath.Join(workdir, "cdk.out")
+	if err := checkLambdaTemplates(assembly); err != nil {
+		return err
+	}
+	for _, check := range lambdaAssemblyChecks[f.scenarioID] {
+		if err := check(assembly); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // run deploys the synthesized assembly, invokes the function, and starts
@@ -382,7 +447,11 @@ func (f *LambdaFixture) diagnose(ctx context.Context, class harness.FailureClass
 // checkLambdaTemplates fails on synthesized properties the rules forbid and
 // telemetry cannot reveal: X-Ray tracing left Active, which competes with
 // OpenTelemetry for the trace context, and an auth token written into the
-// function environment instead of read from Secrets Manager.
+// function environment instead of read from Secrets Manager. A token variable
+// whose value is a {{resolve:secretsmanager:...}} dynamic reference passes:
+// the upstream Collector layer can only read the token from its environment,
+// and the rules prescribe resolving it at deploy time. It also enforces the
+// harness-owned naming of layers, which the deployment role is scoped to.
 func checkLambdaTemplates(assemblyDir string) error {
 	templates, err := filepath.Glob(filepath.Join(assemblyDir, "*.template.json"))
 	if err != nil || len(templates) == 0 {
@@ -398,6 +467,7 @@ func checkLambdaTemplates(assemblyDir string) error {
 			Resources map[string]struct {
 				Type       string `json:"Type"`
 				Properties struct {
+					LayerName     any `json:"LayerName"`
 					TracingConfig struct {
 						Mode string `json:"Mode"`
 					} `json:"TracingConfig"`
@@ -411,14 +481,20 @@ func checkLambdaTemplates(assemblyDir string) error {
 			return fmt.Errorf("parse %s: %w", filepath.Base(path), err)
 		}
 		for id, res := range tpl.Resources {
+			if res.Type == "AWS::Lambda::LayerVersion" {
+				if name, _ := res.Properties.LayerName.(string); !strings.HasPrefix(name, lambdaStackPrefix) {
+					problems = append(problems, fmt.Sprintf("%s: layer name %v does not start with the stack name", id, res.Properties.LayerName))
+				}
+				continue
+			}
 			if res.Type != "AWS::Lambda::Function" {
 				continue
 			}
 			if res.Properties.TracingConfig.Mode == "Active" {
 				problems = append(problems, fmt.Sprintf("%s: X-Ray tracing is Active; set it to PassThrough", id))
 			}
-			for name := range res.Properties.Environment.Variables {
-				if strings.Contains(strings.ToUpper(name), "TOKEN") && !strings.Contains(strings.ToUpper(name), "SECRET") {
+			for name, value := range res.Properties.Environment.Variables {
+				if strings.Contains(strings.ToUpper(name), "TOKEN") && !strings.Contains(strings.ToUpper(name), "SECRET") && !isSecretsManagerReference(value) {
 					problems = append(problems, fmt.Sprintf("%s: environment variable %s carries a token; read it from Secrets Manager instead", id, name))
 				}
 			}
@@ -427,6 +503,86 @@ func checkLambdaTemplates(assemblyDir string) error {
 	if len(problems) > 0 {
 		sort.Strings(problems)
 		return fmt.Errorf("synthesized template check failed:\n- %s", strings.Join(problems, "\n- "))
+	}
+	return nil
+}
+
+// isSecretsManagerReference reports whether a template value resolves from
+// Secrets Manager at deploy time: a {{resolve:secretsmanager:...}} dynamic
+// reference, possibly inside an Fn::Join when the secret ARN is a token.
+func isSecretsManagerReference(value any) bool {
+	data, err := json.Marshal(value)
+	return err == nil && strings.Contains(string(data), "{{resolve:secretsmanager:")
+}
+
+// checkCollectorConfig checks the Collector configuration an upstream-layer
+// scenario packages, for the rules telemetry cannot reveal: it sits at the
+// root of a staged asset (a nested file unpacks where the Collector never
+// looks), every pipeline runs the decouple processor and no memory_limiter,
+// and the otlp receiver binds to localhost rather than all interfaces.
+func checkCollectorConfig(assemblyDir string) error {
+	candidates, err := filepath.Glob(filepath.Join(assemblyDir, "asset.*", "*.y*ml"))
+	if err != nil {
+		return err
+	}
+	var problems []string
+	found := false
+	for _, path := range candidates {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		var cfg struct {
+			Receivers map[string]struct {
+				Protocols map[string]struct {
+					Endpoint string `yaml:"endpoint"`
+				} `yaml:"protocols"`
+			} `yaml:"receivers"`
+			Service struct {
+				Pipelines map[string]struct {
+					Processors []string `yaml:"processors"`
+				} `yaml:"pipelines"`
+			} `yaml:"service"`
+		}
+		if yaml.Unmarshal(data, &cfg) != nil {
+			continue
+		}
+		if _, ok := cfg.Receivers["telemetryapi"]; !ok {
+			continue
+		}
+		found = true
+		name := filepath.Base(path)
+		for id, receiver := range cfg.Receivers {
+			if id != "otlp" && !strings.HasPrefix(id, "otlp/") {
+				continue
+			}
+			for proto, p := range receiver.Protocols {
+				if !strings.HasPrefix(p.Endpoint, "localhost:") && !strings.HasPrefix(p.Endpoint, "127.0.0.1:") {
+					problems = append(problems, fmt.Sprintf("%s: receiver %s %s endpoint %q does not bind to localhost", name, id, proto, p.Endpoint))
+				}
+			}
+		}
+		for id, pipeline := range cfg.Service.Pipelines {
+			hasDecouple := false
+			for _, proc := range pipeline.Processors {
+				if proc == "decouple" || strings.HasPrefix(proc, "decouple/") {
+					hasDecouple = true
+				}
+				if proc == "memory_limiter" || strings.HasPrefix(proc, "memory_limiter/") {
+					problems = append(problems, fmt.Sprintf("%s: pipeline %s runs %s", name, id, proc))
+				}
+			}
+			if !hasDecouple {
+				problems = append(problems, fmt.Sprintf("%s: pipeline %s does not run the decouple processor", name, id))
+			}
+		}
+	}
+	if !found {
+		return fmt.Errorf("no Collector configuration with a telemetryapi receiver at the root of a staged asset in %s", assemblyDir)
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf("collector configuration check failed:\n- %s", strings.Join(problems, "\n- "))
 	}
 	return nil
 }

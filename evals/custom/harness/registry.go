@@ -104,13 +104,7 @@ var defaultRuleClassification = map[string]RuleClassification{
 // the scenario; the registry test fails on any dedicated file that is neither
 // covered by a registered scenario nor listed here, so entries must be
 // removed as the scenarios land.
-var pendingScenarios = map[string]string{
-	// The upstream-layer path (path A) and its Collector layer are covered by
-	// the Python AWS Lambda scenario, which lands after the Node.js one
-	// (lambda-nodejs-dash0-layer) proved the AWS topology.
-	"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md": "lambda-python-upstream-layers",
-	"skills/otel-collector/rules/deployment/aws-lambda.md":                  "lambda-python-upstream-layers",
-}
+var pendingScenarios = map[string]string{}
 
 // Paths that trigger a full-matrix run when changed: the plugin manifest
 // (skill loading), the repo agent rules (prompt-bearing), and the pinned

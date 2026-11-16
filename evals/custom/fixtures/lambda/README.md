@@ -18,7 +18,8 @@ The harness owns these items, and the scenario prompt tells the agent to keep th
 - The stack name and the function name, both read from `EVAL_STACK_NAME`. Every deployed resource matches the `AgentSkillsEval*` scope of the CloudFormation execution policy.
 - The `OTEL_RESOURCE_ATTRIBUTES` value from `EVAL_RESOURCE_ATTRIBUTES`. It carries the per-run `test.id` that the read-back query filters on, and the agent appends to it after a comma.
 - The permissions boundary from `EVAL_PERMISSIONS_BOUNDARY`, applied to every role in the stack.
-- The `dash0Endpoint`, `dash0Dataset`, and `dash0TokenSecretArn` stack props. The agent must use them and must not write literals.
+- The `dash0OtlpHttpEndpoint`, `dash0OtlpGrpcEndpoint`, `dash0Dataset`, and `dash0TokenSecretArn` stack props. The agent must use them and must not write literals.
+- Names of added functions and Lambda layers, which must start with the stack name. The CloudFormation execution policy only allows creating `AgentSkillsEval*` resources, and the harness rejects a layer named otherwise before deploying.
 
 ## How the harness runs a Lambda fixture
 

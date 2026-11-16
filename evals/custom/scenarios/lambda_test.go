@@ -113,6 +113,70 @@ func TestCheckLambdaTemplates(t *testing.T) {
 	require.ErrorContains(t, checkLambdaTemplates(write(t, "Active", `"DASH0_TOKEN_SECRET_ARN": "x"`)), "X-Ray tracing is Active")
 	require.ErrorContains(t, checkLambdaTemplates(write(t, "PassThrough", `"DASH0_AUTH_TOKEN": "TEST-0001"`)), "DASH0_AUTH_TOKEN carries a token")
 	require.Error(t, checkLambdaTemplates(t.TempDir()), "an empty assembly is a build failure")
+
+	// The upstream Collector layer reads the token from the environment, so a
+	// deploy-time Secrets Manager reference passes, plain or inside Fn::Join.
+	require.NoError(t, checkLambdaTemplates(write(t, "PassThrough", `"OTLP_AUTH_TOKEN": "{{resolve:secretsmanager:arn:aws:secretsmanager:eu-west-1:000000000000:secret:TEST-0001:SecretString:::}}"`)))
+	require.NoError(t, checkLambdaTemplates(write(t, "PassThrough", `"OTLP_AUTH_TOKEN": {"Fn::Join": ["", ["{{resolve:secretsmanager:", {"Ref": "TEST"}, ":SecretString:::}}"]]}`)))
+}
+
+func TestCheckLambdaTemplatesLayerNames(t *testing.T) {
+	write := func(t *testing.T, layerName string) string {
+		dir := t.TempDir()
+		tpl := `{"Resources": {"ConfigLayer": {"Type": "AWS::Lambda::LayerVersion", "Properties": {` + layerName + `}}}}`
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "CheckoutStack.template.json"), []byte(tpl), 0o644))
+		return dir
+	}
+
+	require.NoError(t, checkLambdaTemplates(write(t, `"LayerName": "AgentSkillsEval-TEST-0001-collector-config"`)))
+	require.ErrorContains(t, checkLambdaTemplates(write(t, `"LayerName": "otel-collector-config"`)), "does not start with the stack name")
+	require.ErrorContains(t, checkLambdaTemplates(write(t, ``)), "does not start with the stack name", "an unnamed layer gets a name the deployment role cannot create")
+}
+
+func TestCheckCollectorConfig(t *testing.T) {
+	const good = `receivers:
+  telemetryapi:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "localhost:4317"
+      http:
+        endpoint: "localhost:4318"
+processors:
+  decouple:
+exporters:
+  otlp_grpc:
+    endpoint: ${env:OTLP_ENDPOINT}
+service:
+  pipelines:
+    traces:
+      receivers: [telemetryapi, otlp]
+      processors: [decouple]
+      exporters: [otlp_grpc]
+`
+	stage := func(t *testing.T, rel, content string) string {
+		dir := t.TempDir()
+		path := filepath.Join(dir, rel)
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+		return dir
+	}
+
+	require.NoError(t, checkCollectorConfig(stage(t, "asset.TEST0001/otel-collector-config.yaml", good)))
+	require.ErrorContains(t, checkCollectorConfig(stage(t, "asset.TEST0001/config/otel-collector-config.yaml", good)),
+		"no Collector configuration", "a nested file unpacks where the Collector never looks")
+	require.ErrorContains(t, checkCollectorConfig(stage(t, "asset.TEST0001/otel-collector-config.yaml",
+		strings.ReplaceAll(good, "localhost:4317", "0.0.0.0:4317"))), "does not bind to localhost")
+	require.ErrorContains(t, checkCollectorConfig(stage(t, "asset.TEST0001/otel-collector-config.yaml",
+		strings.ReplaceAll(good, "processors: [decouple]", "processors: [memory_limiter, batch]"))), "does not run the decouple processor")
+	require.ErrorContains(t, checkCollectorConfig(stage(t, "asset.TEST0001/otel-collector-config.yaml",
+		strings.ReplaceAll(good, "processors: [decouple]", "processors: [memory_limiter, decouple]"))), "runs memory_limiter")
+}
+
+func TestLambdaConfigGRPCEndpoint(t *testing.T) {
+	for _, endpoint := range []string{"https://ingress.example.test", "https://ingress.example.test/", "https://ingress.example.test:443"} {
+		require.Equal(t, "ingress.example.test:4317", LambdaConfig{OTLPEndpoint: endpoint}.grpcEndpoint())
+	}
 }
 
 func TestLambdaConfigAccount(t *testing.T) {
@@ -159,7 +223,7 @@ func TestLambdaScenarios(t *testing.T) {
 			if !selected(sc.ID) {
 				t.Skip("skipped by the EVAL_SCENARIOS filter")
 			}
-			fix := NewLambdaFixture(t, cfg)
+			fix := NewLambdaFixture(t, cfg, sc.ID)
 			defer fix.Close()
 			runner := &harness.Runner{
 				RepoRoot: root,

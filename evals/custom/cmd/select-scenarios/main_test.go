@@ -34,7 +34,7 @@ func TestBuildSelectionPRGoRuleFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Exactly the scenarios declaring the Go SDK rule file (AE2).
-	require.Equal(t, []string{scenarios.GoHTTPID, scenarios.GoLogsID, scenarios.LambdaGoDash0LayerID}, ids(out, nil))
+	require.Equal(t, []string{scenarios.GoHTTPID, scenarios.GoLogsID, scenarios.LambdaGoDash0LayerID, scenarios.LambdaGoUpstreamLayersID}, ids(out, nil))
 	require.Equal(t, 2, out.Count)
 	require.Equal(t, 0, out.KindCount)
 	require.Empty(t, out.Quarantined)
@@ -46,7 +46,7 @@ func TestBuildSelectionQuarantineExcludedInPRIncludedInNightly(t *testing.T) {
 
 	pr, err := buildSelection(reg, gatePR, []string{"skills/otel-instrumentation/rules/sdks/go.md"}, quarantined)
 	require.NoError(t, err)
-	require.Equal(t, []string{scenarios.GoLogsID, scenarios.LambdaGoDash0LayerID}, ids(pr, nil),
+	require.Equal(t, []string{scenarios.GoLogsID, scenarios.LambdaGoDash0LayerID, scenarios.LambdaGoUpstreamLayersID}, ids(pr, nil),
 		"quarantined scenarios must be excluded from the PR gate")
 	require.Equal(t, 1, pr.Count)
 	require.Equal(t, []string{scenarios.GoHTTPID}, pr.Quarantined,
@@ -70,7 +70,7 @@ func TestBuildSelectionNightlyIsTheFullMatrix(t *testing.T) {
 	require.Contains(t, ids(out, boolPtr(true)), scenarios.K8sDownwardAPIID,
 		"nightly must include every RequiresKind scenario")
 	require.Equal(t, 5, out.KindCount, "the 5 Kubernetes scenarios form the kind matrix")
-	require.Equal(t, 10, out.AWSCount, "the 10 Lambda scenarios form the AWS matrix")
+	require.Equal(t, 11, out.AWSCount, "the 11 Lambda scenarios form the AWS matrix")
 }
 
 func TestBuildSelectionKindSplitting(t *testing.T) {
@@ -125,7 +125,7 @@ func TestRunWithChangedFileExitsCleanly(t *testing.T) {
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &out))
 	// The Go SDK diff selects both Go scenarios; neither is quarantined in
 	// the real evals/custom/quarantine.yaml, so both run and nothing is excluded.
-	require.ElementsMatch(t, []string{scenarios.GoHTTPID, scenarios.GoLogsID, scenarios.LambdaGoDash0LayerID}, ids(&out, nil))
+	require.ElementsMatch(t, []string{scenarios.GoHTTPID, scenarios.GoLogsID, scenarios.LambdaGoDash0LayerID, scenarios.LambdaGoUpstreamLayersID}, ids(&out, nil))
 	require.Empty(t, out.Quarantined)
 	require.Empty(t, stderr.String(), "no quarantine warnings expected")
 }
@@ -141,7 +141,7 @@ func TestRunWithChangedFromGitSelectsFromDiff(t *testing.T) {
 	// The diff touches the Go SDK rule file, selecting both Go scenarios;
 	// instr-go-logs is quarantined, so the PR gate reports it and keeps
 	// instr-go-http.
-	require.Equal(t, []string{scenarios.GoHTTPID, scenarios.LambdaGoDash0LayerID}, ids(&out, nil))
+	require.Equal(t, []string{scenarios.GoHTTPID, scenarios.LambdaGoDash0LayerID, scenarios.LambdaGoUpstreamLayersID}, ids(&out, nil))
 	require.Contains(t, out.Quarantined, scenarios.GoLogsID)
 }
 

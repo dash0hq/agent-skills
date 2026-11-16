@@ -33,6 +33,7 @@ var allScenarioIDs = []string{
 	LambdaDotnetDash0LayerID,
 	LambdaDotnetUpstreamLayersID,
 	LambdaGoDash0LayerID,
+	LambdaGoUpstreamLayersID,
 }
 
 // instrumentationSelectable is every otel-instrumentation scenario reachable
@@ -90,7 +91,7 @@ func TestSelection(t *testing.T) {
 			// selects exactly the scenarios declaring it.
 			name:    "go rule file selects the Go scenarios",
 			changed: []string{"skills/otel-instrumentation/rules/sdks/go.md"},
-			want:    []string{GoHTTPID, GoLogsID, LambdaGoDash0LayerID},
+			want:    []string{GoHTTPID, GoLogsID, LambdaGoDash0LayerID, LambdaGoUpstreamLayersID},
 		},
 		{
 			name:    "nodejs rule file selects the Node.js scenario",

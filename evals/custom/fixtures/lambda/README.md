@@ -11,7 +11,9 @@ Each Lambda fixture is a CDK app with exactly this behavior:
 - 1 function whose handler makes 1 outbound call that both layer paths trace, and returns synthetic data (`TEST-`-prefixed identifiers, `example.test` addresses).
   `nodejs-function` uses global `fetch`; `python-function` uses `boto3` (STS `GetCallerIdentity`), because neither Python layer instruments `urllib`.
   `java-function` uses `java.net.http`; `java-aws-function` only calls AWS (STS `GetCallerIdentity`), so the two drive the rules' choice between the `javaagent` and `javawrapper` upstream layers.
+  `dotnet-function` uses `HttpClient`; .NET has no auto-instrumentation layer, so its scenarios let the agent change the handler code.
 - No OpenTelemetry or Dash0 layers, wrappers, environment variables, or dependencies.
+  For a runtime without an auto-instrumentation layer (.NET, Go), the agent instruments the handler in code and must keep its behavior and response.
 - X-Ray tracing set to `Active`. The skill tells the agent to resolve this conflict, and the harness rejects a synthesized template that still carries it.
 - Exact dependency pins in `package.json`, with a committed `package-lock.json`.
 

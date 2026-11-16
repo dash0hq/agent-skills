@@ -23,6 +23,8 @@ evals/custom/fixtures/*/target/
 evals/custom/fixtures/*/vendor/
 evals/custom/fixtures/lambda/*/cdk.out/
 evals/custom/fixtures/lambda/*/lambda/target/
+evals/custom/fixtures/lambda/*/lambda/obj/
+evals/custom/fixtures/lambda/*/lambda/publish/
 
 # CDK and build artifacts of the AWS Lambda example projects.
 examples/lambda/*/cdk.out/

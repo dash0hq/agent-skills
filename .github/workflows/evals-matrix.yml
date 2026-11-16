@@ -345,6 +345,22 @@ jobs:
         with:
           node-version: 22
 
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install the pinned Maven
+        run: |
+          source evals/custom/versions.env
+          archive="apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+          curl -fsSL -o "/tmp/${archive}" "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/${archive}"
+          echo "${MAVEN_SHA512}  /tmp/${archive}" | sha512sum -c -
+          mkdir -p "$HOME/.local"
+          tar -xzf "/tmp/${archive}" -C "$HOME/.local"
+          echo "$HOME/.local/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
+
       - name: Install the pinned Claude Code CLI
         run: |
           source evals/custom/versions.env

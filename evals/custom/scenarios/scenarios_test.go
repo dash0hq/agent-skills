@@ -27,6 +27,9 @@ var allScenarioIDs = []string{
 	LambdaNodejsUpstreamLayersID,
 	LambdaPythonDash0LayerID,
 	LambdaPythonUpstreamLayersID,
+	LambdaJavaDash0LayerID,
+	LambdaJavaUpstreamJavaagentID,
+	LambdaJavaUpstreamJavawrapperID,
 }
 
 // instrumentationSelectable is every otel-instrumentation scenario reachable

@@ -61,6 +61,11 @@ const LambdaJavaUpstreamJavaagentID = "lambda-java-upstream-javaagent"
 // opentelemetry-javawrapper layer.
 const LambdaJavaUpstreamJavawrapperID = "lambda-java-upstream-javawrapper"
 
+// LambdaDotnetDash0LayerID covers the .NET section of
+// platforms/aws-lambda.md: the agent instruments a .NET function in code
+// and exports through the dash0-extension-manual layer.
+const LambdaDotnetDash0LayerID = "lambda-dotnet-dash0-layer"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -136,6 +141,10 @@ type lambdaFixture struct {
 	// build compiles the function before synthesis; nil for interpreted
 	// runtimes.
 	build *lambdaBuild
+	// sdkRule marks a runtime without an auto-instrumentation layer: the
+	// agent instruments the handler in code per this SDK rule file and
+	// exports through a layer.
+	sdkRule string
 }
 
 // lambdaBuild is the command the harness compiles a fixture's function with.
@@ -183,6 +192,17 @@ var (
 		handler: "lambda/src/main/java/com/example/checkout/CheckoutHandler.java",
 		build:   lambdaMavenBuild,
 	}
+	// lambdaDotnetFunction's outbound call is an HttpClient request.
+	lambdaDotnetFunction = lambdaFixture{
+		dir:     "evals/custom/fixtures/lambda/dotnet-function",
+		runtime: ".NET 10",
+		handler: "lambda/Function.cs",
+		build: &lambdaBuild{
+			args:   []string{"dotnet", "publish", "-c", "Release", "-r", "linux-arm64", "--self-contained", "false", "-o", "publish"},
+			output: "lambda/publish",
+		},
+		sdkRule: "skills/otel-instrumentation/rules/sdks/dotnet.md",
+	}
 )
 
 var lambdaMavenBuild = &lambdaBuild{
@@ -204,6 +224,7 @@ var lambdaSpecs = []lambdaSpec{
 		id: LambdaJavaUpstreamJavawrapperID, fixture: lambdaJavaAWSFunction, path: lambdaPathUpstream,
 		checks: []func(string) error{checkJavaLayer("javawrapper", "javaagent")},
 	},
+	{id: LambdaDotnetDash0LayerID, fixture: lambdaDotnetFunction, path: lambdaPathDash0},
 }
 
 // lambdaSpecFor returns the spec of a registered Lambda scenario.
@@ -228,17 +249,26 @@ func (s lambdaSpec) assemblyChecks() []func(assemblyDir string) error {
 }
 
 func (s lambdaSpec) scenario() harness.Scenario {
+	inCode := s.fixture.sdkRule != ""
 	ruleFiles := []string{"skills/otel-instrumentation/rules/platforms/aws-lambda.md"}
 	task := "Instrument it so its traces reach Dash0, per the otel-instrumentation skill (dash0-agent-skills:otel-instrumentation)."
 	path := "Dash0 is the only telemetry backend."
-	if s.path == lambdaPathUpstream {
+	switch {
+	case s.path == lambdaPathUpstream && inCode:
+		ruleFiles = append(ruleFiles, "skills/otel-collector/rules/deployment/aws-lambda.md")
+		task = "Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector)."
+		path = "The platform team requires exporting through the upstream OpenTelemetry Collector Lambda layer, so the same setup can later fan out to a second backend; do not use any Dash0 Lambda layer."
+	case s.path == lambdaPathUpstream:
 		ruleFiles = append(ruleFiles,
 			"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md",
 			"skills/otel-collector/rules/deployment/aws-lambda.md")
 		task = "Instrument it so its traces reach Dash0, per the otel-instrumentation and otel-collector skills (dash0-agent-skills:otel-instrumentation, dash0-agent-skills:otel-collector)."
 		path = "The platform team requires the upstream OpenTelemetry Lambda layers with the OpenTelemetry Collector layer, so the same setup can later fan out to a second backend; do not use the Dash0 Lambda extension."
-	} else {
+	default:
 		ruleFiles = append(ruleFiles, "skills/otel-instrumentation/rules/platforms/aws-lambda-dash0-layers.md")
+	}
+	if inCode {
+		ruleFiles = append(ruleFiles, s.fixture.sdkRule)
 	}
 	return harness.Scenario{
 		ID:               s.id,
@@ -260,10 +290,14 @@ func (f lambdaFixture) prompt(task, path string) string {
 	if f.build != nil {
 		build = "\n- Before synthesizing, the harness builds the function by running `" + strings.Join(append(append([]string(nil), f.build.env...), f.build.args...), " ") + "` in lambda/, and the stack deploys " + f.build.output + ". Keep that command and that path working."
 	}
+	handlerRequirement := "Do not change the handler code in " + f.handler + "."
+	if f.sdkRule != "" {
+		handlerRequirement = "Keep the handler's behavior and response unchanged; change its code and dependencies only as far as the instrumentation requires."
+	}
 	return `The current directory contains an AWS CDK app (TypeScript) that deploys the ` + f.runtime + ` AWS Lambda function CheckoutFunction (lib/checkout-stack.ts; the handler is ` + f.handler + `) as a ZIP archive. It emits no telemetry. ` + task + `
 
 Requirements:
-- Do not change the handler code in ` + f.handler + `.
+- ` + handlerRequirement + `
 - ` + path + `
 - The stack props already carry the Dash0 OTLP/HTTP endpoint (dash0OtlpHttpEndpoint), the Dash0 OTLP/gRPC endpoint (dash0OtlpGrpcEndpoint), the dataset (dash0Dataset), and the ARN of the AWS Secrets Manager secret holding the Dash0 auth token as a plain string (dash0TokenSecretArn). Use them; never write the token, an endpoint, or the dataset as literals.
 - Attribute the telemetry to the service checkout-service, not to the function name.

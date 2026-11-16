@@ -1,0 +1,22 @@
+{
+  "name": "go-function",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eval fixture: deliberately uninstrumented Go AWS Lambda function deployed with CDK (see evals/custom/fixtures/lambda/README.md).",
+  "license": "MIT",
+  "bin": {
+    "app": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "synth": "cdk synth"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.0",
+    "aws-cdk": "2.1146.0",
+    "aws-cdk-lib": "2.275.0",
+    "constructs": "10.5.1",
+    "ts-node": "10.9.2",
+    "typescript": "5.6.3"
+  }
+}

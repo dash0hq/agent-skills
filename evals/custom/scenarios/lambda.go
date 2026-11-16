@@ -70,6 +70,11 @@ const LambdaDotnetDash0LayerID = "lambda-dotnet-dash0-layer"
 // the upstream Collector layer instead.
 const LambdaDotnetUpstreamLayersID = "lambda-dotnet-upstream-layers"
 
+// LambdaGoDash0LayerID covers the Go section of platforms/aws-lambda.md: the
+// agent instruments a Go function in code and exports through the
+// dash0-extension-manual layer.
+const LambdaGoDash0LayerID = "lambda-go-dash0-layer"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -207,6 +212,18 @@ var (
 		},
 		sdkRule: "skills/otel-instrumentation/rules/sdks/dotnet.md",
 	}
+	// lambdaGoFunction's outbound call is a net/http request.
+	lambdaGoFunction = lambdaFixture{
+		dir:     "evals/custom/fixtures/lambda/go-function",
+		runtime: "Go (provided.al2023)",
+		handler: "lambda/main.go",
+		build: &lambdaBuild{
+			env:    []string{"GOOS=linux", "GOARCH=arm64", "CGO_ENABLED=0"},
+			args:   []string{"go", "build", "-tags", "lambda.norpc", "-o", "build/bootstrap", "."},
+			output: "lambda/build",
+		},
+		sdkRule: "skills/otel-instrumentation/rules/sdks/go.md",
+	}
 )
 
 var lambdaMavenBuild = &lambdaBuild{
@@ -230,6 +247,7 @@ var lambdaSpecs = []lambdaSpec{
 	},
 	{id: LambdaDotnetDash0LayerID, fixture: lambdaDotnetFunction, path: lambdaPathDash0},
 	{id: LambdaDotnetUpstreamLayersID, fixture: lambdaDotnetFunction, path: lambdaPathUpstream},
+	{id: LambdaGoDash0LayerID, fixture: lambdaGoFunction, path: lambdaPathDash0},
 }
 
 // lambdaSpecFor returns the spec of a registered Lambda scenario.

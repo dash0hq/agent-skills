@@ -56,6 +56,11 @@ const LambdaJavaDash0LayerID = "lambda-java-dash0-layer"
 // opentelemetry-javaagent layer.
 const LambdaJavaUpstreamJavaagentID = "lambda-java-upstream-javaagent"
 
+// LambdaJavaUpstreamJavawrapperID is the upstream-layer path for the Java
+// function that only calls AWS, which the rules route to the
+// opentelemetry-javawrapper layer.
+const LambdaJavaUpstreamJavawrapperID = "lambda-java-upstream-javawrapper"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -171,6 +176,13 @@ var (
 		handler: "lambda/src/main/java/com/example/checkout/CheckoutHandler.java",
 		build:   lambdaMavenBuild,
 	}
+	// lambdaJavaAWSFunction's only outbound call is an AWS SDK request.
+	lambdaJavaAWSFunction = lambdaFixture{
+		dir:     "evals/custom/fixtures/lambda/java-aws-function",
+		runtime: "Java 21",
+		handler: "lambda/src/main/java/com/example/checkout/CheckoutHandler.java",
+		build:   lambdaMavenBuild,
+	}
 )
 
 var lambdaMavenBuild = &lambdaBuild{
@@ -187,6 +199,10 @@ var lambdaSpecs = []lambdaSpec{
 	{
 		id: LambdaJavaUpstreamJavaagentID, fixture: lambdaJavaFunction, path: lambdaPathUpstream,
 		checks: []func(string) error{checkJavaLayer("javaagent", "javawrapper")},
+	},
+	{
+		id: LambdaJavaUpstreamJavawrapperID, fixture: lambdaJavaAWSFunction, path: lambdaPathUpstream,
+		checks: []func(string) error{checkJavaLayer("javawrapper", "javaagent")},
 	},
 }
 

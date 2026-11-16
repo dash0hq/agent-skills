@@ -52,7 +52,9 @@ opentelemetry-otlp = { version = "=0.33.1", default-features = false, features =
 opentelemetry-http = "=0.33.1"
 tracing = "=0.1.44"
 tracing-opentelemetry = "=0.34.0"
-tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "json", "registry"] }
+tracing-subscriber = { version = "=0.3.23", features = ["env-filter", "registry"] }
+# The JSON log layer in the setup below.
+serde_json = "=1.0.145"
 ```
 
 Use `http-proto` with `reqwest-blocking-client`.
@@ -92,6 +94,8 @@ use opentelemetry_sdk::{
 };
 use tracing_subscriber::{EnvFilter, prelude::*};
 
+use crate::logs::JsonStdoutLogs;
+
 /// Owns the providers so `main` can flush and shut them down before exiting.
 pub struct Telemetry {
     tracer_provider: SdkTracerProvider,
@@ -120,13 +124,22 @@ pub fn init() -> Result<Telemetry, Box<dyn std::error::Error + Send + Sync>> {
     global::set_tracer_provider(tracer_provider.clone());
     global::set_meter_provider(meter_provider.clone());
 
-    // Bridge `tracing` spans to OpenTelemetry, and write logs as one JSON
-    // object per line on stdout.
     let tracer = tracer_provider.tracer(env!("CARGO_PKG_NAME"));
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .with(tracing_opentelemetry::layer().with_tracer(tracer))
-        .with(tracing_subscriber::fmt::layer().json().with_span_list(true))
+        // Bridge `tracing` spans to OpenTelemetry, without the bridge's own
+        // attributes (busy_ns, idle_ns, thread.*, code.*, target), which are
+        // not semantic conventions.
+        .with(
+            tracing_opentelemetry::layer()
+                .with_tracer(tracer)
+                .with_tracked_inactivity(false)
+                .with_threads(false)
+                .with_location(false)
+                .with_target(false),
+        )
+        // Logs: one JSON object per line on stdout, see the Logs section.
+        .with(JsonStdoutLogs)
         .try_init()?;
 
     Ok(Telemetry { tracer_provider, meter_provider })
@@ -241,7 +254,7 @@ http = "1"
 
 ```rust
 use axum::{Router, extract::MatchedPath, http::Request, routing::get};
-use opentelemetry::{global, trace::{Status, TraceContextExt as _}};
+use opentelemetry::{global, trace::Status};
 use opentelemetry_http::HeaderExtractor;
 use tower_http::trace::TraceLayer;
 use tracing::{Span, field, info_span};
@@ -265,12 +278,9 @@ let app = Router::new()
                     http.route = route,
                     url.path = req.uri().path(),
                     http.response.status_code = field::Empty,
-                    trace_id = field::Empty,
                 );
                 let parent = global::get_text_map_propagator(|p| p.extract(&HeaderExtractor(req.headers())));
                 let _ = span.set_parent(parent);
-                // Correlates every log line of the request with its trace.
-                span.record("trace_id", span.context().span().span_context().trace_id().to_string());
                 span
             })
             .on_response(|res: &axum::http::Response<_>, _latency, span: &Span| {
@@ -284,6 +294,24 @@ let app = Router::new()
 
 Add the layer with `Router::layer`, after the routes.
 `MatchedPath` is only present on a route-level layer; added in front of the router, the span name loses the route.
+
+### Adding attributes to the SERVER span
+
+Inside a handler without its own `#[instrument]`, `Span::current()` is the SERVER span of the request.
+Add request-level attributes to it with `set_attribute`; do not create a child span only to carry them:
+
+```rust
+use tracing::Span;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+
+async fn checkout(/* extractors */) -> impl IntoResponse {
+    Span::current().set_attribute("order.id", "TEST-0001");
+    // ...
+}
+```
+
+`#[instrument]` on the handler makes its own span the current one.
+Then add the attribute through the `#[instrument]` fields instead, or drop `#[instrument]` from the handler.
 
 ## HTTP clients
 
@@ -370,8 +398,68 @@ Follow [metrics](../metrics.md) for instrument selection, naming, and attribute 
 
 ## Logs
 
-Write logs to stdout as one JSON object per line, per [logs](../logs.md).
-The setup above does this with `fmt::layer().json().with_span_list(true)`, which prints the fields of every enclosing span, including the `trace_id` that the [HTTP server span](#http-servers) records.
+Write logs to stdout as one JSON object per line, per [logs](../logs.md), and put the `trace_id` and `span_id` of the active span on every line as top-level fields.
+`tracing-subscriber`'s built-in JSON formatter cannot do this: it knows nothing about OpenTelemetry IDs, and with `with_span_list` it nests span fields in an array.
+Use this layer, registered in the [setup](#setup):
+
+```rust
+// src/logs.rs
+use std::io::Write as _;
+
+use opentelemetry::trace::TraceContextExt as _;
+use serde_json::{Map, Value};
+use tracing::{Event, Subscriber, field::{Field, Visit}};
+use tracing_opentelemetry::OpenTelemetrySpanExt as _;
+use tracing_subscriber::{Layer, layer::Context};
+
+/// Writes every event as one JSON object per line on stdout, with the
+/// `trace_id` and `span_id` of the active span as top-level fields.
+pub struct JsonStdoutLogs;
+
+impl<S: Subscriber> Layer<S> for JsonStdoutLogs {
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        let mut record = Map::new();
+        record.insert("level".into(), event.metadata().level().as_str().into());
+        record.insert("target".into(), event.metadata().target().into());
+        event.record(&mut JsonFields(&mut record));
+
+        let cx = tracing::Span::current().context();
+        let span_context = cx.span().span_context().clone();
+        if span_context.is_valid() {
+            record.insert("trace_id".into(), span_context.trace_id().to_string().into());
+            record.insert("span_id".into(), span_context.span_id().to_string().into());
+        }
+
+        let mut line = Value::Object(record).to_string();
+        line.push('\n');
+        let _ = std::io::stdout().lock().write_all(line.as_bytes());
+    }
+}
+
+struct JsonFields<'a>(&'a mut Map<String, Value>);
+
+impl Visit for JsonFields<'_> {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.0.insert(field.name().into(), value.into());
+    }
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.0.insert(field.name().into(), value.into());
+    }
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        self.0.insert(field.name().into(), value.into());
+    }
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.0.insert(field.name().into(), value.into());
+    }
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        self.0.insert(field.name().into(), format!("{value:?}").into());
+    }
+}
+```
+
+The event message lands in the `message` field.
+Register the layer **after** the OpenTelemetry layer, and remove any other `fmt` layer that writes to stdout, or every event is printed twice.
+
 Use `tracing` events with structured fields, never interpolated strings:
 
 ```rust
@@ -383,6 +471,7 @@ tracing::info!(order.id = %order_id, user.id = %user_id, "order placed");
 ```
 
 Do not also export logs over OTLP when stdout is collected, or every log record arrives twice; see [stdout vs OTLP](../logs.md#stdout-vs-otlp-for-log-delivery).
+Do not add `opentelemetry-appender-tracing` for the same reason.
 
 ## Graceful shutdown
 
@@ -390,6 +479,7 @@ The batch processors hold up to 5 seconds of spans in memory.
 Call `shutdown()` on every exit path, after the server stops accepting requests:
 
 ```rust
+mod logs;
 mod telemetry;
 
 #[tokio::main]

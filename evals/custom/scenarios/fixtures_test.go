@@ -37,6 +37,7 @@ var fixtureSourceFiles = map[string][]string{
 var nonServiceFixtures = map[string]string{
 	"evals/custom/fixtures/collector-workspace": "Collector config workspace the agent edits (U5); no service contract",
 	"evals/custom/fixtures/k8s":                 "Kubernetes manifests and workspaces the agent edits (U6); no service contract",
+	"evals/custom/fixtures/lambda":              "AWS CDK apps deploying Lambda functions the agent instruments; no service contract",
 }
 
 // preInstrumentedFixtures lists service fixtures that deviate from the

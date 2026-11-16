@@ -8,15 +8,17 @@
 //     block merges;
 //   - --gate nightly: the full matrix, including quarantined scenarios,
 //     FullMatrixOnly scenarios, and every
-//     RequiresKind scenario.
+//     RequiresKind and RequiresAWS scenario.
 //
 // Output is JSON on stdout, shaped so workflows can build job matrices with
-// jq and split RequiresKind scenarios into the dedicated kind job:
+// jq and split RequiresKind and RequiresAWS scenarios into their dedicated
+// jobs:
 //
 //	{
-//	  "count": 2,        // scenarios that run without a kind cluster
+//	  "count": 2,        // scenarios that need neither a kind cluster nor AWS
 //	  "kindCount": 1,    // scenarios needing the dedicated kind job
-//	  "scenarios": [{"id": "...", "skill": "...", "requiresKind": false}],
+//	  "awsCount": 1,     // scenarios needing the dedicated AWS job
+//	  "scenarios": [{"id": "...", "skill": "...", "requiresKind": false, "requiresAWS": false}],
 //	  "quarantined": []  // pr: excluded IDs; nightly: quarantined IDs in the matrix
 //	}
 //
@@ -52,12 +54,13 @@ type scenarioOutput struct {
 	ID           string `json:"id"`
 	Skill        string `json:"skill"`
 	RequiresKind bool   `json:"requiresKind"`
+	RequiresAWS  bool   `json:"requiresAWS"`
 }
 
 // output is the JSON document written to stdout.
 type output struct {
 	// Count is the number of selected scenarios that run without a kind
-	// cluster: the size of the agent-scenarios job matrix.
+	// cluster or AWS: the size of the agent-scenarios job matrix.
 	Count int `json:"count"`
 	// Scenarios lists every selected scenario (kind and non-kind) in
 	// registration order.
@@ -65,6 +68,9 @@ type output struct {
 	// KindCount is the number of selected RequiresKind scenarios: the size
 	// of the kind-scenarios job matrix.
 	KindCount int `json:"kindCount"`
+	// AWSCount is the number of selected RequiresAWS scenarios: the size of
+	// the aws-scenarios job matrix.
+	AWSCount int `json:"awsCount"`
 	// Quarantined lists quarantined scenario IDs relevant to the selection:
 	// in pr mode the IDs excluded from it, in nightly mode the quarantined
 	// IDs included in the full matrix.
@@ -187,14 +193,23 @@ func buildSelection(reg *harness.Registry, gate string, changed, quarantined []s
 			ID:           sc.ID,
 			Skill:        string(sc.Skill),
 			RequiresKind: sc.RequiresKind,
+			RequiresAWS:  sc.RequiresAWS,
 		})
-		if sc.RequiresKind {
-			out.KindCount++
-		} else {
-			out.Count++
-		}
+		out.tally(sc.RequiresKind, sc.RequiresAWS)
 	}
 	return out, nil
+}
+
+// tally counts one selected scenario into the job matrix it runs in.
+func (out *output) tally(requiresKind, requiresAWS bool) {
+	switch {
+	case requiresKind:
+		out.KindCount++
+	case requiresAWS:
+		out.AWSCount++
+	default:
+		out.Count++
+	}
 }
 
 // filterToScenarios narrows a nightly selection to the comma-separated IDs in
@@ -221,17 +236,13 @@ func filterToScenarios(out *output, csv string) error {
 		}
 	}
 	kept := make([]scenarioOutput, 0, len(want))
-	out.Count, out.KindCount = 0, 0
+	out.Count, out.KindCount, out.AWSCount = 0, 0, 0
 	for _, sc := range out.Scenarios {
 		if !want[sc.ID] {
 			continue
 		}
 		kept = append(kept, sc)
-		if sc.RequiresKind {
-			out.KindCount++
-		} else {
-			out.Count++
-		}
+		out.tally(sc.RequiresKind, sc.RequiresAWS)
 	}
 	out.Scenarios = kept
 	keptQ := make([]string, 0, len(out.Quarantined))

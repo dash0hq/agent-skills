@@ -63,6 +63,11 @@ jobs:
     name: Eval full matrix
     needs: resolve
     uses: ./.github/workflows/evals-matrix.yml
+    # id-token: write lets the matrix's aws-scenarios job assume the eval AWS
+    # role through GitHub OIDC; a called workflow cannot exceed these.
+    permissions:
+      contents: read
+      id-token: write
     with:
       ref: ${{ needs.resolve.outputs.sha }}
     secrets: inherit

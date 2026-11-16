@@ -171,3 +171,19 @@ func TestFailureClassAgentAttributable(t *testing.T) {
 	require.False(t, ClassInfraFail.AgentAttributable())
 	require.False(t, ClassNone.AgentAttributable())
 }
+
+func TestMergedEnvHidesCloudCredentialsFromTheAgent(t *testing.T) {
+	for key := range agentEnvDenylist {
+		t.Setenv(key, "TEST-secret")
+	}
+	t.Setenv("EVAL_VISIBLE", "kept")
+
+	env := mergedEnv(map[string]string{"EVAL_EXTRA": "added"})
+
+	for _, kv := range env {
+		key, _, _ := strings.Cut(kv, "=")
+		require.False(t, agentEnvDenylist[key], "agent environment must not carry %s", key)
+	}
+	require.Contains(t, env, "EVAL_VISIBLE=kept")
+	require.Contains(t, env, "EVAL_EXTRA=added")
+}

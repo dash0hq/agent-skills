@@ -21,6 +21,7 @@ evals/**/bin/
 evals/custom/fixtures/*/obj/
 evals/custom/fixtures/*/target/
 evals/custom/fixtures/*/vendor/
+evals/custom/fixtures/lambda/*/cdk.out/
 
 # CDK and build artifacts of the AWS Lambda example projects.
 examples/lambda/*/cdk.out/
@@ -32,3 +33,8 @@ examples/lambda/*/*.zip
 
 # npm: the package has no dependencies; a stray npm install must not commit a lockfile.
 package-lock.json
+
+# Lambda eval fixtures: bin/ holds the CDK entrypoint (not Go or .NET build
+# output), and the lockfile pins the CDK toolchain the harness installs.
+!evals/custom/fixtures/lambda/*/bin/
+!evals/custom/fixtures/lambda/*/package-lock.json

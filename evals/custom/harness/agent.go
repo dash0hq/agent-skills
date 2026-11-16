@@ -381,12 +381,42 @@ func containsOverloadMarker(s string) bool {
 	return false
 }
 
-// mergedEnv layers extra over the parent environment.
-func mergedEnv(extra map[string]string) []string {
-	if len(extra) == 0 {
-		return os.Environ()
+// agentEnvDenylist names parent-environment variables the agent under test
+// must never see. The AWS Lambda scenarios run in jobs holding cloud
+// credentials that only the fixture hooks may use: the AWS session the
+// workflow assumed, the GitHub Actions OIDC token request variables (with
+// which the agent could mint its own token and assume the eval role), and
+// the Dash0 token the hooks read telemetry back with.
+var agentEnvDenylist = map[string]bool{
+	"AWS_ACCESS_KEY_ID":              true,
+	"AWS_SECRET_ACCESS_KEY":          true,
+	"AWS_SESSION_TOKEN":              true,
+	"AWS_PROFILE":                    true,
+	"AWS_ROLE_ARN":                   true,
+	"AWS_WEB_IDENTITY_TOKEN_FILE":    true,
+	"ACTIONS_ID_TOKEN_REQUEST_TOKEN": true,
+	"ACTIONS_ID_TOKEN_REQUEST_URL":   true,
+	"DASH0_AUTH_TOKEN":               true,
+}
+
+// ScrubbedEnviron returns the parent environment minus the variables in
+// agentEnvDenylist. Fixture hooks use it for any process that executes
+// agent-authored code, such as a CDK app synthesis.
+func ScrubbedEnviron() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		key, _, _ := strings.Cut(kv, "=")
+		if !agentEnvDenylist[key] {
+			env = append(env, kv)
+		}
 	}
-	env := os.Environ()
+	return env
+}
+
+// mergedEnv layers extra over the parent environment, minus the variables in
+// agentEnvDenylist.
+func mergedEnv(extra map[string]string) []string {
+	env := ScrubbedEnviron()
 	for k, v := range extra {
 		env = append(env, k+"="+v)
 	}

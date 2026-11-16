@@ -44,6 +44,12 @@ on:
       kind-matrix:
         description: "JSON array of RequiresKind scenario IDs"
         value: ${{ jobs.select.outputs.kind-matrix }}
+      aws-count:
+        description: "Number of RequiresAWS scenarios in the matrix"
+        value: ${{ jobs.select.outputs.aws-count }}
+      aws-matrix:
+        description: "JSON array of RequiresAWS scenario IDs"
+        value: ${{ jobs.select.outputs.aws-matrix }}
       quarantined:
         description: "JSON array of quarantined scenario IDs included in the matrix"
         value: ${{ jobs.select.outputs.quarantined }}
@@ -81,6 +87,8 @@ jobs:
       kind-count: ${{ steps.select.outputs.kind-count }}
       matrix: ${{ steps.select.outputs.matrix }}
       kind-matrix: ${{ steps.select.outputs.kind-matrix }}
+      aws-count: ${{ steps.select.outputs.aws-count }}
+      aws-matrix: ${{ steps.select.outputs.aws-matrix }}
       quarantined: ${{ steps.select.outputs.quarantined }}
     steps:
       - name: Checkout
@@ -107,8 +115,10 @@ jobs:
           {
             echo "count=$(jq '.count' /tmp/selection.json)"
             echo "kind-count=$(jq '.kindCount' /tmp/selection.json)"
-            echo "matrix=$(jq -c '[.scenarios[] | select(.requiresKind | not) | .id]' /tmp/selection.json)"
+            echo "matrix=$(jq -c '[.scenarios[] | select((.requiresKind | not) and (.requiresAWS | not)) | .id]' /tmp/selection.json)"
             echo "kind-matrix=$(jq -c '[.scenarios[] | select(.requiresKind) | .id]' /tmp/selection.json)"
+            echo "aws-count=$(jq '.awsCount' /tmp/selection.json)"
+            echo "aws-matrix=$(jq -c '[.scenarios[] | select(.requiresAWS) | .id]' /tmp/selection.json)"
             echo "quarantined=$(jq -c '.quarantined' /tmp/selection.json)"
           } >> "$GITHUB_OUTPUT"
 
@@ -271,6 +281,113 @@ jobs:
           # Fail closed on a vacuous green (see the agent-scenarios job).
           if [ "$status" -eq 0 ] && ! ls ../../evidence/verdict-*.json >/dev/null 2>&1; then
             echo "::error::Kind scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check kind/Docker availability)"
+            status=1
+          fi
+          passed=false
+          [ "$status" -eq 0 ] && passed=true
+          printf '{"scenario":"%s","passed":%s}\n' "$EVAL_SCENARIOS" "$passed" > ../../evidence/result.json
+          exit "$status"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: evidence-${{ matrix.scenario }}
+          path: evidence
+          retention-days: 7
+
+  aws-scenarios:
+    name: AWS scenario ${{ matrix.scenario }}
+    needs: select
+    # See the same-named guard on agent-scenarios above: no environment binds
+    # this job, so this if: is the only thing standing between the
+    # repository secrets, the AWS role, and an untrusted trigger.
+    if: needs.select.outputs.aws-count > 0 && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # The AWS role (evals/custom/aws/eval-access.yaml) trusts this repository's
+    # branch refs; id-token: write lets the job request the OIDC token.
+    permissions:
+      contents: read
+      id-token: write
+    # 40m internal go-test timeout plus tool installs and artifact upload.
+    timeout-minutes: 55
+    continue-on-error: ${{ contains(fromJSON(needs.select.outputs.quarantined), matrix.scenario) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJSON(needs.select.outputs.aws-matrix) }}
+    steps:
+      - name: Require the API key and the Dash0 token
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_DASH0_TOKEN: ${{ secrets.DASH0_EVAL_AUTH_TOKEN != '' }}
+        run: |
+          # Fail closed: TestLambdaScenarios skips (exit 0) without either,
+          # so a missing secret would otherwise turn into a vacuous green run.
+          if [ "$HAS_KEY" != "true" ] || [ "$HAS_DASH0_TOKEN" != "true" ]; then
+            echo "::error::ANTHROPIC_API_KEY or DASH0_EVAL_AUTH_TOKEN did not resolve; configure them as repository secrets (see evals/custom/README.md)"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: evals/custom/go.mod
+          cache-dependency-path: evals/custom/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install the pinned Claude Code CLI
+        run: |
+          source evals/custom/versions.env
+          curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install the pinned Dash0 CLI
+        run: |
+          source evals/custom/versions.env
+          archive="dash0_${DASH0_CLI_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "/tmp/${archive}" "https://github.com/dash0hq/dash0-cli/releases/download/v${DASH0_CLI_VERSION}/${archive}"
+          echo "${DASH0_CLI_SHA256_LINUX_AMD64}  /tmp/${archive}" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf "/tmp/${archive}" -C "$HOME/.local/bin" dash0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Assume the eval AWS role
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_EVALS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_EVALS_REGION }}
+
+      - name: Run the AWS scenario
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DASH0_AUTH_TOKEN: ${{ secrets.DASH0_EVAL_AUTH_TOKEN }}
+          EVAL_AWS_REGION: ${{ vars.AWS_EVALS_REGION }}
+          EVAL_DASH0_OTLP_ENDPOINT: ${{ vars.DASH0_EVAL_OTLP_HTTP_ENDPOINT }}
+          EVAL_DASH0_API_URL: ${{ vars.DASH0_EVAL_API_ENDPOINT }}
+          EVAL_DASH0_DATASET: ${{ vars.DASH0_EVAL_DATASET }}
+          EVAL_DASH0_TOKEN_SECRET_ARN: ${{ vars.DASH0_EVAL_TOKEN_SECRET_ARN }}
+          EVAL_SCENARIOS: ${{ matrix.scenario }}
+          EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+        run: |
+          mkdir -p evidence
+          cd evals/custom
+          set +e
+          go test ./scenarios -run TestLambdaScenarios -v -timeout 40m 2>&1 | tee ../../evidence/test-output.log
+          status=${PIPESTATUS[0]}
+          set -e
+          # Fail closed on a vacuous green (see the agent-scenarios job).
+          if [ "$status" -eq 0 ] && ! ls ../../evidence/verdict-*.json >/dev/null 2>&1; then
+            echo "::error::AWS scenario $EVAL_SCENARIOS produced no verdict — it skipped instead of running (check the EVAL_* repository variables)"
             status=1
           fi
           passed=false

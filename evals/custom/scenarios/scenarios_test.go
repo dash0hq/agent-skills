@@ -14,7 +14,7 @@ import (
 
 // allScenarioIDs is every scenario ID (order-insensitive): the U3 core, the
 // U4 SDK registrations, the U5 Collector, OTTL, and semconv registrations, and
-// the U6 Kubernetes registrations.
+// the U6 Kubernetes registrations, and the AWS Lambda registrations.
 var allScenarioIDs = []string{
 	GoHTTPID, GoLogsID, NodeHTTPID,
 	PythonHTTPID, JavaHTTPID, RubyHTTPID, PHPHTTPID, ScalaHTTPID,
@@ -23,6 +23,8 @@ var allScenarioIDs = []string{
 	CollectorPipelineHardeningID, OTTLRedactionID, OTTLEnrichmentID, SemconvAttributesID,
 	K8sDownwardAPIID, K8sOTelOperatorID, K8sHelmChartID, K8sRawManifestsID, K8sDash0OperatorID,
 	PythonRetiredInstrumentationUpgradeID,
+	LambdaNodejsDash0LayerID,
+	LambdaNodejsUpstreamLayersID,
 }
 
 // instrumentationSelectable is every otel-instrumentation scenario reachable

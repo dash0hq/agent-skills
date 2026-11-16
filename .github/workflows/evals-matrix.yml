@@ -366,6 +366,17 @@ jobs:
           tar -xzf "/tmp/${archive}" -C "$HOME/.local"
           echo "$HOME/.local/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
 
+      - name: Install the pinned Rust toolchain and cargo-lambda
+        run: |
+          source evals/custom/versions.env
+          rustup toolchain install "${RUST_VERSION}" --profile minimal --target aarch64-unknown-linux-gnu
+          rustup default "${RUST_VERSION}"
+          # cargo-lambda cross-compiles with Zig, which it runs as
+          # `python3 -m ziglang`; the venv's python3 must come first on PATH.
+          python3 -m venv "${RUNNER_TEMP}/cargo-lambda"
+          "${RUNNER_TEMP}/cargo-lambda/bin/pip" install --quiet "cargo-lambda==${CARGO_LAMBDA_VERSION}" "ziglang==${ZIGLANG_VERSION}"
+          echo "${RUNNER_TEMP}/cargo-lambda/bin" >> "$GITHUB_PATH"
+
       - name: Install the pinned Claude Code CLI
         run: |
           source evals/custom/versions.env

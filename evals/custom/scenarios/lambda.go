@@ -79,6 +79,11 @@ const LambdaGoDash0LayerID = "lambda-go-dash0-layer"
 // upstream Collector layer instead.
 const LambdaGoUpstreamLayersID = "lambda-go-upstream-layers"
 
+// LambdaRustDash0LayerID covers the Rust section of platforms/aws-lambda.md:
+// the agent instruments a Rust function in code and exports through the
+// dash0-extension-manual layer.
+const LambdaRustDash0LayerID = "lambda-rust-dash0-layer"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -228,6 +233,17 @@ var (
 		},
 		sdkRule: "skills/otel-instrumentation/rules/sdks/go.md",
 	}
+	// lambdaRustFunction's outbound call is a reqwest request.
+	lambdaRustFunction = lambdaFixture{
+		dir:     "evals/custom/fixtures/lambda/rust-function",
+		runtime: "Rust (provided.al2023)",
+		handler: "lambda/src/main.rs",
+		build: &lambdaBuild{
+			args:   []string{"cargo", "lambda", "build", "--release", "--arm64"},
+			output: "lambda/target/lambda/bootstrap",
+		},
+		sdkRule: "skills/otel-instrumentation/rules/sdks/rust.md",
+	}
 )
 
 var lambdaMavenBuild = &lambdaBuild{
@@ -253,6 +269,7 @@ var lambdaSpecs = []lambdaSpec{
 	{id: LambdaDotnetUpstreamLayersID, fixture: lambdaDotnetFunction, path: lambdaPathUpstream},
 	{id: LambdaGoDash0LayerID, fixture: lambdaGoFunction, path: lambdaPathDash0},
 	{id: LambdaGoUpstreamLayersID, fixture: lambdaGoFunction, path: lambdaPathUpstream},
+	{id: LambdaRustDash0LayerID, fixture: lambdaRustFunction, path: lambdaPathDash0},
 }
 
 // lambdaSpecFor returns the spec of a registered Lambda scenario.

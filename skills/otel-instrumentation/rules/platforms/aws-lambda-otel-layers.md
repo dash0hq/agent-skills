@@ -15,7 +15,7 @@ This is path A of [AWS Lambda deployment](./aws-lambda.md): three layers attache
 Read the [decision process](./aws-lambda.md#decision-process) first — path A is the right choice when the runtime is Node.js, Python, Java, or Ruby and the backend is anything other than Dash0 alone, or telemetry must reach more than one backend.
 
 For the Dash0-specific single-layer alternative, see [AWS Lambda with the Dash0 Lambda Extension](./aws-lambda-dash0-layers.md).
-For Go and .NET, which have no instrumentation layer, see [runtimes without an auto-instrumentation layer](./aws-lambda.md#runtimes-without-an-auto-instrumentation-layer).
+For Go, .NET, and Rust, which have no instrumentation layer, see [runtimes without an auto-instrumentation layer](./aws-lambda.md#runtimes-without-an-auto-instrumentation-layer).
 
 ## The three layers
 
@@ -142,7 +142,7 @@ The decisive difference is **Python versus Node.js**.
 On Python the layer only puts `/opt/python` on `PYTHONPATH` and runs `opentelemetry-instrument`, which discovers instrumentors through setuptools entry points across the whole path — so `/var/task` counts and a package installed into the deployment bundle is picked up.
 On Node.js the layer loads the instrumentation copies it bundles and never looks at the function's `node_modules`, so installing an instrumentation package into the function has no effect at all.
 
-Go and .NET have no instrumentation layer, so there is nothing to switch: the instrumentation set is exactly the list registered in code — see [runtimes without an auto-instrumentation layer](./aws-lambda.md#runtimes-without-an-auto-instrumentation-layer).
+Go, .NET, and Rust have no instrumentation layer, so there is nothing to switch: the instrumentation set is exactly the list registered in code — see [runtimes without an auto-instrumentation layer](./aws-lambda.md#runtimes-without-an-auto-instrumentation-layer).
 
 ### Tuning the Node.js instrumentation set
 

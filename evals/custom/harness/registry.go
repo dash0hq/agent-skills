@@ -50,6 +50,7 @@ var defaultRuleClassification = map[string]RuleClassification{
 	"skills/otel-instrumentation/rules/sdks/python.md":                       {Class: ClassificationDedicated},
 	"skills/otel-instrumentation/rules/sdks/ruby.md":                         {Class: ClassificationDedicated},
 	"skills/otel-instrumentation/rules/sdks/scala.md":                        {Class: ClassificationDedicated},
+	"skills/otel-instrumentation/rules/sdks/rust.md":                         {Class: ClassificationDedicated},
 	"skills/otel-instrumentation/rules/platforms/k8s.md":                     {Class: ClassificationDedicated},
 	"skills/otel-instrumentation/rules/platforms/aws-lambda.md":              {Class: ClassificationDedicated},
 	"skills/otel-instrumentation/rules/platforms/aws-lambda-otel-layers.md":  {Class: ClassificationDedicated},

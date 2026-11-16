@@ -51,6 +51,11 @@ const LambdaPythonUpstreamLayersID = "lambda-python-upstream-layers"
 // whose outbound call is an HTTP request.
 const LambdaJavaDash0LayerID = "lambda-java-dash0-layer"
 
+// LambdaJavaUpstreamJavaagentID is the upstream-layer path for the Java
+// function that makes HTTP calls, which the rules route to the
+// opentelemetry-javaagent layer.
+const LambdaJavaUpstreamJavaagentID = "lambda-java-upstream-javaagent"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -179,6 +184,10 @@ var lambdaSpecs = []lambdaSpec{
 	{id: LambdaPythonDash0LayerID, fixture: lambdaPythonFunction, path: lambdaPathDash0},
 	{id: LambdaPythonUpstreamLayersID, fixture: lambdaPythonFunction, path: lambdaPathUpstream},
 	{id: LambdaJavaDash0LayerID, fixture: lambdaJavaFunction, path: lambdaPathDash0},
+	{
+		id: LambdaJavaUpstreamJavaagentID, fixture: lambdaJavaFunction, path: lambdaPathUpstream,
+		checks: []func(string) error{checkJavaLayer("javaagent", "javawrapper")},
+	},
 }
 
 // lambdaSpecFor returns the spec of a registered Lambda scenario.
@@ -698,6 +707,49 @@ func checkCollectorConfig(assemblyDir string) error {
 		return fmt.Errorf("collector configuration check failed:\n- %s", strings.Join(problems, "\n- "))
 	}
 	return nil
+}
+
+// checkJavaLayer checks which upstream Java instrumentation layer the
+// function attaches: the rules choose between the two by what the handler
+// calls, and both produce an invocation span, so telemetry alone does not
+// show a wrong choice.
+func checkJavaLayer(want, not string) func(assemblyDir string) error {
+	return func(assemblyDir string) error {
+		templates, err := filepath.Glob(filepath.Join(assemblyDir, "*.template.json"))
+		if err != nil || len(templates) == 0 {
+			return fmt.Errorf("no synthesized templates in %s", assemblyDir)
+		}
+		for _, path := range templates {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			var tpl struct {
+				Resources map[string]struct {
+					Type       string `json:"Type"`
+					Properties struct {
+						Layers any `json:"Layers"`
+					} `json:"Properties"`
+				} `json:"Resources"`
+			}
+			if err := json.Unmarshal(data, &tpl); err != nil {
+				return fmt.Errorf("parse %s: %w", filepath.Base(path), err)
+			}
+			for id, res := range tpl.Resources {
+				if res.Type != "AWS::Lambda::Function" {
+					continue
+				}
+				layers, _ := json.Marshal(res.Properties.Layers)
+				if strings.Contains(string(layers), ":layer:opentelemetry-"+not+"-") {
+					return fmt.Errorf("%s attaches the opentelemetry-%s layer; this function needs opentelemetry-%s", id, not, want)
+				}
+				if strings.Contains(string(layers), ":layer:opentelemetry-"+want+"-") {
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("no function attaches the opentelemetry-%s layer", want)
+	}
 }
 
 // assertLambdaInvocation builds the Lambda assertion: the invocation span

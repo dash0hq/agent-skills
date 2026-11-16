@@ -173,6 +173,23 @@ service:
 		strings.ReplaceAll(good, "processors: [decouple]", "processors: [memory_limiter, decouple]"))), "runs memory_limiter")
 }
 
+func TestCheckJavaLayer(t *testing.T) {
+	write := func(t *testing.T, layers string) string {
+		dir := t.TempDir()
+		tpl := `{"Resources": {"CheckoutFunction": {"Type": "AWS::Lambda::Function", "Properties": {"Layers": ` + layers + `}}}}`
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "CheckoutStack.template.json"), []byte(tpl), 0o644))
+		return dir
+	}
+	agent := `"arn:aws:lambda:eu-west-1:184161586896:layer:opentelemetry-javaagent-0_24_0:1"`
+	wrapper := `"arn:aws:lambda:eu-west-1:184161586896:layer:opentelemetry-javawrapper-0_24_0:1"`
+	collector := `"arn:aws:lambda:eu-west-1:184161586896:layer:opentelemetry-collector-arm64-0_24_0:1"`
+
+	require.NoError(t, checkJavaLayer("javaagent", "javawrapper")(write(t, "["+agent+","+collector+"]")))
+	require.ErrorContains(t, checkJavaLayer("javaagent", "javawrapper")(write(t, "["+wrapper+","+collector+"]")), "needs opentelemetry-javaagent")
+	require.ErrorContains(t, checkJavaLayer("javawrapper", "javaagent")(write(t, "["+collector+"]")), "no function attaches")
+	require.NoError(t, checkJavaLayer("javawrapper", "javaagent")(write(t, `[{"Fn::Join": ["", ["arn:aws:lambda:", {"Ref": "AWS::Region"}, ":184161586896:layer:opentelemetry-javawrapper-0_24_0:1"]]}]`)))
+}
+
 func TestLambdaConfigGRPCEndpoint(t *testing.T) {
 	for _, endpoint := range []string{"https://ingress.example.test", "https://ingress.example.test/", "https://ingress.example.test:443"} {
 		require.Equal(t, "ingress.example.test:4317", LambdaConfig{OTLPEndpoint: endpoint}.grpcEndpoint())

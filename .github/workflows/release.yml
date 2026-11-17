@@ -11,6 +11,19 @@ on:
           - patch
           - minor
           - major
+      # Keep these options in sync with the model input of evals-matrix.yml,
+      # and the default with EVAL_MODEL in evals/custom/versions.env.
+      model:
+        description: "Model the release eval matrix runs the agent with"
+        required: true
+        type: choice
+        default: claude-opus-5-5
+        options:
+          - claude-opus-5-5
+          - claude-sonnet-5-5
+          - claude-haiku-5-5
+          - claude-fable-5-1
+          - claude-opus-4-8
 
 permissions:
   contents: write
@@ -70,6 +83,7 @@ jobs:
       id-token: write
     with:
       ref: ${{ needs.resolve.outputs.sha }}
+      model: ${{ inputs.model }}
     secrets: inherit
 
   release:

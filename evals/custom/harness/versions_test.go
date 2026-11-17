@@ -9,13 +9,21 @@ import (
 )
 
 func TestLoadVersionsFromCommittedFile(t *testing.T) {
+	t.Setenv("EVAL_MODEL", "")
 	v, err := LoadVersions(filepath.Join("..", "versions.env"))
 	require.NoError(t, err)
 	require.Equal(t, "2.1.179", v.ClaudeCodeVersion)
-	require.Equal(t, "claude-opus-4-8", v.EvalModel)
+	require.Equal(t, "claude-opus-5-5", v.EvalModel)
 	require.Equal(t, "0.163.1", v.OtelcolContribVersion)
 	require.Equal(t, "1.44.0", v.OtelGoCoreVersion)
 	require.Equal(t, "0.20.0", v.OtelGoLogVersion)
+}
+
+func TestLoadVersionsEvalModelEnvOverridesPin(t *testing.T) {
+	t.Setenv("EVAL_MODEL", "claude-sonnet-5-5")
+	v, err := LoadVersions(filepath.Join("..", "versions.env"))
+	require.NoError(t, err)
+	require.Equal(t, "claude-sonnet-5-5", v.EvalModel)
 }
 
 func TestLoadVersionsRejectsMissingOtelGoPins(t *testing.T) {

@@ -141,7 +141,7 @@ Resources:
       Handler: index.handler
       Tracing: PassThrough
       Layers:
-        - !Sub 'arn:aws:lambda:${AWS::Region}:115813213817:layer:dash0-extension-node:26'
+        - !Sub 'arn:aws:lambda:${AWS::Region}:115813213817:layer:dash0-extension-node:31'
       Environment:
         Variables:
           AWS_LAMBDA_EXEC_WRAPPER: /opt/wrapper
@@ -189,7 +189,7 @@ resource "aws_lambda_function" "checkout" {
   role          = aws_iam_role.checkout.arn
 
   layers = [
-    "arn:aws:lambda:${var.region}:115813213817:layer:dash0-extension-node:26",
+    "arn:aws:lambda:${var.region}:115813213817:layer:dash0-extension-node:31",
   ]
 
   tracing_config {
@@ -216,7 +216,7 @@ resource "aws_lambda_function" "checkout" {
 const dash0Layer = lambda.LayerVersion.fromLayerVersionArn(
   this,
   'Dash0Layer',
-  `arn:aws:lambda:${this.region}:115813213817:layer:dash0-extension-node:26`,
+  `arn:aws:lambda:${this.region}:115813213817:layer:dash0-extension-node:31`,
 );
 
 const checkout = new lambda.Function(this, 'Checkout', {
@@ -244,7 +244,7 @@ dash0Token.grantRead(checkout);
 ```bash
 aws lambda update-function-configuration \
   --function-name checkout \
-  --layers "arn:aws:lambda:eu-west-1:115813213817:layer:dash0-extension-node:26" \
+  --layers "arn:aws:lambda:eu-west-1:115813213817:layer:dash0-extension-node:31" \
   --environment "Variables={AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper,DASH0_ENDPOINT=https://ingress.eu-west-1.aws.dash0.com:4318,DASH0_DATASET=production,DASH0_TOKEN_SECRET_ARN=$DASH0_TOKEN_SECRET_ARN,OTEL_SERVICE_NAME=checkout}"
 ```
 

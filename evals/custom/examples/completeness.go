@@ -62,8 +62,13 @@ func isCompleteCode(tag, content string) bool {
 		// "# <path>.rb" comment or it requires a library at the top level;
 		// see ruby.go.
 		return isCompleteRuby(content)
+	case "php":
+		// A PHP block is a file iff it opens with "<?php", names its file
+		// with a "// <path>.php" first line, or has a top-level namespaced
+		// use statement; see php.go.
+		return isCompletePHP(content)
 	default:
-		// php, scala, and anything else: bias to fragment. Their
+		// scala and anything else: bias to fragment. Their
 		// complete blocks would be compile-skipped anyway, so treating them
 		// as fragments only changes the reported category, not the outcome.
 		return false

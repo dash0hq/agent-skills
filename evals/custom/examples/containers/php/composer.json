@@ -1,0 +1,21 @@
+{
+    "name": "eval/php-examples",
+    "description": "Pinned package set the PHP examples in skills/ are statically analysed against.",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.3",
+        "monolog/monolog": "3.13.0",
+        "open-telemetry/api": "1.11.0",
+        "open-telemetry/sdk": "1.16.1"
+    },
+    "config": {
+        "platform": {
+            "php": "8.3"
+        },
+        "allow-plugins": false,
+        "sort-packages": true
+    },
+    "require-dev": {
+        "phpstan/phpstan": "2.3.6"
+    }
+}

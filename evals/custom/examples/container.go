@@ -64,6 +64,14 @@ type containerRunArgs interface {
 	RunArgs(langDir string) ([]string, error)
 }
 
+// ContainerFetchImager is optionally implemented by a ContainerLanguage whose
+// compile image lacks the package manager: FetchCommand then runs in the
+// image FetchImage reads from the fixture Dockerfile at dockerfile, instead of
+// the compile image.
+type ContainerFetchImager interface {
+	FetchImage(dockerfile string) (string, error)
+}
+
 // ContainerCache is one host cache directory mounted into the compile
 // container.
 type ContainerCache struct {
@@ -115,7 +123,7 @@ func DefaultContainerCacheDir() (string, error) {
 
 // ContainerLanguages returns every registered container language plug-in.
 func ContainerLanguages() []ContainerLanguage {
-	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}, golangLanguage{}, csharpLanguage{}, rubyLanguage{}}
+	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}, golangLanguage{}, csharpLanguage{}, rubyLanguage{}, phpLanguage{}}
 }
 
 // Timeouts for the container phases.
@@ -275,6 +283,17 @@ func (r *ContainerRunner) runGroup(group *containerGroup, fileBlocks []*Block) {
 		r.unavailable(group, err.Error())
 		return
 	}
+	fetchImage := image
+	if imager, ok := language.(ContainerFetchImager); ok {
+		if fetchImage, err = imager.FetchImage(r.dockerfile(language)); err != nil {
+			r.unavailable(group, err.Error())
+			return
+		}
+		if err := ensureImage(fetchImage); err != nil {
+			r.unavailable(group, err.Error())
+			return
+		}
+	}
 
 	langDir := filepath.Join(r.CacheDir, language.Name())
 	if err := os.MkdirAll(filepath.Join(langDir, "work"), 0o755); err != nil {
@@ -302,7 +321,7 @@ func (r *ContainerRunner) runGroup(group *containerGroup, fileBlocks []*Block) {
 		return
 	}
 	fetch := language.FetchCommand()
-	fetchArgs := slices.Concat(args, []string{image}, fetch)
+	fetchArgs := slices.Concat(args, []string{fetchImage}, fetch)
 	if out, err := runDocker(fetchTimeout, fetchArgs...); err != nil {
 		group.setAll(StatusFailed, fmt.Sprintf("%s failed (network phase): %s", strings.Join(fetch, " "), trimOutput(out, err)))
 		return
@@ -403,7 +422,12 @@ func trimOutput(out []byte, err error) string {
 // Image returns the compile image for language, read from the fixture
 // Dockerfile.
 func (r *ContainerRunner) Image(language ContainerLanguage) (string, error) {
-	return BuildImage(filepath.Join(r.FixturesDir, language.Fixture(), "Dockerfile"))
+	return BuildImage(r.dockerfile(language))
+}
+
+// dockerfile returns the path of language's fixture Dockerfile.
+func (r *ContainerRunner) dockerfile(language ContainerLanguage) string {
+	return filepath.Join(r.FixturesDir, language.Fixture(), "Dockerfile")
 }
 
 // fromRe matches a FROM line, capturing the image and the optional stage

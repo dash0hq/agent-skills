@@ -61,6 +61,9 @@ Follow these rules when changing skill content:
   The validator compiles every C# block that declares a `namespace` or a top-level type, or starts with a `// <path>.cs` comment line, against `evals/custom/examples/containers/csharp/Examples.csproj`; declare every type, field, and method the block uses, and put top-level statements only in a block that starts with `// Program.cs`.
 - **Require only pinned gems in Ruby examples.**
   A Ruby block with a top-level `require` or a `# <path>.rb` first line is checked against `evals/custom/examples/containers/ruby/Gemfile`: add a gem a new example requires to that pin with an exact version, and require the standard libraries a block uses, such as `net/http`, because constants and methods under a loaded library are resolved.
+- **Use only pinned packages in PHP examples.**
+  A PHP block with a top-level `use` statement, a `<?php` tag, or a `// <path>.php` first line is analysed with PHPStan against `evals/custom/examples/containers/php/composer.json`; add a package a new example uses to that pin and regenerate `composer.lock`.
+  A PHP block with none of these markers is a fragment and is not checked.
 - **Mark deliberately wrong examples.**
   Use a `// BAD`-style line comment or `<!-- eval:bad -->` so the validator exempts them.
 - **Keep fixture data synthetic.**

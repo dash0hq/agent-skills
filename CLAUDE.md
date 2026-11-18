@@ -64,6 +64,8 @@ Follow these rules when changing skill content:
 - **Use only pinned packages in PHP examples.**
   A PHP block with a top-level `use` statement, a `<?php` tag, or a `// <path>.php` first line is analysed with PHPStan against `evals/custom/examples/containers/php/composer.json`; add a package a new example uses to that pin and regenerate `composer.lock`.
   A PHP block with none of these markers is a fragment and is not checked.
+- **Import only pinned libraries in Scala examples.**
+  The validator compiles every complete Scala block against `evals/custom/examples/containers/scala/build.sbt`; add a library a new example imports to that pin by hand, and start blocks that reference each other with a `// src/main/scala/<path>.scala` comment line.
 - **Mark deliberately wrong examples.**
   Use a `// BAD`-style line comment or `<!-- eval:bad -->` so the validator exempts them.
 - **Keep fixture data synthetic.**

@@ -304,3 +304,15 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             -f tag="${TAG}"
           echo "Dispatched publish-npm.yml for ${TAG}; its result appears on that workflow's own run."
+
+  # Attaches <skill>.zip and <skill>.skill archives to the GitHub release.
+  # A reusable workflow (unlike publish-npm.yml) because nothing external
+  # pins its filename; the same file stays dispatchable by hand for retrofits.
+  package-skills:
+    name: Package skills
+    needs: release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package-skills.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}

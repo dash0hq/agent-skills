@@ -84,6 +84,10 @@ const LambdaGoUpstreamLayersID = "lambda-go-upstream-layers"
 // dash0-extension-manual layer.
 const LambdaRustDash0LayerID = "lambda-rust-dash0-layer"
 
+// LambdaRustUpstreamLayersID is LambdaRustDash0LayerID exporting through the
+// upstream Collector layer instead.
+const LambdaRustUpstreamLayersID = "lambda-rust-upstream-layers"
+
 // Names the account setup in evals/custom/aws/eval-access.yaml scopes every
 // permission to; changing one here requires changing it there.
 const (
@@ -270,6 +274,7 @@ var lambdaSpecs = []lambdaSpec{
 	{id: LambdaGoDash0LayerID, fixture: lambdaGoFunction, path: lambdaPathDash0},
 	{id: LambdaGoUpstreamLayersID, fixture: lambdaGoFunction, path: lambdaPathUpstream},
 	{id: LambdaRustDash0LayerID, fixture: lambdaRustFunction, path: lambdaPathDash0},
+	{id: LambdaRustUpstreamLayersID, fixture: lambdaRustFunction, path: lambdaPathUpstream},
 }
 
 // lambdaSpecFor returns the spec of a registered Lambda scenario.

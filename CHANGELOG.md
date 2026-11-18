@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.4.2 (2026-11-18)
+
+### Added
+
+- attach packaged .skill and .zip archives per skill to releases
+- pick the eval model from a dropdown, defaulting to Opus 5.5 (#173)
+
+### Fixed
+
+- attach skill archives at release creation and add a bundle
+
+### Changed
+
+- update plugin manifests for v1.4.2
+
+
 ## v1.4.1 (2026-11-17)
 
 ### Added

@@ -47,18 +47,19 @@ Follow the SDK-specific rule for the language in use:
 | Go (pgx direct) | `otelpgx.WithIncludeQueryParameters()` | no — library-specific shape | [go](./sdks/go.md#database-query-parameters) |
 | Ruby (pg, mysql2, ActiveRecord) | not supported | n/a | [ruby](./sdks/ruby.md#database-query-parameters) |
 | PHP (PDO) | not supported | n/a | [php](./sdks/php.md#database-query-parameters) |
+| Rust (sqlx, diesel, tokio-postgres) | hand-coded span attribute | up to the developer | [rust](./sdks/rust.md#database-query-parameters) |
 
 ## At-a-glance comparison
 
-| | Java/Scala (JDBC) | .NET SqlClient | .NET EFCore | .NET Npgsql direct | Python | Node.js | Go (otelsql) | Go (pgx + otelpgx) | Ruby | PHP |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Toggle | env var | env var | env var | hand-coded callback | kwarg | hand-coded hook | hand-coded hook | library option | not supported | not supported |
-| Default | off | off | off | n/a | off | n/a | n/a | off | n/a | n/a |
-| Standard key (`db.query.parameter.<key>`) | yes | yes | yes | up to the developer | **no** (`db.statement.parameters`) | up to the developer | up to the developer | no (library shape) | n/a | n/a |
-| Key form | 0-based index | name or index | EFCore-generated name | up to the developer | single tuple-string | up to the developer | name or index | library-defined | n/a | n/a |
-| Type whitelist | yes | no | no | up to the developer | no | up to the developer | up to the developer | library-defined | n/a | n/a |
-| Excluded scenarios | batches | — | — | — | — | — | — | — | n/a | n/a |
-| Sanitizer side-effect | forces sanitizer off | independent | independent | — | independent | — | — | — | — | — |
+| | Java/Scala (JDBC) | .NET SqlClient | .NET EFCore | .NET Npgsql direct | Python | Node.js | Go (otelsql) | Go (pgx + otelpgx) | Ruby | PHP | Rust |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Toggle | env var | env var | env var | hand-coded callback | kwarg | hand-coded hook | hand-coded hook | library option | not supported | not supported | hand-coded span attribute |
+| Default | off | off | off | n/a | off | n/a | n/a | off | n/a | n/a | n/a |
+| Standard key (`db.query.parameter.<key>`) | yes | yes | yes | up to the developer | **no** (`db.statement.parameters`) | up to the developer | up to the developer | no (library shape) | n/a | n/a | up to the developer |
+| Key form | 0-based index | name or index | EFCore-generated name | up to the developer | single tuple-string | up to the developer | name or index | library-defined | n/a | n/a | up to the developer |
+| Type whitelist | yes | no | no | up to the developer | no | up to the developer | up to the developer | library-defined | n/a | n/a | up to the developer |
+| Excluded scenarios | batches | — | — | — | — | — | — | — | n/a | n/a | — |
+| Sanitizer side-effect | forces sanitizer off | independent | independent | — | independent | — | — | — | — | — | — |
 
 ## References
 

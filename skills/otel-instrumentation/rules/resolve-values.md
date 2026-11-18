@@ -42,6 +42,7 @@ Check the following sources in order:
    - Python: `name` in `pyproject.toml`, `setup.cfg`, or `setup.py`.
    - Ruby: `spec.name` in the `.gemspec`, or the directory name if none exists.
    - PHP: `name` in `composer.json` (take the segment after the `/`).
+   - Rust: `name` under `[package]` in the `Cargo.toml` of the crate that builds the deployed binary; in a workspace, that is the member crate, not the root `Cargo.toml`.
 3. **Project directory name** — use the name of the root project directory as a last resort.
 
 Convert the result to kebab-case if it contains spaces, underscores, or mixed case (e.g., `OrderApi` → `order-api`).
@@ -64,6 +65,7 @@ Check the following sources in order:
    - Python: `version` in `pyproject.toml`, `setup.cfg`, or `setup.py`.
    - Ruby: `spec.version` in the `.gemspec`.
    - PHP: `version` in `composer.json`.
+   - Rust: `version` under `[package]` in the binary crate's `Cargo.toml`, or under `[workspace.package]` in the root `Cargo.toml` when the crate declares `version.workspace = true`; read it in code with `env!("CARGO_PKG_VERSION")`.
 4. **Git metadata** — use the output of `git describe --tags --always` to derive a version.
    If tags exist, this produces a tag-based version (e.g., `v1.4.2`).
    If no tags exist, use the first 7 characters of the current commit SHA.
@@ -85,6 +87,8 @@ Check the following sources in order:
    - .NET: `ASPNETCORE_ENVIRONMENT` or `DOTNET_ENVIRONMENT`.
    - PHP (Laravel): `APP_ENV`.
    - Go: no standard variable; check for `ENV`, `APP_ENV`, or `GO_ENV` in existing config.
+   - Rust: no standard variable; check for `ENV` or `APP_ENV` in existing config, and the profile name passed to the configuration crate in use (for example `config` or `figment`).
+     `RUST_LOG` sets log levels and does not indicate the environment.
 3. **Kubernetes namespace** — if the project has Kubernetes manifests, use the namespace as a proxy (e.g., `production`, `staging`, `dev`).
 4. **Dockerfile or Compose target** — check for `TARGET` or `ENVIRONMENT` build args.
 

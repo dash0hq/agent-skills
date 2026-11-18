@@ -27,7 +27,10 @@ If **yes** and the runtime is Node.js, Python, or Java — use the **[Dash0 Lamb
 It is a single layer that auto-instruments the function and exports to Dash0 directly, so no Collector runs in the function at all: there is no Collector layer, no configuration layer, and no Collector YAML to write or maintain.
 Configure it with `DASH0_ENDPOINT`, `DASH0_DATASET`, and `DASH0_TOKEN_SECRET_ARN` on the function.
 
-If **no**, or the runtime is Ruby, Go, or .NET, or telemetry must fan out to more than one backend — use the **[Collector Lambda layer](./deployment/aws-lambda.md)**.
+If **yes** and the runtime is Go, .NET, or Rust — use the Dash0 Lambda Extension's `dash0-extension-manual` layer, also without a Collector.
+These runtimes have no auto-instrumentation layer, so the function is instrumented in code; see [runtimes without an auto-instrumentation layer](../../otel-instrumentation/rules/platforms/aws-lambda.md#runtimes-without-an-auto-instrumentation-layer).
+
+If **no**, or the runtime is Ruby, or telemetry must fan out to more than one backend — use the **[Collector Lambda layer](./deployment/aws-lambda.md)**.
 It runs as a Lambda extension inside the function and needs a different component set from a long-lived Collector.
 
 Either way, the remaining steps do not apply.
@@ -68,7 +71,8 @@ Is the target AWS Lambda?
 ├─ Yes
 │  └─ Is Dash0 the backend?
 │     ├─ Yes, Node.js / Python / Java  → Dash0 Lambda Extension (no Collector)
-│     └─ No, or Ruby / Go / .NET       → Collector Lambda layer
+│     ├─ Yes, Go / .NET / Rust         → dash0-extension-manual layer (no Collector)
+│     └─ No, or Ruby                   → Collector Lambda layer
 └─ No
    └─ Is the target Kubernetes?
       ├─ No  → Docker Compose / binary

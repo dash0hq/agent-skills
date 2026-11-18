@@ -38,12 +38,10 @@ Check which instrumentation libraries are already installed in the project:
 | .NET | `<PackageReference>` entries in `.csproj` | `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http` |
 | Ruby | `Gemfile` | `opentelemetry-instrumentation-rack`, `opentelemetry-instrumentation-rails` |
 | PHP | `require` entries in `composer.json` | `open-telemetry/opentelemetry-auto-slim-framework` |
-| Rust | `[dependencies]` in `Cargo.toml` | `actix-web-opentelemetry` with its `metrics` feature |
+| Rust | `[dependencies]` in `Cargo.toml` | `opentelemetry-instrumentation-tower`, `opentelemetry-instrumentation-actix-web` |
 
-`actix-web-opentelemetry` 0.22 records the pre-stable `http.server.duration`, not `http.server.request.duration`, and depends on `opentelemetry` 0.29.
-Check its `opentelemetry` dependency against the project's before relying on its metrics; a mismatch puts two copies of `opentelemetry` in the build, see [rust](./sdks/rust.md#how-rust-instrumentation-works).
-In Rust, `tower-http`'s `TraceLayer`, `reqwest-tracing`, and the `tracing-opentelemetry` bridge emit spans only.
-With them, `http.server.request.duration` and `http.client.request.duration` do not exist until the code records them; see [rust](./sdks/rust.md#metrics).
+In Rust, `tower-http`'s `TraceLayer`, `reqwest-tracing`, and the `tracing-opentelemetry` bridge emit spans only, and no crate records `http.client.request.duration` for `reqwest`.
+`actix-web-opentelemetry` 0.22 records the pre-stable `http.server.duration` and depends on `opentelemetry` 0.29; see [rust](./sdks/rust.md#supported-libraries) for the crates to use and [rust](./sdks/rust.md#recording-client-request-duration) for the client metric.
 
 ### Common auto-instrumented metrics
 
@@ -52,7 +50,7 @@ If a library from the left column is installed, the metrics in the right column 
 
 | Domain | Instrumentation library (example) | Metrics emitted |
 |--------|----------------------------------|-----------------|
-| HTTP server | `instrumentation-http`, `AspNetCore`, `otelhttp` | `http.server.request.duration`, `http.server.active_requests` |
+| HTTP server | `instrumentation-http`, `AspNetCore`, `otelhttp`, `opentelemetry-instrumentation-tower` | `http.server.request.duration`, `http.server.active_requests` |
 | HTTP client | `instrumentation-http`, `HttpClient` | `http.client.request.duration` |
 | Database client | `instrumentation-pg`, `instrumentation-mysql2`, `SqlClient` | `db.client.operation.duration` |
 | Messaging | `instrumentation-kafkajs`, `instrumentation-amqplib` | `messaging.process.duration`, `messaging.publish.duration` |

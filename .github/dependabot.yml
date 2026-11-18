@@ -132,9 +132,12 @@ updates:
         patterns:
           - "*"
 
+  # The examples/containers/csharp entry is the package set the C# examples
+  # in skills/ are compiled against.
   - package-ecosystem: "nuget"
     directories:
       - "/evals/custom/fixtures/*"
+      - "/evals/custom/examples/containers/csharp"
     schedule:
       interval: "monthly"
     labels:

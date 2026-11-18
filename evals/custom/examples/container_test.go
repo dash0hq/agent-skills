@@ -384,3 +384,48 @@ func TestJavaContainerCheck(t *testing.T) {
 		}
 	})
 }
+
+// TestCSharpContainerCheck compiles the C# testdata projects in the
+// dotnet-service fixture build image.
+func TestCSharpContainerCheck(t *testing.T) {
+	newRunner := containerTestRunner(t)
+
+	t.Run("ok", func(t *testing.T) {
+		runner := newRunner()
+		results, all := queueFile(t, runner, "testdata/csharp-ok/rule.md", "csharp")
+		if len(results) != 3 {
+			t.Fatalf("complete blocks = %d, want 3", len(results))
+		}
+		runner.Run(all)
+		for _, result := range results {
+			if result.Status != StatusValidated {
+				t.Errorf("line %d: status = %q, want validated (detail: %s)", result.Line, result.Status, result.Detail)
+			}
+		}
+	})
+
+	t.Run("broken", func(t *testing.T) {
+		runner := newRunner()
+		path := "testdata/csharp-broken/rule.md"
+		results, all := queueFile(t, runner, path, "csharp")
+		runner.Run(all)
+		wantLoc := path + ":" + strconv.Itoa(lineOf(t, path, "ActivityStatusCode.Failed")) + ":"
+		var mapped, pointer int
+		for _, result := range results {
+			if result.Status != StatusFailed {
+				t.Errorf("line %d: status = %q, want failed", result.Line, result.Status)
+			}
+			switch {
+			case strings.Contains(result.Detail, wantLoc) && strings.Contains(result.Detail, "CS0117"):
+				mapped++
+			case strings.Contains(result.Detail, "errors in examples/Block"):
+				pointer++
+			default:
+				t.Errorf("line %d: unexpected detail: %s", result.Line, result.Detail)
+			}
+		}
+		if mapped != 1 || pointer != 1 {
+			t.Errorf("mapped = %d, pointer = %d; want 1 each", mapped, pointer)
+		}
+	})
+}

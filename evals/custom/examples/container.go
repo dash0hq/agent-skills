@@ -57,6 +57,13 @@ type ContainerLanguage interface {
 	Diagnostics(output string) []Diagnostic
 }
 
+// containerRunArgs is an optional ContainerLanguage extension that adds
+// docker run arguments, for example a mount of a file it prepares under
+// langDir, the language's host cache directory.
+type containerRunArgs interface {
+	RunArgs(langDir string) ([]string, error)
+}
+
 // ContainerCache is one host cache directory mounted into the compile
 // container.
 type ContainerCache struct {
@@ -108,7 +115,7 @@ func DefaultContainerCacheDir() (string, error) {
 
 // ContainerLanguages returns every registered container language plug-in.
 func ContainerLanguages() []ContainerLanguage {
-	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}, golangLanguage{}}
+	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}, golangLanguage{}, csharpLanguage{}}
 }
 
 // Timeouts for the container phases.
@@ -328,6 +335,13 @@ func (r *ContainerRunner) runArgs(language ContainerLanguage, langDir, workDir s
 	}
 	for _, env := range language.Env() {
 		args = append(args, "-e", env)
+	}
+	if extra, ok := language.(containerRunArgs); ok {
+		more, err := extra.RunArgs(langDir)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, more...)
 	}
 	return args, nil
 }

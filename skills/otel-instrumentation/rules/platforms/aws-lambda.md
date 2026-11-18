@@ -187,6 +187,7 @@ Omitting any of them produces a function that succeeds while exporting nothing, 
 2. **Detect the Lambda resource.**
    Add `LambdaResourceDetector` from [`opentelemetry-aws`](https://docs.rs/opentelemetry-aws) with the `detector-aws-lambda` feature.
    It sets `faas.name`, `faas.version`, `faas.max_memory`, `cloud.provider`, `cloud.platform`, and `cloud.region`; nothing else sets them on this path.
+   Add it before the environment detectors, as below, so `OTEL_RESOURCE_ATTRIBUTES` keeps precedence; see [resource detectors](../sdks/rust.md#1-activate-the-sdk).
 3. **Create the invocation span yourself, with kind SERVER.**
    The `OpenTelemetryLayer` of `lambda_runtime` creates an INTERNAL span and enters it before the handler runs, after which `tracing-opentelemetry` ignores a changed `otel.kind`.
    Create the span in the `service_fn` closure with `otel.kind = "server"` and `faas.invocation_id` set to the request ID.
@@ -223,6 +224,7 @@ use opentelemetry_aws::detector::LambdaResourceDetector;
 use opentelemetry_otlp::SpanExporter;
 use opentelemetry_sdk::{
     Resource,
+    resource::{EnvResourceDetector, SdkProvidedResourceDetector, TelemetryResourceDetector},
     trace::{Sampler, SdkTracerProvider},
 };
 use serde_json::{Value, json};
@@ -238,8 +240,16 @@ async fn handler(_event: LambdaEvent<Value>) -> Result<Value, Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    // Lambda resource attributes, plus OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES.
-    let resource = Resource::builder().with_detector(Box::new(LambdaResourceDetector)).build();
+    // Lambda resource attributes first, then OTEL_RESOURCE_ATTRIBUTES and
+    // OTEL_SERVICE_NAME, so the function's environment overrides the detector.
+    let resource = Resource::builder_empty()
+        .with_detector(Box::new(LambdaResourceDetector))
+        .with_detectors(&[
+            Box::new(TelemetryResourceDetector),
+            Box::new(EnvResourceDetector::new()),
+            Box::new(SdkProvidedResourceDetector),
+        ])
+        .build();
     let provider = SdkTracerProvider::builder()
         .with_sampler(Sampler::AlwaysOn)
         .with_batch_exporter(SpanExporter::builder().build()?)

@@ -276,6 +276,8 @@ Treat the Python attribute as opaque debugging context, not as a structured repl
 Add business context to auto-instrumented traces:
 
 ```python
+import traceback
+
 from opentelemetry import trace
 from opentelemetry.trace import StatusCode
 

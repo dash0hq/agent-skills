@@ -1,0 +1,25 @@
+# Pinned packages the Python examples in skills/ are type-checked against
+# (see evals/custom/examples/python.go). Every package is pinned, including
+# the transitive ones, so the install resolves the same set every time.
+# Resolve a bump inside the python-service fixture image with
+# pip install --only-binary=:all: and pip freeze.
+#
+# Packages complete examples import, plus the type checker; pin the latest
+# release, which is what the skills tell agents to install:
+mypy==2.4.1
+opentelemetry-api==1.45.2
+opentelemetry-instrumentation-psycopg2==0.66b2
+python-json-logger==4.2.0
+structlog==26.1.0
+
+# Transitive dependencies of the packages above:
+ast_serialize==0.13.1
+librt==0.16.0
+mypy_extensions==1.2.0
+opentelemetry-instrumentation==0.66b2
+opentelemetry-instrumentation-dbapi==0.66b2
+opentelemetry-semantic-conventions==0.66b2
+packaging==26.3
+pathspec==1.1.1
+typing_extensions==4.16.0
+wrapt==2.5.2

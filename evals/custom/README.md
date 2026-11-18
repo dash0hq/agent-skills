@@ -62,8 +62,8 @@ Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment,
 ```
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.
-Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, a Java block only when it declares a top-level type (`class`, `interface`, `enum`, `record`, or `@interface` at column 0) or its first line is a `// src/main/java/<path>.java` comment, and the other languages use conservative heuristics that bias to fragment.
-Complete Go, Rust, JavaScript, TypeScript, Python, and Java blocks are checked inside a container, as described in the next section; no language compiles with a host toolchain.
+Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, a Java block only when it declares a top-level type (`class`, `interface`, `enum`, `record`, or `@interface` at column 0) or its first line is a `// src/main/java/<path>.java` comment, a C# block only when it declares a `namespace` or a top-level type at column 0 or its first line is a `// <path>.cs` comment, and the other languages use conservative heuristics that bias to fragment.
+Complete Go, Rust, JavaScript, TypeScript, Python, Java, and C# blocks are checked inside a container, as described in the next section; no language compiles with a host toolchain.
 Complete blocks in every other language report `skipped-no-toolchain`, naming the language, until a container plug-in is wired for it.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
 
@@ -81,6 +81,7 @@ Languages whose rule files carry no dependency manifest check against a pinned p
 | Python | `python` | `python-service` | [`examples/containers/python/`](./examples/containers/python) | `mypy` |
 | Java | `java` | `java-service` | [`examples/containers/java/`](./examples/containers/java) | `mvn --offline compile` |
 | Go | `go` | `go-service` | `OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` in [`versions.env`](./versions.env) | `go build` and `go vet` |
+| C# | `csharp` | `dotnet-service` | [`examples/containers/csharp/`](./examples/containers/csharp) | `dotnet build --no-restore` |
 
 #### Rust
 
@@ -135,6 +136,18 @@ The Go blocks of a rule file become 1 module, resolved with `go mod tidy`, then 
 5. Compiler and vet errors are reported on the block they occur in, at the rule-file line; the other blocks of the module fail with a pointer to it.
 
 The module cache (`GOMODCACHE`) is the CI-cached `packages` directory, and the build cache (`GOCACHE`) stays local.
+
+#### C#
+
+The C# blocks of a rule file become 1 project, restored with `dotnet restore`, then compiled with `dotnet build --no-restore` against the pinned [`Examples.csproj`](./examples/containers/csharp/Examples.csproj), which mirrors the `dotnet-service` fixture: the Web SDK, `net8.0`, and nullable and implicit usings enabled.
+
+1. A block whose first line is a `// <path>.cs` comment is written to that path, and any other complete block (one declaring a `namespace` or a top-level type) to `examples/Block<line>.cs`.
+2. Only a block written to `Program.cs` may hold top-level statements, and that file makes the project an executable; without it the project is a library, so top-level statements elsewhere fail with CS8805 or CS8802.
+3. All blocks of the rule file share 1 assembly, so every name a block uses must be declared in that block, in another complete block of the file, or in the pinned packages; declare each type once per rule file.
+4. Packages resolve only against the pinned set; add a package an example needs to `Examples.csproj` at its latest version, resolved with `dotnet add package <id>` in the `dotnet-service` build image.
+5. Compiler errors are reported on the block they occur in, at the rule-file line, and the other blocks of the project fail with a pointer to it; warnings never fail a block.
+
+The container runs as the host user, so the plug-in mounts a generated `/etc/passwd` naming that user: without an entry, the .NET runtime cannot create the named mutex NuGet takes on every `dotnet` command.
 
 Without Docker, the fixture Dockerfile, or the image, complete blocks of container languages report `skipped-no-toolchain` locally.
 CI fails closed instead: the `validate-examples` job passes `--require-containers` (or set `EVAL_REQUIRE_CONTAINERS=1`), which makes any of those a failure.

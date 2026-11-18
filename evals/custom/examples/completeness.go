@@ -18,8 +18,9 @@ var goPackageRe = regexp.MustCompile(`(?m)^package\s+\w+`)
 // pyTopLevelRe matches a Python top-level import, def, or class at column 0.
 var pyTopLevelRe = regexp.MustCompile(`(?m)^(import\s+\w|from\s+\w|def\s+\w|class\s+\w)`)
 
-// csharpTypeRe matches a C# top-level namespace, class, interface, or struct.
-var csharpTypeRe = regexp.MustCompile(`(?m)^(namespace|(public\s+|internal\s+|sealed\s+|static\s+)*(class|interface|struct))\s+\w`)
+// csharpTypeRe matches a C# namespace or a top-level class, interface,
+// struct, record, or enum declaration at column 0.
+var csharpTypeRe = regexp.MustCompile(`(?m)^(namespace|((public|internal|sealed|static|abstract|partial|readonly)\s+)*(class|interface|struct|record|enum))\s+\w`)
 
 // jsEntrypointRe matches a JavaScript or TypeScript top-level import or
 // require at column 0, a rough proxy for a runnable entrypoint.
@@ -48,7 +49,10 @@ func isCompleteCode(tag, content string) bool {
 		// type at column 0; see java.go.
 		return isCompleteJava(content)
 	case "csharp":
-		return csharpTypeRe.MatchString(content)
+		// A C# block is a compilation unit iff it names its file with a
+		// "// <path>.cs" first line or declares a namespace or top-level
+		// type; see csharp.go.
+		return isCompleteCSharp(content)
 	case "javascript", "typescript":
 		// Bias to fragment: require a top-level import or require, or a
 		// "// <path>" first line naming the file; see javascript.go.

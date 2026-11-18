@@ -15,6 +15,7 @@ import (
 var tagNormalization = map[string]string{
 	"sh": "bash",
 	"js": "javascript",
+	"rs": "rust",
 }
 
 // NormalizeTag returns the canonical fence tag for tag (lowercased, aliases

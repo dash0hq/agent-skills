@@ -62,10 +62,31 @@ Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment,
 ```
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.
-Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, and the other languages use conservative heuristics that bias to fragment.
+Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, and the other languages use conservative heuristics that bias to fragment.
 Complete Go blocks compile against a pinned OpenTelemetry Go SDK dependency set (`OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` in [`versions.env`](./versions.env)) via the host `go` toolchain; when `go` is absent that compile reports `skipped-no-toolchain` rather than passing silently.
-Complete blocks in other languages report `skipped-no-toolchain` too, naming the language, because their fixture-image compilers are a follow-up.
+Complete Rust blocks compile inside a container, as described in the next section.
+Complete blocks in every other language report `skipped-no-toolchain`, naming the language, until a container plug-in is wired for it.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
+
+### Compiling code in containers
+
+A language with a container plug-in (`ContainerLanguage` in [`examples/container.go`](./examples/container.go)) compiles in the build image of its eval fixture: the image named on the `FROM <image> AS build` line of `fixtures/<language>-service/Dockerfile`, so examples and evals share 1 toolchain pin.
+The validator assembles 1 project per rule file from that file's complete blocks and runs 1 container for it in 2 phases: a dependency fetch with network access, then the compile check with `--network none`, so third-party build scripts and macros never reach the network.
+The package cache is a host directory under `agent-skills-evals-containers` in the user cache directory (override it with `EVAL_CONTAINER_CACHE_DIR`), and `go run ./cmd/validate-examples --container-cache-key` prints the CI cache key for it: the compile images plus a hash of the generated manifests.
+Rust is the only container language today.
+
+A Rust rule file becomes 1 crate checked with `cargo fetch`, then `cargo check --offline`:
+
+1. A block whose first line is `// src/<path>.rs` is written to that path, and any other complete block (one declaring `fn main`) to `src/main.rs`.
+2. Every `toml` block of the file feeds `Cargo.toml`: lines before any table header and the `[dependencies]`, `[dev-dependencies]`, and `[build-dependencies]` bodies merge per table, other tables such as `[[bin]]` are copied verbatim, and a `[package]` table replaces the generated one (edition 2024).
+3. A dependency declared twice with different specifications, or 2 blocks naming the same path, fail the file's blocks.
+4. A top-level `src/<name>.rs` module the crate root does not declare is declared automatically, so every written block is checked.
+5. Compiler errors are reported on the block they occur in, at the rule-file line; the other blocks of the crate fail with a pointer to it.
+
+Annotate a `toml` block that is not `Cargo.toml` content with `<!-- eval:skip -->`.
+
+Without Docker, the fixture Dockerfile, or the image, complete blocks of container languages report `skipped-no-toolchain` locally.
+CI fails closed instead: the `validate-examples` job passes `--require-containers` (or set `EVAL_REQUIRE_CONTAINERS=1`), which makes any of those a failure.
 
 `dockerfile` blocks are linted for the `ENV` and `LABEL` `name=value` contract: the legacy space-separated form fails validation because the classic (non-BuildKit) Docker builder rejects values containing spaces at parse time ([issue #120](https://github.com/dash0hq/agent-skills/issues/120)).
 The same check gates every scenario's fixture workspace before `docker build`, so an agent-written Dockerfile using the legacy form fails the attempt even on BuildKit-backed hosts that would accept it.
@@ -118,6 +139,7 @@ Add an entry with the scenario ID, the date, and a link to the tracking issue; r
 
 Bump pins only through a PR: `evals/custom/versions.env` is a full-matrix trigger in the registry, so the PR runs every scenario (requirement R19) and behavior drift surfaces before merge.
 When bumping `OTELCOL_CONTRIB_VERSION`, update all 3 checksum keys from the new release's checksums file in the same PR.
+The images that compile container-language examples are not pinned here: they come from the `FROM <image> AS build` line of each fixture Dockerfile, so bumping a fixture's build image also bumps the compiler for that language's examples.
 
 ## AWS Lambda scenarios
 

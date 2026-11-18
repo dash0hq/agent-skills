@@ -106,6 +106,7 @@ const (
 // reported but not compiled) by Classify.
 var codeTags = map[string]bool{
 	"go":         true,
+	"rust":       true,
 	"python":     true,
 	"javascript": true,
 	"typescript": true,

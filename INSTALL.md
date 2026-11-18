@@ -8,6 +8,18 @@ npx skills add https://github.com/dash0hq/agent-skills --all
 npx skills add https://github.com/dash0hq/agent-skills --skill otel-semantic-conventions
 ```
 
+## Packaged archives
+
+Each [GitHub release](https://github.com/dash0hq/agent-skills/releases) attaches one `<skill>.skill` file and one `<skill>.zip` file per skill: `otel-collector`, `otel-instrumentation`, `otel-ottl`, and `otel-semantic-conventions`.
+The two formats hold identical content, a single top-level folder named after the skill with `SKILL.md` inside it.
+Use the `.skill` file to import a skill into Claude (for example, in Claude.ai under Settings > Capabilities > Skills), or open it with Claude directly.
+Use the `.zip` file to unpack a skill into any tool's skills directory by hand.
+
+```bash
+gh release download --repo dash0hq/agent-skills --pattern 'otel-ottl.zip'
+unzip otel-ottl.zip -d ~/.claude/skills/
+```
+
 ## Tessl
 
 ```bash

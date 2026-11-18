@@ -259,11 +259,22 @@ import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OrderService {
 
     private static final Tracer tracer =
         GlobalOpenTelemetry.getTracer("my-service");
+
+    private static final Logger logger =
+        LoggerFactory.getLogger(OrderService.class);
+
+    private final OrderRepository repository;
+
+    public OrderService(OrderRepository repository) {
+        this.repository = repository;
+    }
 
     private static String stackTraceAsString(Throwable t) {
         var sw = new java.io.StringWriter();
@@ -274,9 +285,9 @@ public class OrderService {
     public Order processOrder(Order order) {
         Span span = tracer.spanBuilder("order.process").startSpan();
         try (var scope = span.makeCurrent()) {
-            span.setAttribute("order.id", order.getId());
-            span.setAttribute("order.total", order.getTotal());
-            Order result = saveOrder(order);
+            span.setAttribute("order.id", order.id());
+            span.setAttribute("order.total", order.total());
+            Order result = repository.save(order);
             return result;
         } catch (Exception e) {
             span.setStatus(StatusCode.ERROR, e.getMessage());
@@ -294,7 +305,16 @@ public class OrderService {
         }
     }
 }
+
+record Order(String id, double total) {}
+
+interface OrderRepository {
+    Order save(Order order);
+}
 ```
+
+`Order` and `OrderRepository` stand in for the application's own domain types.
+The `logger.atError().addKeyValue(...)` chain is the SLF4J fluent API and requires `org.slf4j:slf4j-api` 2.0 or later.
 
 ### Retrieving the active span
 

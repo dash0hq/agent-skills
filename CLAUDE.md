@@ -48,7 +48,7 @@ Follow these rules when changing skill content:
   The registry completeness test fails CI on unclassified files, stale entries, and uncovered dedicated files.
 - **Every fenced example must validate or carry an `eval:` annotation.**
   Unclassifiable blocks fail CI; use `<!-- eval:skip -->`, `<!-- eval:fragment -->`, `<!-- eval:k8s -->`, or `<!-- eval:collector-config -->` per the annotation table in [evals/custom/README.md](evals/custom/README.md).
-  `<!-- eval:fragment -->` is context-aware: on a `yaml` or untagged block it marks a service-less Collector fragment, and on an SDK-code block it marks a code fragment that is reported but not compiled — use it on a genuinely-complete Go or Rust block only when the block is deliberately uncompilable, never to hide a real compile failure.
+  `<!-- eval:fragment -->` is context-aware: on a `yaml` or untagged block it marks a service-less Collector fragment, and on an SDK-code block it marks a code fragment that is reported but not compiled — use it on a genuinely-complete SDK-code block only when the block is deliberately uncompilable, never to hide a real compile failure.
 - **Keep the Rust blocks of a rule file compilable as 1 crate.**
   The validator writes each `// src/<path>.rs` block to that path and a `fn main` block to `src/main.rs`, and builds `Cargo.toml` from every `toml` block of the file, so declare every crate the code uses in those `toml` blocks; the assembly rules are in [evals/custom/README.md](evals/custom/README.md).
 - **Import only pinned packages in JavaScript and TypeScript examples.**
@@ -64,6 +64,8 @@ Follow these rules when changing skill content:
 - **Use only pinned packages in PHP examples.**
   A PHP block with a top-level `use` statement, a `<?php` tag, or a `// <path>.php` first line is analysed with PHPStan against `evals/custom/examples/containers/php/composer.json`; add a package a new example uses to that pin and regenerate `composer.lock`.
   A PHP block with none of these markers is a fragment and is not checked.
+- **Import only pinned libraries in Scala examples.**
+  The validator compiles every complete Scala block against `evals/custom/examples/containers/scala/build.sbt`; add a library a new example imports to that pin by hand, and start blocks that reference each other with a `// src/main/scala/<path>.scala` comment line.
 - **Mark deliberately wrong examples.**
   Use a `// BAD`-style line comment or `<!-- eval:bad -->` so the validator exempts them.
 - **Keep fixture data synthetic.**

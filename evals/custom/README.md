@@ -58,12 +58,12 @@ Add `--dry-run` to print the per-file classification and exemption report withou
 The run opens with a one-line summary that separates what was actually checked from what was exempted or skipped, so a green run cannot quietly overstate itself:
 
 ```text
-Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment, 58 bad, 33 skip, 13 not-validated), 32 skipped-no-toolchain, 0 failed.
+Summary: 158 validated (54 code compiled), 392 exempt (181 bash, 80 code-fragment, 66 bad, 43 skip, 22 not-validated), 0 skipped-no-toolchain, 0 failed.
 ```
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.
-Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, a Java block only when it declares a top-level type (`class`, `interface`, `enum`, `record`, or `@interface` at column 0) or its first line is a `// src/main/java/<path>.java` comment, a C# block only when it declares a `namespace` or a top-level type at column 0 or its first line is a `// <path>.cs` comment, a Ruby block only when its first line is a `# <path>.rb` comment or it has a `require` of a library at column 0, a PHP block only when it opens with `<?php`, names its file with a `// <path>.php` comment, or has a top-level namespaced `use` statement, and the other languages use conservative heuristics that bias to fragment.
-Complete Go, Rust, JavaScript, TypeScript, Python, Java, C#, Ruby, and PHP blocks are checked inside a container, as described in the next section; no language compiles with a host toolchain.
+Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, a Java block only when it declares a top-level type (`class`, `interface`, `enum`, `record`, or `@interface` at column 0) or its first line is a `// src/main/java/<path>.java` comment, a C# block only when it declares a `namespace` or a top-level type at column 0 or its first line is a `// <path>.cs` comment, a Ruby block only when its first line is a `# <path>.rb` comment or it has a `require` of a library at column 0, a PHP block only when it opens with `<?php`, names its file with a `// <path>.php` comment, or has a top-level namespaced `use` statement, a Scala block only when its first line is a `// src/main/scala/<path>.scala` comment, it declares a top-level `@main def`, or it pairs a top-level `package` or `import` with a top-level `object`, `class`, `trait`, or `enum`, and the other languages use conservative heuristics that bias to fragment.
+Complete Go, Rust, JavaScript, TypeScript, Python, Java, C#, Ruby, PHP, and Scala blocks are checked inside a container, as described in the next section; no language compiles with a host toolchain.
 Complete blocks in every other language report `skipped-no-toolchain`, naming the language, until a container plug-in is wired for it.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
 
@@ -84,6 +84,7 @@ Languages whose rule files carry no dependency manifest check against a pinned p
 | C# | `csharp` | `dotnet-service` | [`examples/containers/csharp/`](./examples/containers/csharp) | `dotnet build --no-restore` |
 | Ruby | `ruby` | `ruby-service` | [`examples/containers/ruby/`](./examples/containers/ruby) | `ruby -wc` plus require, constant, and method checks |
 | PHP | `php` | `php-service` | [`examples/containers/php/`](./examples/containers/php) | `php -l` and PHPStan level 2 |
+| Scala | `scala` | `scala-service` | [`examples/containers/scala/`](./examples/containers/scala) | `sbt compile`, offline |
 
 #### Rust
 
@@ -174,6 +175,18 @@ The PHP blocks of a rule file become 1 project, installed with `composer install
 3. The `php-service` image has no Composer, so the fetch phase runs in the image the fixture Dockerfile copies its `composer` binary from (`COPY --from=<image>`); the check runs in the fixture image.
 4. Imports resolve only against the pinned packages; add a package an example needs to [`examples/containers/php/composer.json`](./examples/containers/php/composer.json) with an exact version and regenerate `composer.lock` with `composer update --lock --no-scripts --no-plugins` in that Composer image.
 5. Level 2 reports unknown classes, functions, constants, methods, and properties without type checks; undefined variables such as `$order` (`variable.undefined`) and unqualified functions an example calls without defining them, such as `saveOrder()` (`function.notFound`), are ignored, and every other error fails the block, at the rule-file line.
+
+#### Scala
+
+The Scala blocks of a rule file become 1 sbt build in the `scala-service` image (the fixture's Scala and sbt versions), resolved with `sbt update`, then compiled with `sbt compile` offline:
+
+1. A block whose first line is `// src/main/scala/<path>.scala` is written to that path in the root project, and such blocks may reference each other.
+2. Any other complete block is written to `examples/block_<line>/src/main/scala/Example.scala`, in a subproject of its own, so 2 standalone blocks may both declare `object OrderService`.
+3. Imports resolve only against the libraries pinned in [`examples/containers/scala/build.sbt`](./examples/containers/scala/build.sbt); add a library an example needs there at its latest Maven Central release, resolved inside the `scala-service` image.
+4. `Not found` errors (E006) for names a block uses without defining them, such as `Order`, `saveOrder`, or `logger`, are ignored unless they occur on an `import` line; every other compiler error fails the block, at the rule-file line.
+5. sbt build definitions, such as a block starting with `// build.sbt`, are fragments and are not compiled.
+
+Dependabot has no sbt ecosystem, so bump the Scala pins by hand.
 
 Without Docker, the fixture Dockerfile, or the image, complete blocks of container languages report `skipped-no-toolchain` locally.
 CI fails closed instead: the `validate-examples` job passes `--require-containers` (or set `EVAL_REQUIRE_CONTAINERS=1`), which makes any of those a failure.

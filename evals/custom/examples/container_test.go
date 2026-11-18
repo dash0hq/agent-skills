@@ -474,3 +474,51 @@ func TestRubyContainerCheck(t *testing.T) {
 		}
 	})
 }
+
+// TestScalaContainerCheck compiles the Scala testdata builds in the
+// scala-service fixture image.
+func TestScalaContainerCheck(t *testing.T) {
+	newRunner := containerTestRunner(t)
+
+	t.Run("ok", func(t *testing.T) {
+		runner := newRunner()
+		results, all := queueFile(t, runner, "testdata/scala-ok/rule.md", "scala")
+		if len(results) != 4 {
+			t.Fatalf("complete blocks = %d, want 4", len(results))
+		}
+		runner.Run(all)
+		for _, result := range results {
+			if result.Status != StatusValidated {
+				t.Errorf("line %d: status = %q, want validated (detail: %s)", result.Line, result.Status, result.Detail)
+			}
+		}
+	})
+
+	t.Run("broken", func(t *testing.T) {
+		runner := newRunner()
+		path := "testdata/scala-broken/rule.md"
+		results, all := queueFile(t, runner, path, "scala")
+		runner.Run(all)
+		failedLoc := path + ":" + strconv.Itoa(lineOf(t, path, "StatusCode.FAILED")) + ":"
+		importLoc := path + ":" + strconv.Itoa(lineOf(t, path, "import zio.ZIO")) + ":"
+		var failed, imported, pointer int
+		for _, result := range results {
+			if result.Status != StatusFailed {
+				t.Errorf("line %d: status = %q, want failed", result.Line, result.Status)
+			}
+			switch {
+			case strings.Contains(result.Detail, failedLoc) && strings.Contains(result.Detail, "value FAILED is not a member"):
+				failed++
+			case strings.Contains(result.Detail, importLoc) && strings.Contains(result.Detail, "Not found: zio"):
+				imported++
+			case strings.Contains(result.Detail, "errors in examples/block_"):
+				pointer++
+			default:
+				t.Errorf("line %d: unexpected detail: %s", result.Line, result.Detail)
+			}
+		}
+		if failed != 1 || imported != 1 || pointer != 1 {
+			t.Errorf("failed = %d, imported = %d, pointer = %d; want 1 each", failed, imported, pointer)
+		}
+	})
+}

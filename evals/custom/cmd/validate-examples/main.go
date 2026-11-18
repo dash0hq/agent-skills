@@ -3,8 +3,8 @@
 // deterministically (R10). With --dry-run it prints the per-file
 // classification, exemption, and substitution report and exits 0; otherwise
 // it validates and exits non-zero listing file:line and reason for every
-// failure. Complete blocks of container languages (Rust) compile inside the
-// build image of their eval fixture; --require-containers makes a missing
+// failure. Complete SDK code blocks compile or type-check inside the image of
+// their language's eval fixture; --require-containers makes a missing
 // Docker daemon or image fail the run instead of skipping those blocks, and
 // --container-cache-key prints the CI cache key for their package caches.
 package main

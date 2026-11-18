@@ -123,7 +123,7 @@ func DefaultContainerCacheDir() (string, error) {
 
 // ContainerLanguages returns every registered container language plug-in.
 func ContainerLanguages() []ContainerLanguage {
-	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}, golangLanguage{}, csharpLanguage{}, rubyLanguage{}, phpLanguage{}}
+	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}, golangLanguage{}, csharpLanguage{}, rubyLanguage{}, phpLanguage{}, scalaLanguage{}}
 }
 
 // Timeouts for the container phases.

@@ -8,9 +8,9 @@ import "regexp"
 // bodies, and elided examples. The detectors are deliberately conservative —
 // when a block is ambiguous they return false so it is treated as a fragment,
 // because a false "complete" wrongly fails a run while a false "fragment" only
-// skips a compile. Go, Rust, and Scala complete blocks are compiled, so their
-// detectors follow explicit rules; the other languages have no compiler wired
-// yet, and their heuristics are simple and bias to fragment.
+// skips a compile. Every language with a container plug-in follows an
+// explicit rule documented in its plug-in file; an unknown tag is always a
+// fragment.
 
 // goPackageRe matches a top-level Go package declaration at column 0.
 var goPackageRe = regexp.MustCompile(`(?m)^package\s+\w+`)

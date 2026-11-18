@@ -16,7 +16,7 @@ otel-instrumentation/
     ├── logs.md           # Structured logging, severity, trace correlation
     ├── platforms/
     │   ├── k8s.md                      # Kubernetes deployment — downward API, pod spec
-    │   ├── aws-lambda.md               # AWS Lambda — decision process, Go/.NET, shared rules
+    │   ├── aws-lambda.md               # AWS Lambda — decision process, Go/.NET/Rust, shared rules
     │   ├── aws-lambda-otel-layers.md   # Path A — upstream OTel layers
     │   └── aws-lambda-dash0-layers.md  # Path B — Dash0 Lambda Extension
     └── sdks/
@@ -27,6 +27,7 @@ otel-instrumentation/
         ├── dotnet.md     # .NET instrumentation
         ├── ruby.md       # Ruby instrumentation
         ├── php.md        # PHP instrumentation
+        ├── rust.md       # Rust instrumentation
         ├── browser.md    # Browser instrumentation
         └── nextjs.md     # Next.js full-stack instrumentation
 ```
@@ -50,7 +51,7 @@ The skill activates automatically when working on observability tasks.
 | [metrics](./rules/metrics.md) | CRITICAL | Instrument types, naming, units, cardinality |
 | [logs](./rules/logs.md) | CRITICAL | Structured logging, severity, trace correlation |
 | [k8s](./rules/platforms/k8s.md) | HIGH | Kubernetes deployment — downward API, pod spec |
-| [aws-lambda](./rules/platforms/aws-lambda.md) | HIGH | AWS Lambda deployment — decision process, manual SDK for Go and .NET, resource attributes, validation |
+| [aws-lambda](./rules/platforms/aws-lambda.md) | HIGH | AWS Lambda deployment — decision process, manual SDK for Go, .NET, and Rust, resource attributes, validation |
 | [aws-lambda-otel-layers](./rules/platforms/aws-lambda-otel-layers.md) | HIGH | Path A — upstream OTel layers, wrapper paths, per-runtime instrumentation tuning |
 | [aws-lambda-dash0-layers](./rules/platforms/aws-lambda-dash0-layers.md) | HIGH | Path B — Dash0 Lambda Extension, `DASH0_*` variables, collection modes |
 | [nodejs](./rules/sdks/nodejs.md) | HIGH | Node.js auto-instrumentation setup |
@@ -60,6 +61,7 @@ The skill activates automatically when working on observability tasks.
 | [dotnet](./rules/sdks/dotnet.md) | HIGH | .NET auto-instrumentation setup |
 | [ruby](./rules/sdks/ruby.md) | HIGH | Ruby instrumentation setup |
 | [php](./rules/sdks/php.md) | HIGH | PHP auto-instrumentation setup |
+| [rust](./rules/sdks/rust.md) | HIGH | Rust instrumentation setup |
 | [browser](./rules/sdks/browser.md) | HIGH | Browser instrumentation with Dash0 SDK |
 | [nextjs](./rules/sdks/nextjs.md) | HIGH | Next.js full-stack instrumentation (App Router) |
 

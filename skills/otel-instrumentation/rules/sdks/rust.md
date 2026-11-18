@@ -60,6 +60,21 @@ serde_json = "=1.0.145"
 Use `http-proto` with `reqwest-blocking-client`.
 Do not enable `grpc-tonic` as well: with both transports compiled in, `SpanExporter::builder().build()` picks one from `OTEL_EXPORTER_OTLP_PROTOCOL`, and an unset variable silently selects HTTP.
 
+### Verifying dependencies
+
+Never hand-write a `[dependencies]` entry in `Cargo.toml` with a version from memory; verify the crate against crates.io first, per [verify-dependencies](../verify-dependencies.md):
+
+```bash
+cargo info opentelemetry-otlp
+cargo info opentelemetry-otlp@0.33.1
+```
+
+The first command prints the latest published version, its `rust-version`, and its features; the second fails when that version was never published.
+Check the reported `rust-version` against the project's `rust-version` in `Cargo.toml`, its `rust-toolchain.toml`, and the `rust:` base image in its Dockerfile.
+
+Add crates with `cargo add <crate>@=<version>`, which writes the exact pin and updates `Cargo.lock` in one step.
+After editing `Cargo.toml` by hand, run `cargo update --workspace` to bring `Cargo.lock` in step without upgrading unrelated crates, then run `cargo tree -d -i opentelemetry` to confirm that no second copy entered the graph.
+
 ## Environment variables
 
 The Rust SDK reads a subset of the standard variables.
@@ -301,6 +316,7 @@ Inside a handler without its own `#[instrument]`, `Span::current()` is the SERVE
 Add request-level attributes to it with `set_attribute`; do not create a child span only to carry them:
 
 ```rust
+use axum::response::IntoResponse;
 use tracing::Span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -359,6 +375,42 @@ let client = ClientBuilder::new(reqwest::Client::new())
 
 Build the client once and share it.
 A plain `reqwest::Client` bypasses the middleware and produces no CLIENT span.
+
+## Database query parameters
+
+`sqlx`, `diesel`, and `tokio-postgres` emit no OpenTelemetry database CLIENT spans, so no crate captures prepared-statement parameter values for you.
+Read [capturing database query parameters](../capture-database-query-parameters.md) first: it covers the cross-language risks and the Collector-side redaction that must be in place before enabling capture.
+
+Build the CLIENT span around the query, and record each parameter as `db.query.parameter.<index>`, with the 0-based index of its bind position (`$1` is index `0`).
+Gate the capture behind a setting that is off by default, and record only parameters that are not on the [never-instrument list](../sensitive-data.md#never-instrument-list):
+
+```rust
+use tracing::{Instrument, info_span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+
+const FIND_ORDER: &str = "SELECT id, status FROM orders WHERE id = $1";
+
+async fn find_order(pool: &sqlx::PgPool, order_id: &str, capture_parameters: bool) -> Result<Order, sqlx::Error> {
+    let span = info_span!(
+        "SELECT orders",
+        otel.kind = "client",
+        db.system.name = "postgresql",
+        db.operation.name = "SELECT",
+        db.collection.name = "orders",
+        db.query.text = FIND_ORDER,
+    );
+    if capture_parameters {
+        span.set_attribute("db.query.parameter.0", order_id.to_owned());
+    }
+    sqlx::query_as::<_, Order>(FIND_ORDER)
+        .bind(order_id)
+        .fetch_one(pool)
+        .instrument(span)
+        .await
+}
+```
+
+Read `capture_parameters` once at startup, for example from an `APP_CAPTURE_DB_QUERY_PARAMETERS=true` environment variable, and never enable it by default in production.
 
 ## Context propagation
 

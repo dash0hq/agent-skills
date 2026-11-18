@@ -12,7 +12,8 @@ type Versions struct {
 	// ClaudeCodeVersion is the pinned Claude Code CLI version
 	// (CLAUDE_CODE_VERSION).
 	ClaudeCodeVersion string
-	// EvalModel is the pinned model ID passed to --model (EVAL_MODEL).
+	// EvalModel is the model ID passed to --model: the EVAL_MODEL environment
+	// variable when it is set and non-empty, otherwise the pinned EVAL_MODEL.
 	EvalModel string
 	// OtelcolContribVersion is the pinned otelcol-contrib version shared
 	// with example validation (OTELCOL_CONTRIB_VERSION).
@@ -61,6 +62,12 @@ func LoadVersions(path string) (*Versions, error) {
 	}
 	if v.OtelGoCoreVersion == "" || v.OtelGoLogVersion == "" {
 		return nil, fmt.Errorf("versions: %s must pin OTEL_GO_CORE_VERSION and OTEL_GO_LOG_VERSION", path)
+	}
+	// The file must pin a model even when the environment overrides it. A
+	// manually dispatched CI run passes the model picked from its dropdown as
+	// EVAL_MODEL; an empty value keeps the pin.
+	if model := strings.TrimSpace(os.Getenv("EVAL_MODEL")); model != "" {
+		v.EvalModel = model
 	}
 	return v, nil
 }

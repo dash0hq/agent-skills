@@ -31,6 +31,11 @@ on:
         required: false
         type: string
         default: ""
+      model:
+        description: "Model ID the agent runs with; empty uses EVAL_MODEL from evals/custom/versions.env"
+        required: false
+        type: string
+        default: ""
     outputs:
       count:
         description: "Number of non-kind scenarios in the matrix"
@@ -67,6 +72,19 @@ on:
         required: false
         type: string
         default: ""
+      # Keep these options in sync with the model input of release.yml, and
+      # the default with EVAL_MODEL in evals/custom/versions.env.
+      model:
+        description: "Model the agent runs with"
+        required: true
+        type: choice
+        default: claude-opus-5-5
+        options:
+          - claude-opus-5-5
+          - claude-sonnet-5-5
+          - claude-haiku-5-5
+          - claude-fable-5-1
+          - claude-opus-4-8
 
 permissions:
   contents: read
@@ -178,6 +196,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           EVAL_SCENARIOS: ${{ matrix.scenario }}
           EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+          # Overrides the pinned EVAL_MODEL when set; see evals/custom/versions.env.
+          EVAL_MODEL: ${{ inputs.model }}
         run: |
           # The per-run relay bearer token is generated in-process by the
           # harness and never logged, so there is no token value to
@@ -271,6 +291,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           EVAL_SCENARIOS: ${{ matrix.scenario }}
           EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+          # Overrides the pinned EVAL_MODEL when set; see evals/custom/versions.env.
+          EVAL_MODEL: ${{ inputs.model }}
         run: |
           mkdir -p evidence
           cd evals/custom
@@ -399,6 +421,8 @@ jobs:
           EVAL_DASH0_TOKEN_SECRET_ARN: ${{ vars.DASH0_EVAL_TOKEN_SECRET_ARN }}
           EVAL_SCENARIOS: ${{ matrix.scenario }}
           EVAL_VERDICT_DIR: ${{ github.workspace }}/evidence
+          # Overrides the pinned EVAL_MODEL when set; see evals/custom/versions.env.
+          EVAL_MODEL: ${{ inputs.model }}
         run: |
           mkdir -p evidence
           cd evals/custom

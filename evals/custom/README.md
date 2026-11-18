@@ -110,7 +110,9 @@ Add an entry with the scenario ID, the date, and a link to the tracking issue; r
 [`versions.env`](./versions.env) pins everything the harness shells out to:
 
 - `CLAUDE_CODE_VERSION` — the Claude Code CLI version CI installs.
-- `EVAL_MODEL` — the model ID passed to `--model`.
+- `EVAL_MODEL` — the default model ID passed to `--model`.
+  A non-empty `EVAL_MODEL` environment variable overrides it, which is how the `model` dropdown of a manually dispatched `evals-matrix.yml` or `release.yml` run reaches the harness.
+  The pull-request gate has no dropdown and always uses the pin.
 - `OTELCOL_CONTRIB_VERSION` — the `otelcol-contrib` version used by example validation and the Collector scenarios.
 - `OTELCOL_CONTRIB_SHA256_LINUX_AMD64`, `OTELCOL_CONTRIB_SHA256_LINUX_ARM64`, and `OTELCOL_CONTRIB_SHA256_DARWIN_ARM64` — SHA-256 checksums of the release archives, copied from the `opentelemetry-collector-releases_otelcol-contrib_checksums.txt` asset on the matching [opentelemetry-collector-releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) release.
 - `OTEL_GO_CORE_VERSION` — the version of the stable OpenTelemetry Go modules (`go.opentelemetry.io/otel` and friends) used to compile complete Go SDK code blocks.

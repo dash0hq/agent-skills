@@ -1,0 +1,52 @@
+# Configuration for the upstream OpenTelemetry Collector Lambda layer.
+#
+# This file is packaged as its own Lambda layer by the CDK stack and must land at
+# the ROOT of the layer archive: AWS unpacks layers into /opt, and the function
+# points at it with OPENTELEMETRY_COLLECTOR_CONFIG_URI=/opt/otel-collector-config.yaml.
+# A file nested in a subdirectory lands at /opt/<subdir>/... and the Collector falls
+# back to its built-in configuration without logging an error.
+#
+# Every value that differs per deployment is read from an environment variable on the
+# function, so the layer itself carries no endpoint, dataset, or credential.
+
+receivers:
+  # Subscribes to the Lambda Telemetry API: platform events and the function's own
+  # CloudWatch log lines become spans and log records. Its metrics support is at Development stability and is not wired here.
+  telemetryapi:
+  otlp:
+    protocols:
+      grpc:
+        # localhost, never 0.0.0.0: only the in-process SDK connects to this receiver,
+        # and binding to all interfaces exposes it to the function's VPC.
+        endpoint: "localhost:4317"
+      http:
+        endpoint: "localhost:4318"
+
+processors:
+  # Returns control to the function immediately and lets the export finish before the
+  # extension signals that the execution environment may freeze. Without it the export
+  # round trip runs inside the invocation and is billed as function duration.
+  # No memory_limiter, no sending_queue, no file_storage: none of them belong in Lambda.
+  decouple:
+
+exporters:
+  otlp_grpc/dash0:
+    endpoint: "${env:DASH0_OTLP_GRPC_ENDPOINT}"
+    headers:
+      Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}"
+      Dash0-Dataset: "${env:DASH0_DATASET}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [telemetryapi, otlp]
+      processors: [decouple]
+      exporters: [otlp_grpc/dash0]
+    metrics:
+      receivers: [otlp]
+      processors: [decouple]
+      exporters: [otlp_grpc/dash0]
+    logs:
+      receivers: [telemetryapi, otlp]
+      processors: [decouple]
+      exporters: [otlp_grpc/dash0]

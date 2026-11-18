@@ -25,8 +25,9 @@ const (
 	// validation.
 	StatusClassified Status = "classified"
 	// StatusSkippedNoToolchain means a code-complete block could not be
-	// compiled because its toolchain is unavailable here (a non-Go language
-	// whose fixture-image compiler is a follow-up, or a missing go binary).
+	// compiled because its toolchain is unavailable here (a language without
+	// a container plug-in, a missing go binary, or, unless containers are
+	// required, a missing Docker daemon, fixture Dockerfile, or image).
 	// It is visible in the report and never counts as validated.
 	StatusSkippedNoToolchain Status = "skipped-no-toolchain"
 )
@@ -108,6 +109,11 @@ func (v *Validator) ValidateTree(skillsDir string) (*Report, error) {
 			report.Results = append(report.Results, v.validateDocument(doc)...)
 		}
 	}
+	if !v.DryRun {
+		// Container languages compile per rule file, so their results are
+		// filled in once every block is known.
+		v.Code.Finish(blocks)
+	}
 	return report, nil
 }
 
@@ -148,7 +154,7 @@ func (v *Validator) validateDocument(doc *Document) []*Result {
 		result.Status = StatusExempt
 		result.Detail = "fragment — not compiled (needs surrounding context; covered by agent scenarios)"
 	case CategoryCodeComplete:
-		v.Code.Validate(result, block.Tag, doc.Content)
+		v.Code.Validate(result, block)
 	case CategoryDockerfile:
 		if issues := LintDockerfile(doc.Content); len(issues) > 0 {
 			var details []string

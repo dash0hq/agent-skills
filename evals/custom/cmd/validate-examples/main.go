@@ -3,7 +3,10 @@
 // deterministically (R10). With --dry-run it prints the per-file
 // classification, exemption, and substitution report and exits 0; otherwise
 // it validates and exits non-zero listing file:line and reason for every
-// failure.
+// failure. Complete blocks of container languages (Rust) compile inside the
+// build image of their eval fixture; --require-containers makes a missing
+// Docker daemon or image fail the run instead of skipping those blocks, and
+// --container-cache-key prints the CI cache key for their package caches.
 package main
 
 import (
@@ -23,24 +26,70 @@ func main() {
 	dryRun := flag.Bool("dry-run", false, "print the per-file classification report without validating")
 	skillsDir := flag.String("skills-dir", "", "path to the skills/ directory (default: <repo root>/skills)")
 	versionsEnv := flag.String("versions-env", "", "path to evals/custom/versions.env (default: <repo root>/evals/custom/versions.env)")
+	fixturesDir := flag.String("fixtures-dir", "", "path to evals/custom/fixtures, whose Dockerfiles name the container compile images (default: <repo root>/evals/custom/fixtures)")
+	requireContainers := flag.Bool("require-containers", examples.RequireContainersFromEnv(),
+		"fail instead of skipping when Docker, a fixture Dockerfile, or a compile image is unavailable (default from "+examples.RequireContainersEnv+")")
+	cacheKey := flag.Bool("container-cache-key", false, "print the CI cache key for the container package caches and exit")
 	flag.Parse()
 
-	if err := run(*dryRun, *skillsDir, *versionsEnv); err != nil {
+	opts := options{
+		dryRun:            *dryRun,
+		skillsDir:         *skillsDir,
+		versionsEnv:       *versionsEnv,
+		fixturesDir:       *fixturesDir,
+		requireContainers: *requireContainers,
+		cacheKey:          *cacheKey,
+	}
+	if err := run(opts); err != nil {
 		fmt.Fprintf(os.Stderr, "validate-examples: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(dryRun bool, skillsDir, versionsEnv string) error {
+type options struct {
+	dryRun            bool
+	skillsDir         string
+	versionsEnv       string
+	fixturesDir       string
+	requireContainers bool
+	cacheKey          bool
+}
+
+func run(opts options) error {
+	dryRun, skillsDir, versionsEnv, fixturesDir := opts.dryRun, opts.skillsDir, opts.versionsEnv, opts.fixturesDir
 	root, err := repoRoot()
-	if err != nil && (skillsDir == "" || versionsEnv == "") {
-		return fmt.Errorf("cannot autodetect repo root (%v); pass --skills-dir and --versions-env", err)
+	if err != nil && (skillsDir == "" || versionsEnv == "" || fixturesDir == "") {
+		return fmt.Errorf("cannot autodetect repo root (%v); pass --skills-dir, --versions-env, and --fixtures-dir", err)
 	}
 	if skillsDir == "" {
 		skillsDir = filepath.Join(root, "skills")
 	}
 	if versionsEnv == "" {
 		versionsEnv = filepath.Join(root, "evals", "custom", "versions.env")
+	}
+	if fixturesDir == "" {
+		fixturesDir = filepath.Join(root, "evals", "custom", "fixtures")
+	}
+	cacheDir, err := examples.DefaultContainerCacheDir()
+	if err != nil {
+		return err
+	}
+	containers := examples.NewContainerRunner(fixturesDir, cacheDir, opts.requireContainers)
+
+	if opts.cacheKey {
+		blocks, err := examples.ExtractTree(skillsDir)
+		if err != nil {
+			return err
+		}
+		key, err := containers.CacheKey(blocks)
+		if err != nil {
+			return err
+		}
+		fmt.Println(key)
+		return nil
+	}
+	if !dryRun && opts.requireContainers && !examples.DockerAvailable() {
+		return fmt.Errorf("--require-containers is set but Docker is unavailable")
 	}
 
 	var collector *examples.CollectorValidator
@@ -56,6 +105,7 @@ func run(dryRun bool, skillsDir, versionsEnv string) error {
 		}
 		collector = &examples.CollectorValidator{BinaryPath: binaryPath}
 		code = examples.NewCodeValidator(versions.OtelGoCoreVersion, versions.OtelGoLogVersion)
+		code.Containers = containers
 		defer code.Cleanup()
 	}
 

@@ -8,9 +8,9 @@ import "regexp"
 // bodies, and elided examples. The detectors are deliberately conservative —
 // when a block is ambiguous they return false so it is treated as a fragment,
 // because a false "complete" wrongly fails a run while a false "fragment" only
-// skips a compile. Non-Go complete blocks are compile-skipped anyway (their
-// fixture-image compilers are a follow-up), so only the Go detector needs to
-// be precise today; the other heuristics are simple and bias to fragment.
+// skips a compile. Go and Rust complete blocks are compiled, so their
+// detectors follow explicit rules; the other languages have no compiler wired
+// yet, and their heuristics are simple and bias to fragment.
 
 // goPackageRe matches a top-level Go package declaration at column 0.
 var goPackageRe = regexp.MustCompile(`(?m)^package\s+\w+`)
@@ -36,6 +36,10 @@ func isCompleteCode(tag, content string) bool {
 	case "go":
 		// A Go source file is a compilation unit iff it declares a package.
 		return goPackageRe.MatchString(content)
+	case "rust":
+		// A Rust block is a compilation unit iff it names its file with a
+		// "// src/<path>.rs" first line or declares fn main; see rust.go.
+		return isCompleteRust(content)
 	case "python":
 		// Bias to fragment: require a top-level import, def, or class, which
 		// most snippet method bodies lack.
@@ -50,8 +54,8 @@ func isCompleteCode(tag, content string) bool {
 		return jsEntrypointRe.MatchString(content)
 	default:
 		// ruby, php, scala, and anything else: bias to fragment. Their
-		// complete blocks are compile-skipped anyway, so treating them as
-		// fragments only changes the reported category, not the outcome.
+		// complete blocks would be compile-skipped anyway, so treating them
+		// as fragments only changes the reported category, not the outcome.
 		return false
 	}
 }

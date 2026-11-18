@@ -95,10 +95,41 @@ jobs:
           path: ~/.cache/agent-skills-evals
           key: ${{ steps.otelcol.outputs.key }}
 
+      - name: Compute the container package cache key
+        id: containers
+        run: |
+          cd evals/custom
+          key=$(go run ./cmd/validate-examples --container-cache-key)
+          echo "key=${key}" >> "$GITHUB_OUTPUT"
+          # The prefix up to the manifest hash restores the closest older
+          # cache when only the generated manifests changed.
+          echo "restore-prefix=${key%-*}-" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the container package caches
+        uses: actions/cache@v6
+        with:
+          # evals/custom/examples/container.go mounts <user cache dir>/
+          # agent-skills-evals-containers/<language>/packages into the compile
+          # container (CARGO_HOME for Rust). The key carries the compile
+          # images and a hash of the generated manifests.
+          path: ~/.cache/agent-skills-evals-containers/*/packages
+          key: ${{ steps.containers.outputs.key }}
+          restore-keys: ${{ steps.containers.outputs.restore-prefix }}
+
       - name: Validate every fenced example in skills/
         run: |
           cd evals/custom
-          go run ./cmd/validate-examples
+          # Fail closed: a missing Docker daemon, fixture Dockerfile, or
+          # compile image fails the job instead of skipping the blocks.
+          go run ./cmd/validate-examples --require-containers
+
+      - name: Compile the container-language testdata
+        env:
+          # Fails instead of skipping when Docker is unavailable.
+          EVAL_REQUIRE_CONTAINERS: "1"
+        run: |
+          cd evals/custom
+          go test ./examples -run 'TestRustContainerCheck' -v
 
   list-fixtures:
     name: List fixture services

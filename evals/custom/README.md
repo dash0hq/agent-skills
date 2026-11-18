@@ -62,18 +62,25 @@ Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment,
 ```
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.
-Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, and the other languages use conservative heuristics that bias to fragment.
+Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, and the other languages use conservative heuristics that bias to fragment.
 Complete Go blocks compile against a pinned OpenTelemetry Go SDK dependency set (`OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` in [`versions.env`](./versions.env)) via the host `go` toolchain; when `go` is absent that compile reports `skipped-no-toolchain` rather than passing silently.
-Complete Rust blocks compile inside a container, as described in the next section.
+Complete Rust, JavaScript, and TypeScript blocks are checked inside a container, as described in the next section.
 Complete blocks in every other language report `skipped-no-toolchain`, naming the language, until a container plug-in is wired for it.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
 
 ### Compiling code in containers
 
-A language with a container plug-in (`ContainerLanguage` in [`examples/container.go`](./examples/container.go)) compiles in the build image of its eval fixture: the image named on the `FROM <image> AS build` line of `fixtures/<language>-service/Dockerfile`, so examples and evals share 1 toolchain pin.
+A language with a container plug-in (`ContainerLanguage` in [`examples/container.go`](./examples/container.go)) compiles in the image of its eval fixture: the image on the `FROM <image> AS build` line of the fixture Dockerfile, or the only `FROM` line of a single-stage one, so examples and evals share 1 toolchain pin.
 The validator assembles 1 project per rule file from that file's complete blocks and runs 1 container for it in 2 phases: a dependency fetch with network access, then the compile check with `--network none`, so third-party build scripts and macros never reach the network.
 The package cache is a host directory under `agent-skills-evals-containers` in the user cache directory (override it with `EVAL_CONTAINER_CACHE_DIR`), and `go run ./cmd/validate-examples --container-cache-key` prints the CI cache key for it: the compile images plus a hash of the generated manifests.
-Rust is the only container language today.
+Languages whose rule files carry no dependency manifest check against a pinned package set under [`examples/containers/<language>/`](./examples/containers), which Dependabot bumps.
+
+| Language | Fence tags | Fixture image | Dependencies | Check |
+| --- | --- | --- | --- | --- |
+| Rust | `rust` | `rust-service` | the rule file's `toml` blocks | `cargo check --offline` |
+| JavaScript and TypeScript | `javascript`, `typescript` | `nodejs-service` | [`examples/containers/javascript/`](./examples/containers/javascript) | `tsc --noEmit` |
+
+#### Rust
 
 A Rust rule file becomes 1 crate checked with `cargo fetch`, then `cargo check --offline`:
 
@@ -84,6 +91,15 @@ A Rust rule file becomes 1 crate checked with `cargo fetch`, then `cargo check -
 5. Compiler errors are reported on the block they occur in, at the rule-file line; the other blocks of the crate fail with a pointer to it.
 
 Annotate a `toml` block that is not `Cargo.toml` content with `<!-- eval:skip -->`.
+
+#### JavaScript and TypeScript
+
+The JavaScript and TypeScript blocks of a rule file become 1 project, installed with `npm install --ignore-scripts`, then type-checked with `tsc --noEmit` and `checkJs` at non-strict settings:
+
+1. A block whose first line is a `// <path>` comment naming a `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.mts`, or `.tsx` file is written to that path, and any other complete block to `examples/block_<line>.<ext>`, with a `.jsx` or `.tsx` extension when it contains JSX.
+2. The path alias `@/*` resolves to `src/*`, the Next.js default, so name the file of an imported helper with a `// src/<path>.ts` first line.
+3. Imports resolve only against the pinned packages; add a package an example needs to [`examples/containers/javascript/package.json`](./examples/containers/javascript/package.json) and regenerate `package-lock.json` with `npm install --package-lock-only` in the `nodejs-service` image.
+4. Names a block uses without defining them, such as `app` or `orderId`, are ignored (TS2304 and TS2552); every other diagnostic fails the block, at the rule-file line.
 
 Without Docker, the fixture Dockerfile, or the image, complete blocks of container languages report `skipped-no-toolchain` locally.
 CI fails closed instead: the `validate-examples` job passes `--require-containers` (or set `EVAL_REQUIRE_CONTAINERS=1`), which makes any of those a failure.

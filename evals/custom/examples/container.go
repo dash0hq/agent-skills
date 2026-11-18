@@ -25,11 +25,14 @@ import (
 // runs with --network none, so third-party build scripts and macros never see
 // the network.
 type ContainerLanguage interface {
-	// Tag is the normalized fence tag the language handles, for example
-	// "rust".
-	Tag() string
+	// Name identifies the language in reports and names its host cache
+	// directory, for example "rust".
+	Name() string
+	// Tags are the normalized fence tags the language compiles; blocks of
+	// all of them in one rule file share one project.
+	Tags() []string
 	// Fixture is the fixture directory under evals/custom/fixtures whose
-	// Dockerfile "FROM <image> AS build" line names the compile image.
+	// Dockerfile names the compile image (see BuildImage).
 	Fixture() string
 	// Assemble writes a project into dir from the complete code blocks of one
 	// rule file and every block of that file (for manifest blocks such as
@@ -47,6 +50,9 @@ type ContainerLanguage interface {
 	FetchCommand() []string
 	// CheckCommand compiles the project; it runs with --network none.
 	CheckCommand() []string
+	// CheckLabel names the check in failure details, for example
+	// "cargo check".
+	CheckLabel() string
 	// Diagnostics extracts the error diagnostics from the check output.
 	Diagnostics(output string) []Diagnostic
 }
@@ -102,7 +108,7 @@ func DefaultContainerCacheDir() (string, error) {
 
 // ContainerLanguages returns every registered container language plug-in.
 func ContainerLanguages() []ContainerLanguage {
-	return []ContainerLanguage{rustLanguage{}}
+	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}}
 }
 
 // Timeouts for the container phases.
@@ -144,7 +150,9 @@ type queuedBlock struct {
 func NewContainerRunner(fixturesDir, cacheDir string, require bool) *ContainerRunner {
 	languages := map[string]ContainerLanguage{}
 	for _, language := range ContainerLanguages() {
-		languages[language.Tag()] = language
+		for _, tag := range language.Tags() {
+			languages[tag] = language
+		}
 	}
 	return &ContainerRunner{
 		FixturesDir: fixturesDir,
@@ -187,10 +195,11 @@ func (r *ContainerRunner) groups(queue []queuedBlock) []*containerGroup {
 	var groups []*containerGroup
 	index := map[string]*containerGroup{}
 	for _, q := range queue {
-		key := q.block.File + "\x00" + q.block.Tag
+		language := r.languages[q.block.Tag]
+		key := q.block.File + "\x00" + language.Name()
 		group, ok := index[key]
 		if !ok {
-			group = &containerGroup{file: q.block.File, language: r.languages[q.block.Tag]}
+			group = &containerGroup{file: q.block.File, language: language}
 			index[key] = group
 			groups = append(groups, group)
 		}
@@ -227,7 +236,7 @@ func (g *containerGroup) setAll(status Status, detail string) {
 // unavailable records an environment problem: skipped-no-toolchain locally,
 // failed when the runner is required to fail closed.
 func (r *ContainerRunner) unavailable(group *containerGroup, reason string) {
-	tag := group.language.Tag()
+	tag := group.language.Name()
 	if r.Require {
 		group.setAll(StatusFailed, fmt.Sprintf("%s; complete %s block not compiled (%s set, failing closed)", reason, tag, RequireContainersEnv))
 		return
@@ -252,7 +261,7 @@ func (r *ContainerRunner) runGroup(group *containerGroup, fileBlocks []*Block) {
 		return
 	}
 
-	langDir := filepath.Join(r.CacheDir, language.Tag())
+	langDir := filepath.Join(r.CacheDir, language.Name())
 	if err := os.MkdirAll(filepath.Join(langDir, "work"), 0o755); err != nil {
 		group.setAll(StatusFailed, "container work dir: "+err.Error())
 		return
@@ -268,7 +277,7 @@ func (r *ContainerRunner) runGroup(group *containerGroup, fileBlocks []*Block) {
 
 	paths, err := language.Assemble(workDir, group.codeBlocks(), fileBlocks)
 	if err != nil {
-		group.setAll(StatusFailed, fmt.Sprintf("assemble %s project: %v", language.Tag(), err))
+		group.setAll(StatusFailed, fmt.Sprintf("assemble %s project: %v", language.Name(), err))
 		return
 	}
 
@@ -287,7 +296,7 @@ func (r *ContainerRunner) runGroup(group *containerGroup, fileBlocks []*Block) {
 	checkArgs := slices.Concat(args, []string{"--network", "none", image}, check)
 	out, err := runDocker(checkTimeout, checkArgs...)
 	if err != nil {
-		r.attribute(group, paths, strings.Join(check, " "), out, err)
+		r.attribute(group, paths, language.CheckLabel(), out, err)
 		return
 	}
 	group.setAll(StatusValidated, "")
@@ -375,13 +384,14 @@ func (r *ContainerRunner) Image(language ContainerLanguage) (string, error) {
 	return BuildImage(filepath.Join(r.FixturesDir, language.Fixture(), "Dockerfile"))
 }
 
-// buildStageRe matches a "FROM <image> AS build" line; the stage name is
-// case-insensitive like the Dockerfile keywords.
-var buildStageRe = regexp.MustCompile(`(?i)^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)\s+AS\s+build\s*$`)
+// fromRe matches a FROM line, capturing the image and the optional stage
+// name; keywords are case-insensitive as in Dockerfiles.
+var fromRe = regexp.MustCompile(`(?i)^\s*FROM\s+(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?\s*$`)
 
-// BuildImage returns the image of the "FROM <image> AS build" stage of the
-// Dockerfile at path, so snippet compiles use the toolchain the fixture
-// builds with.
+// BuildImage returns the compile image named by the Dockerfile at path, so
+// snippet compiles use the toolchain the fixture builds with: the image of the
+// "FROM <image> AS build" stage, or, in a single-stage Dockerfile, the image
+// of its only FROM line.
 func BuildImage(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -392,15 +402,24 @@ func BuildImage(path string) (string, error) {
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
+	var images []string
 	for scanner.Scan() {
-		if m := buildStageRe.FindStringSubmatch(scanner.Text()); m != nil {
+		m := fromRe.FindStringSubmatch(scanner.Text())
+		if m == nil {
+			continue
+		}
+		if strings.EqualFold(m[2], "build") {
 			return m[1], nil
 		}
+		images = append(images, m[1])
 	}
 	if err := scanner.Err(); err != nil {
 		return "", fmt.Errorf("fixture Dockerfile %s: %w", path, err)
 	}
-	return "", fmt.Errorf("fixture Dockerfile %s has no \"FROM <image> AS build\" line", path)
+	if len(images) == 1 {
+		return images[0], nil
+	}
+	return "", fmt.Errorf("fixture Dockerfile %s has neither a \"FROM <image> AS build\" line nor a single FROM line", path)
 }
 
 // CacheKey returns the CI cache key for the container package caches: the
@@ -433,7 +452,7 @@ func (r *ContainerRunner) CacheKey(all []*Block) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		images[language.Tag()] = image
+		images[language.Name()] = image
 		dir := filepath.Join(tmp, fmt.Sprint(i))
 		if _, err := language.Assemble(dir, group.codeBlocks(), blocksOfFile(all, group.file)); err != nil {
 			// The validation run reports the assembly error on the blocks;

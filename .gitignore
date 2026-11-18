@@ -42,3 +42,5 @@ package-lock.json
 # output), and the lockfile pins the CDK toolchain the harness installs.
 !evals/custom/fixtures/lambda/*/bin/
 !evals/custom/fixtures/lambda/*/package-lock.json
+# Pinned package sets the example validator checks skills/ code against.
+!evals/custom/examples/containers/*/package-lock.json

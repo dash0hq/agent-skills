@@ -3,6 +3,7 @@ package examples
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -75,15 +76,15 @@ func TestNormalizeTagRs(t *testing.T) {
 	}
 }
 
-// completeBlocks extracts path and returns its complete blocks of tag.
-func completeBlocks(t *testing.T, path, tag string) (code, all []*Block) {
+// completeBlocks extracts path and returns its complete blocks of tags.
+func completeBlocks(t *testing.T, path string, tags ...string) (code, all []*Block) {
 	t.Helper()
 	all, err := ExtractFile(path)
 	if err != nil {
 		t.Fatalf("ExtractFile: %v", err)
 	}
 	for _, block := range all {
-		if block.Tag == tag && Classify(block.Documents()[0]) == CategoryCodeComplete {
+		if slices.Contains(tags, block.Tag) && Classify(block.Documents()[0]) == CategoryCodeComplete {
 			code = append(code, block)
 		}
 	}

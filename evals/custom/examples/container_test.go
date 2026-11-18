@@ -8,7 +8,9 @@ import (
 	"testing"
 )
 
-const testFixturesDir = "testdata/container-fixtures"
+// testFixturesDir holds the eval fixtures whose Dockerfiles name the compile
+// images.
+const testFixturesDir = "../fixtures"
 
 func TestBuildImage(t *testing.T) {
 	cases := []struct {
@@ -28,9 +30,14 @@ func TestBuildImage(t *testing.T) {
 			want:       "golang:1.24",
 		},
 		{
-			name:       "other stage names are ignored",
+			name:       "single-stage Dockerfile",
+			dockerfile: "FROM node:22-alpine\nWORKDIR /app\n",
+			want:       "node:22-alpine",
+		},
+		{
+			name:       "several stages without a build stage",
 			dockerfile: "FROM node:22-alpine AS deps\nFROM node:22-alpine\n",
-			wantErr:    "no \"FROM <image> AS build\" line",
+			wantErr:    "neither",
 		},
 	}
 	for _, tc := range cases {
@@ -56,31 +63,11 @@ func TestBuildImage(t *testing.T) {
 	}
 }
 
-// TestRustTestFixtureMatchesFixture keeps the test copy of the Rust build
-// image in step with the real rust-service fixture, once that fixture exists.
-func TestRustTestFixtureMatchesFixture(t *testing.T) {
-	real := filepath.Join("..", "fixtures", "rust-service", "Dockerfile")
-	if _, err := os.Stat(real); err != nil {
-		t.Skipf("%s not present yet", real)
-	}
-	want, err := BuildImage(real)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := BuildImage(filepath.Join(testFixturesDir, "rust-service", "Dockerfile"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != want {
-		t.Errorf("test fixture build image %q != rust-service fixture build image %q; update %s", got, want, testFixturesDir)
-	}
-}
-
-// queueFile enqueues the complete blocks of tag in path on runner and returns
-// their results and every block of the file.
-func queueFile(t *testing.T, runner *ContainerRunner, path, tag string) ([]*Result, []*Block) {
+// queueFile enqueues the complete blocks of tags in path on runner and
+// returns their results and every block of the file.
+func queueFile(t *testing.T, runner *ContainerRunner, path string, tags ...string) ([]*Result, []*Block) {
 	t.Helper()
-	code, all := completeBlocks(t, path, tag)
+	code, all := completeBlocks(t, path, tags...)
 	var results []*Result
 	for _, block := range code {
 		result := &Result{File: block.File, Line: block.Line + 1, Tag: block.Tag, Category: CategoryCodeComplete}
@@ -177,11 +164,13 @@ func TestContainerCacheKey(t *testing.T) {
 	}
 }
 
-// TestRustContainerCheck compiles the Rust testdata crates in the fixture
-// build image. It needs Docker and network access to pull the image and
-// crates, so it skips under -short and without Docker, unless
-// EVAL_REQUIRE_CONTAINERS is set, in which case it fails closed.
-func TestRustContainerCheck(t *testing.T) {
+// containerTestRunner returns a constructor for fail-closed runners backed by
+// the real fixtures and cache. Container-backed tests need Docker and network
+// access to pull images and packages, so they skip under -short and without
+// Docker, unless EVAL_REQUIRE_CONTAINERS is set, in which case they fail
+// closed.
+func containerTestRunner(t *testing.T) func() *ContainerRunner {
+	t.Helper()
 	require := RequireContainersFromEnv()
 	if testing.Short() && !require {
 		t.Skip("container-backed test; skipped under -short")
@@ -196,11 +185,30 @@ func TestRustContainerCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newRunner := func() *ContainerRunner {
-		// Always fail closed here: a skip would hide whether the crate
+	return func() *ContainerRunner {
+		// Always fail closed here: a skip would hide whether the project
 		// compiles at all.
 		return NewContainerRunner(testFixturesDir, cacheDir, true)
 	}
+}
+
+// lineOf returns the 1-based line of the first line in path containing
+// needle.
+func lineOf(t *testing.T, path, needle string) int {
+	t.Helper()
+	for i, line := range strings.Split(readFile(t, path), "\n") {
+		if strings.Contains(line, needle) {
+			return i + 1
+		}
+	}
+	t.Fatalf("%q not found in %s", needle, path)
+	return 0
+}
+
+// TestRustContainerCheck compiles the Rust testdata crates in the fixture
+// build image.
+func TestRustContainerCheck(t *testing.T) {
+	newRunner := containerTestRunner(t)
 
 	t.Run("ok", func(t *testing.T) {
 		runner := newRunner()
@@ -218,12 +226,7 @@ func TestRustContainerCheck(t *testing.T) {
 		path := "testdata/rust-broken/rule.md"
 		results, all := queueFile(t, runner, path, "rust")
 		runner.Run(all)
-		appLine := 0
-		for i, line := range strings.Split(readFile(t, path), "\n") {
-			if strings.Contains(line, "app()") {
-				appLine = i + 1
-			}
-		}
+		appLine := lineOf(t, path, "app()")
 		var mainResult, formatResult *Result
 		for _, result := range results {
 			if result.Status != StatusFailed {
@@ -243,6 +246,51 @@ func TestRustContainerCheck(t *testing.T) {
 		}
 		if formatResult == nil || !strings.Contains(formatResult.Detail, "errors in src/main.rs") {
 			t.Errorf("the module block does not point at the failing block: %+v", formatResult)
+		}
+	})
+}
+
+// TestJavaScriptContainerCheck type-checks the JavaScript and TypeScript
+// testdata projects in the nodejs-service fixture image.
+func TestJavaScriptContainerCheck(t *testing.T) {
+	newRunner := containerTestRunner(t)
+
+	t.Run("ok", func(t *testing.T) {
+		runner := newRunner()
+		results, all := queueFile(t, runner, "testdata/javascript-ok/rule.md", "javascript", "typescript")
+		if len(results) != 3 {
+			t.Fatalf("complete blocks = %d, want 3", len(results))
+		}
+		runner.Run(all)
+		for _, result := range results {
+			if result.Status != StatusValidated {
+				t.Errorf("line %d: status = %q, want validated (detail: %s)", result.Line, result.Status, result.Detail)
+			}
+		}
+	})
+
+	t.Run("broken", func(t *testing.T) {
+		runner := newRunner()
+		path := "testdata/javascript-broken/rule.md"
+		results, all := queueFile(t, runner, path, "javascript", "typescript")
+		runner.Run(all)
+		wantLoc := path + ":" + strconv.Itoa(lineOf(t, path, "SpanStatusCode.FAILED")) + ":"
+		var mapped, pointer int
+		for _, result := range results {
+			if result.Status != StatusFailed {
+				t.Errorf("line %d: status = %q, want failed", result.Line, result.Status)
+			}
+			switch {
+			case strings.Contains(result.Detail, wantLoc) && strings.Contains(result.Detail, "TS2339"):
+				mapped++
+			case strings.Contains(result.Detail, "errors in examples/block_"):
+				pointer++
+			default:
+				t.Errorf("line %d: unexpected detail: %s", result.Line, result.Detail)
+			}
+		}
+		if mapped != 1 || pointer != 1 {
+			t.Errorf("mapped = %d, pointer = %d; want 1 each", mapped, pointer)
 		}
 	})
 }

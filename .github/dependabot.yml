@@ -125,6 +125,7 @@ updates:
   - package-ecosystem: "composer"
     directories:
       - "/evals/custom/fixtures/*"
+      - "/evals/custom/examples/containers/php"
     schedule:
       interval: "monthly"
     labels:

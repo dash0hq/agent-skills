@@ -110,8 +110,9 @@ jobs:
         with:
           # evals/custom/examples/container.go mounts <user cache dir>/
           # agent-skills-evals-containers/<language>/packages into the compile
-          # container (CARGO_HOME for Rust). The key carries the compile
-          # images and a hash of the generated manifests.
+          # container (CARGO_HOME for Rust, the npm cache for JavaScript). The
+          # key carries the compile images and a hash of the generated
+          # manifests.
           path: ~/.cache/agent-skills-evals-containers/*/packages
           key: ${{ steps.containers.outputs.key }}
           restore-keys: ${{ steps.containers.outputs.restore-prefix }}
@@ -129,7 +130,7 @@ jobs:
           EVAL_REQUIRE_CONTAINERS: "1"
         run: |
           cd evals/custom
-          go test ./examples -run 'TestRustContainerCheck' -v
+          go test ./examples -run 'ContainerCheck' -v
 
   list-fixtures:
     name: List fixture services

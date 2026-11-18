@@ -354,7 +354,7 @@ import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 
 new PgInstrumentation({
   requestHook: (span, requestInfo) => {
-    const params = requestInfo.params;
+    const params = requestInfo.query.values;
     if (!Array.isArray(params)) return;
     for (let i = 0; i < params.length; i++) {
       const value = params[i];
@@ -543,7 +543,8 @@ import { trace } from "@opentelemetry/api";
 
 function forceFlushAll() {
   const promises = [];
-  let tp = trace.getTracerProvider();
+  // Typed as any: forceFlush() and getDelegate() exist only on some providers.
+  let tp = /** @type {any} */ (trace.getTracerProvider());
   // The auto-instrumentation wraps the real provider in a ProxyTracerProvider
   // that does not expose forceFlush(). Unwrap it to reach the SDK provider.
   if (typeof tp.forceFlush !== "function" && typeof tp.getDelegate === "function") {

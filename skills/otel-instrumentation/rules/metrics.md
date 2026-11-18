@@ -262,9 +262,14 @@ Use an in-memory metric exporter in integration tests to capture metrics produce
 ### Test setup
 
 ```typescript
-import { MeterProvider, InMemoryMetricExporter, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import {
+  AggregationTemporality,
+  MeterProvider,
+  InMemoryMetricExporter,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
 
-const exporter = new InMemoryMetricExporter();
+const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
 const reader = new PeriodicExportingMetricReader({
   exporter,
   exportIntervalMillis: 100,

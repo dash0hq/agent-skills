@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -115,6 +117,21 @@ func (d *DockerFixture) ParentTrafficHooks() harness.FixtureHooks {
 	hooks := d.Hooks()
 	hooks.Run = func(ctx context.Context, workspace string, env map[string]string) error {
 		return d.runWithParents(ctx, workspace, env, []string{sampledTraceparent, unsampledTraceparent})
+	}
+	return hooks
+}
+
+// ResourceOverrideHooks appends attrs to the app's OTEL_RESOURCE_ATTRIBUTES,
+// the way a deployment spec sets resource attributes, for the scenarios that
+// check those values take precedence over the ones the service computes.
+func (d *DockerFixture) ResourceOverrideHooks(attrs map[string]string) harness.FixtureHooks {
+	hooks := d.Hooks()
+	hooks.Run = func(ctx context.Context, workspace string, env map[string]string) error {
+		withOverrides := maps.Clone(env)
+		for _, key := range slices.Sorted(maps.Keys(attrs)) {
+			withOverrides["OTEL_RESOURCE_ATTRIBUTES"] += "," + key + "=" + attrs[key]
+		}
+		return d.run(ctx, workspace, withOverrides)
 	}
 	return hooks
 }

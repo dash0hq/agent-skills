@@ -20,7 +20,7 @@ var allScenarioIDs = []string{
 	PythonHTTPID, JavaHTTPID, RubyHTTPID, PHPHTTPID, ScalaHTTPID,
 	DotnetHTTPID, DotnetNuGetID, DotnetEnrichmentID,
 	NextJSHTTPID, BrowserHTTPID,
-	RustHTTPID, RustLogsID, RustEnrichmentID,
+	RustHTTPID, RustLogsID, RustEnrichmentID, RustMetricsID, RustResourceID, RustGRPCID,
 	CollectorPipelineHardeningID, OTTLRedactionID, OTTLEnrichmentID, SemconvAttributesID,
 	K8sDownwardAPIID, K8sOTelOperatorID, K8sHelmChartID, K8sRawManifestsID, K8sDash0OperatorID,
 	PythonRetiredInstrumentationUpgradeID,
@@ -46,7 +46,7 @@ var instrumentationSelectable = []string{
 	PythonHTTPID, JavaHTTPID, RubyHTTPID, PHPHTTPID, ScalaHTTPID,
 	DotnetHTTPID, DotnetNuGetID, DotnetEnrichmentID,
 	NextJSHTTPID, BrowserHTTPID,
-	RustHTTPID, RustLogsID, RustEnrichmentID,
+	RustHTTPID, RustLogsID, RustEnrichmentID, RustMetricsID, RustResourceID, RustGRPCID,
 	PythonRetiredInstrumentationUpgradeID,
 }
 

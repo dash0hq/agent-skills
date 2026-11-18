@@ -79,6 +79,9 @@ func fixtureHooks(fix *DockerFixture, sc harness.Scenario) harness.FixtureHooks 
 	if sc.ID == NodeHTTPID || sc.ID == RustHTTPID {
 		return fix.ParentTrafficHooks()
 	}
+	if sc.ID == RustResourceID {
+		return fix.ResourceOverrideHooks(rustResourceOverrides)
+	}
 	return fix.Hooks()
 }
 

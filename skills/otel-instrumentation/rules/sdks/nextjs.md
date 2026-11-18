@@ -110,7 +110,7 @@ export async function register() {
 
     const loggerProvider = new LoggerProvider({
       resource,
-      processors: [new BatchLogRecordProcessor(logExporter)],
+      processors: [new BatchLogRecordProcessor({ exporter: logExporter })],
     });
     logs.setGlobalLoggerProvider(loggerProvider);
 
@@ -123,13 +123,15 @@ export async function register() {
         url: `${OTEL_ENDPOINT}/v1/traces`,
         headers: exporterHeaders,
       }),
-      metricReader: new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter({
-          url: `${OTEL_ENDPOINT}/v1/metrics`,
-          headers: exporterHeaders,
+      metricReaders: [
+        new PeriodicExportingMetricReader({
+          exporter: new OTLPMetricExporter({
+            url: `${OTEL_ENDPOINT}/v1/metrics`,
+            headers: exporterHeaders,
+          }),
+          exportIntervalMillis: 10000,
         }),
-        exportIntervalMillis: 10000,
-      }),
+      ],
       instrumentations: [
         getNodeAutoInstrumentations({
           '@opentelemetry/instrumentation-fs': { enabled: false },
@@ -270,6 +272,7 @@ Client-side env vars are inlined at build time. Changes won't take effect withou
 Create `src/lib/telemetry.ts` for custom spans, metrics, and logs:
 
 ```typescript
+// src/lib/telemetry.ts
 import { trace, context, SpanStatusCode, metrics } from '@opentelemetry/api';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 
@@ -467,7 +470,7 @@ export async function GET(request: NextRequest) {
 
       requestDuration.record(Date.now() - startTime, {
         method: 'GET',
-        status_code: '200',w
+        status_code: '200',
       });
 
       const traceContext = getTraceContext();

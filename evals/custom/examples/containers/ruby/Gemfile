@@ -1,0 +1,10 @@
+# Pinned gems the Ruby examples in skills/ are checked against (see
+# evals/custom/examples/ruby.go). Pin exact versions and regenerate
+# Gemfile.lock in the ruby-service fixture image after editing:
+#
+#   bundle lock --add-platform ruby x86_64-linux aarch64-linux
+source "https://rubygems.org"
+
+gem "opentelemetry-instrumentation-all", "0.102.0"
+gem "opentelemetry-sdk", "1.13.1"
+gem "semantic_logger", "5.2.0"

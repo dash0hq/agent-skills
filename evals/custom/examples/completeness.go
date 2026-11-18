@@ -18,9 +18,6 @@ var goPackageRe = regexp.MustCompile(`(?m)^package\s+\w+`)
 // pyTopLevelRe matches a Python top-level import, def, or class at column 0.
 var pyTopLevelRe = regexp.MustCompile(`(?m)^(import\s+\w|from\s+\w|def\s+\w|class\s+\w)`)
 
-// javaTypeRe matches a Java top-level class, interface, or enum at column 0.
-var javaTypeRe = regexp.MustCompile(`(?m)^(public\s+|final\s+|abstract\s+)*(class|interface|enum)\s+\w`)
-
 // csharpTypeRe matches a C# top-level namespace, class, interface, or struct.
 var csharpTypeRe = regexp.MustCompile(`(?m)^(namespace|(public\s+|internal\s+|sealed\s+|static\s+)*(class|interface|struct))\s+\w`)
 
@@ -46,8 +43,10 @@ func isCompleteCode(tag, content string) bool {
 		// naming the file; see python.go.
 		return pyTopLevelRe.MatchString(content) || pythonBlockPath(content) != ""
 	case "java":
-		// A full type declaration is the closest thing to a compilation unit.
-		return javaTypeRe.MatchString(content)
+		// A Java block is a compilation unit iff it names its file with a
+		// "// src/main/java/<path>.java" first line or declares a top-level
+		// type at column 0; see java.go.
+		return isCompleteJava(content)
 	case "csharp":
 		return csharpTypeRe.MatchString(content)
 	case "javascript", "typescript":

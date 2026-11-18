@@ -1,0 +1,8 @@
+node_modules/
+cdk.out/
+*.js
+*.d.ts
+!jest.config.js
+
+# Rust build output
+lambda/target/

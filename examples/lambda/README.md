@@ -18,6 +18,7 @@ This directory is excluded from the published skill artifacts through `.tesslign
 | [`java-dash0-extension`](./java-dash0-extension) | Java | B — Dash0 Lambda Extension | Single layer, cold-start sizing |
 | [`java-upstream-layers`](./java-upstream-layers) | Java | A — upstream OTel layers | The `javawrapper` versus `javaagent` cold-start tradeoff |
 | [`dotnet-upstream-layers`](./dotnet-upstream-layers) | .NET | Manual SDK + Collector layer | No auto-instrumentation layer exists; in-code SDK with an end-of-invocation flush |
+| [`rust-upstream-layers`](./rust-upstream-layers) | Rust | Manual SDK + Collector layer | `cargo lambda` build to `bootstrap`; in-code SERVER invocation span, Lambda resource detector, end-of-invocation flush |
 
 Each project is self-contained.
 Run `npm install` and `npx cdk deploy` from inside its own directory; nothing depends on this directory or on the other projects.
@@ -27,7 +28,7 @@ The layer versions these projects pin go stale; refresh them as described under 
 
 ## Shared conventions
 
-Every project is a CDK v2 app written in TypeScript, regardless of the Lambda runtime, so the stack code reads the same across all seven.
+Every project is a CDK v2 app written in TypeScript, regardless of the Lambda runtime, so the stack code reads the same across all eight.
 
 Configuration comes from environment variables, never from committed values:
 

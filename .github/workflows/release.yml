@@ -254,6 +254,12 @@ jobs:
           fi
           echo "Publish exclusions verified: no evals/ or docs/ paths in the dry-run output."
 
+      # Built before anything is published so a packaging failure stops the
+      # release, and attached by `gh release create` so the release never
+      # appears without its archives. package-skills.yml retrofits older tags.
+      - name: Package skills
+        run: .github/scripts/package-skills.sh "${RUNNER_TEMP}/skill-archives"
+
       - name: Publish to Tessl
         run: |
           # Score the authored Tessl scenarios at publish time. --eval-scenarios
@@ -275,7 +281,8 @@ jobs:
         run: |
           gh release create "${TAG}" \
             --title "${TAG}" \
-            --generate-notes
+            --generate-notes \
+            "${RUNNER_TEMP}"/skill-archives/*
 
   # After the GitHub release so the tag/release stay the source of truth; a
   # failed publish is retried by dispatching publish-npm.yml with the tag,
@@ -304,15 +311,3 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             -f tag="${TAG}"
           echo "Dispatched publish-npm.yml for ${TAG}; its result appears on that workflow's own run."
-
-  # Attaches <skill>.zip and <skill>.skill archives to the GitHub release.
-  # A reusable workflow (unlike publish-npm.yml) because nothing external
-  # pins its filename; the same file stays dispatchable by hand for retrofits.
-  package-skills:
-    name: Package skills
-    needs: release
-    permissions:
-      contents: write
-    uses: ./.github/workflows/package-skills.yml
-    with:
-      tag: ${{ needs.release.outputs.tag }}

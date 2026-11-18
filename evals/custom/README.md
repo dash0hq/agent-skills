@@ -58,7 +58,7 @@ Add `--dry-run` to print the per-file classification and exemption report withou
 The run opens with a one-line summary that separates what was actually checked from what was exempted or skipped, so a green run cannot quietly overstate itself:
 
 ```text
-Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment, 58 bad, 33 skip, 13 not-validated), 32 skipped-no-toolchain, 0 failed.
+Summary: 158 validated (54 code compiled), 392 exempt (181 bash, 80 code-fragment, 66 bad, 43 skip, 22 not-validated), 0 skipped-no-toolchain, 0 failed.
 ```
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.

@@ -294,3 +294,48 @@ func TestJavaScriptContainerCheck(t *testing.T) {
 		}
 	})
 }
+
+// TestPythonContainerCheck type-checks the Python testdata projects in the
+// python-service fixture image.
+func TestPythonContainerCheck(t *testing.T) {
+	newRunner := containerTestRunner(t)
+
+	t.Run("ok", func(t *testing.T) {
+		runner := newRunner()
+		results, all := queueFile(t, runner, "testdata/python-ok/rule.md", "python")
+		if len(results) != 3 {
+			t.Fatalf("complete blocks = %d, want 3", len(results))
+		}
+		runner.Run(all)
+		for _, result := range results {
+			if result.Status != StatusValidated {
+				t.Errorf("line %d: status = %q, want validated (detail: %s)", result.Line, result.Status, result.Detail)
+			}
+		}
+	})
+
+	t.Run("broken", func(t *testing.T) {
+		runner := newRunner()
+		path := "testdata/python-broken/rule.md"
+		results, all := queueFile(t, runner, path, "python")
+		runner.Run(all)
+		wantLoc := path + ":" + strconv.Itoa(lineOf(t, path, "StatusCode.FAILED")) + ":"
+		var mapped, pointer int
+		for _, result := range results {
+			if result.Status != StatusFailed {
+				t.Errorf("line %d: status = %q, want failed", result.Line, result.Status)
+			}
+			switch {
+			case strings.Contains(result.Detail, wantLoc) && strings.Contains(result.Detail, "[attr-defined]"):
+				mapped++
+			case strings.Contains(result.Detail, "errors in examples/block_"):
+				pointer++
+			default:
+				t.Errorf("line %d: unexpected detail: %s", result.Line, result.Detail)
+			}
+		}
+		if mapped != 1 || pointer != 1 {
+			t.Errorf("mapped = %d, pointer = %d; want 1 each", mapped, pointer)
+		}
+	})
+}

@@ -62,9 +62,9 @@ Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment,
 ```
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.
-Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, and the other languages use conservative heuristics that bias to fragment.
+Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, and the other languages use conservative heuristics that bias to fragment.
 Complete Go blocks compile against a pinned OpenTelemetry Go SDK dependency set (`OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` in [`versions.env`](./versions.env)) via the host `go` toolchain; when `go` is absent that compile reports `skipped-no-toolchain` rather than passing silently.
-Complete Rust, JavaScript, and TypeScript blocks are checked inside a container, as described in the next section.
+Complete Rust, JavaScript, TypeScript, and Python blocks are checked inside a container, as described in the next section.
 Complete blocks in every other language report `skipped-no-toolchain`, naming the language, until a container plug-in is wired for it.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
 
@@ -79,6 +79,7 @@ Languages whose rule files carry no dependency manifest check against a pinned p
 | --- | --- | --- | --- | --- |
 | Rust | `rust` | `rust-service` | the rule file's `toml` blocks | `cargo check --offline` |
 | JavaScript and TypeScript | `javascript`, `typescript` | `nodejs-service` | [`examples/containers/javascript/`](./examples/containers/javascript) | `tsc --noEmit` |
+| Python | `python` | `python-service` | [`examples/containers/python/`](./examples/containers/python) | `mypy` |
 
 #### Rust
 
@@ -100,6 +101,15 @@ The JavaScript and TypeScript blocks of a rule file become 1 project, installed 
 2. The path alias `@/*` resolves to `src/*`, the Next.js default, so name the file of an imported helper with a `// src/<path>.ts` first line.
 3. Imports resolve only against the pinned packages; add a package an example needs to [`examples/containers/javascript/package.json`](./examples/containers/javascript/package.json) and regenerate `package-lock.json` with `npm install --package-lock-only` in the `nodejs-service` image.
 4. Names a block uses without defining them, such as `app` or `orderId`, are ignored (TS2304 and TS2552); every other diagnostic fails the block, at the rule-file line.
+
+#### Python
+
+The Python blocks of a rule file become 1 project, installed into a virtual environment with `pip install --only-binary=:all:`, then type-checked with `mypy` at default settings plus `check_untyped_defs`:
+
+1. A block whose first line is a `# <path>.py` comment, with every path segment a Python identifier, is written to that path, and any other complete block to `examples/block_<line>.py`.
+2. Module names follow the path, so another block imports `# app/telemetry.py` as `app.telemetry`.
+3. Imports resolve only against the standard library and the pinned packages; add a package an example needs to [`examples/containers/python/requirements.txt`](./examples/containers/python/requirements.txt), with its transitive dependencies resolved by `pip install --only-binary=:all:` and `pip freeze` in the `python-service` image.
+4. Names a block uses without defining them, such as `app` or `order`, are ignored (the `name-defined` error code is disabled); every other diagnostic fails the block, at the rule-file line.
 
 Without Docker, the fixture Dockerfile, or the image, complete blocks of container languages report `skipped-no-toolchain` locally.
 CI fails closed instead: the `validate-examples` job passes `--require-containers` (or set `EVAL_REQUIRE_CONTAINERS=1`), which makes any of those a failure.

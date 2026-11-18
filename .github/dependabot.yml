@@ -75,6 +75,21 @@ updates:
       - dependency-name: "elasticsearch"
       - dependency-name: "opentelemetry-*"
 
+  # The package set the Python examples in skills/ are type-checked against;
+  # a separate entry because the fixture entry above ignores opentelemetry-*.
+  - package-ecosystem: "pip"
+    directories:
+      - "/evals/custom/examples/containers/python"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "fixtures"
+    groups:
+      python-examples:
+        patterns:
+          - "*"
+
   - package-ecosystem: "maven"
     directories:
       - "/evals/custom/fixtures/*"

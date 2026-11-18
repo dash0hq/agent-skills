@@ -5,7 +5,7 @@
 #
 # The go.* glob copies go.sum too once dependencies (for example the ones an
 # agent adds while instrumenting) introduce it.
-FROM golang:1.24 AS build
+FROM golang:1.25 AS build
 WORKDIR /src
 COPY go.* ./
 RUN go mod download

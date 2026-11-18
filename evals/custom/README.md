@@ -63,8 +63,7 @@ Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment,
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.
 Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, a Java block only when it declares a top-level type (`class`, `interface`, `enum`, `record`, or `@interface` at column 0) or its first line is a `// src/main/java/<path>.java` comment, and the other languages use conservative heuristics that bias to fragment.
-Complete Go blocks compile against a pinned OpenTelemetry Go SDK dependency set (`OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` in [`versions.env`](./versions.env)) via the host `go` toolchain; when `go` is absent that compile reports `skipped-no-toolchain` rather than passing silently.
-Complete Rust, JavaScript, TypeScript, Python, and Java blocks are checked inside a container, as described in the next section.
+Complete Go, Rust, JavaScript, TypeScript, Python, and Java blocks are checked inside a container, as described in the next section; no language compiles with a host toolchain.
 Complete blocks in every other language report `skipped-no-toolchain`, naming the language, until a container plug-in is wired for it.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
 
@@ -81,6 +80,7 @@ Languages whose rule files carry no dependency manifest check against a pinned p
 | JavaScript and TypeScript | `javascript`, `typescript` | `nodejs-service` | [`examples/containers/javascript/`](./examples/containers/javascript) | `tsc --noEmit` |
 | Python | `python` | `python-service` | [`examples/containers/python/`](./examples/containers/python) | `mypy` |
 | Java | `java` | `java-service` | [`examples/containers/java/`](./examples/containers/java) | `mvn --offline compile` |
+| Go | `go` | `go-service` | `OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` in [`versions.env`](./versions.env) | `go build` and `go vet` |
 
 #### Rust
 
@@ -123,6 +123,18 @@ The Java blocks of a rule file become 1 Maven project, whose dependencies and pl
 5. No plugin or annotation processor runs in the network phase; the Maven local repository is the cached package directory.
 
 `xml` blocks are not merged into `pom.xml`; the pinned project is the only build configuration.
+
+#### Go
+
+The Go blocks of a rule file become 1 module, resolved with `go mod tidy`, then checked with `go build ./...` and `go vet ./...` under `GOPROXY=off` and `GOTOOLCHAIN=local`:
+
+1. A block whose first line is a `// <path>.go` comment naming a relative path is written to that path, and any other complete block (one declaring a top-level `package`) to `examples/block_<line>/main.go`, so 2 `package main` blocks of 1 rule file never share a directory.
+2. Blocks that name files in the same directory form 1 package and must declare the same package name; 2 blocks naming the same path fail the file's blocks.
+3. The generated `go.mod` requires the OpenTelemetry Go modules at `OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` from [`versions.env`](./versions.env); `go mod tidy` resolves any other import to its latest version in the network phase.
+4. A pinned module whose `go` directive is newer than the Go of the `go-service` build image fails the network phase with `requires go >= <version>`; bump the fixture's `FROM golang:<version> AS build` line, never `GOTOOLCHAIN`.
+5. Compiler and vet errors are reported on the block they occur in, at the rule-file line; the other blocks of the module fail with a pointer to it.
+
+The module cache (`GOMODCACHE`) is the CI-cached `packages` directory, and the build cache (`GOCACHE`) stays local.
 
 Without Docker, the fixture Dockerfile, or the image, complete blocks of container languages report `skipped-no-toolchain` locally.
 CI fails closed instead: the `validate-examples` job passes `--require-containers` (or set `EVAL_REQUIRE_CONTAINERS=1`), which makes any of those a failure.
@@ -173,7 +185,7 @@ Add an entry with the scenario ID, the date, and a link to the tracking issue; r
 - `EVAL_MODEL` — the model ID passed to `--model`.
 - `OTELCOL_CONTRIB_VERSION` — the `otelcol-contrib` version used by example validation and the Collector scenarios.
 - `OTELCOL_CONTRIB_SHA256_LINUX_AMD64`, `OTELCOL_CONTRIB_SHA256_LINUX_ARM64`, and `OTELCOL_CONTRIB_SHA256_DARWIN_ARM64` — SHA-256 checksums of the release archives, copied from the `opentelemetry-collector-releases_otelcol-contrib_checksums.txt` asset on the matching [opentelemetry-collector-releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) release.
-- `OTEL_GO_CORE_VERSION` — the version of the stable OpenTelemetry Go modules (`go.opentelemetry.io/otel` and friends) used to compile complete Go SDK code blocks.
+- `OTEL_GO_CORE_VERSION` — the version of the stable OpenTelemetry Go modules (`go.opentelemetry.io/otel` and friends) used to compile complete Go SDK code blocks in the `go-service` build image; its `go` directive must not exceed that image's Go version.
 - `OTEL_GO_LOG_VERSION` — the version of the pre-release OpenTelemetry Go log modules (`go.opentelemetry.io/otel/log` and the log exporters), which track a separate v0.x line.
 
 Bump pins only through a PR: `evals/custom/versions.env` is a full-matrix trigger in the registry, so the PR runs every scenario (requirement R19) and behavior drift surfaces before merge.

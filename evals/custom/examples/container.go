@@ -108,7 +108,7 @@ func DefaultContainerCacheDir() (string, error) {
 
 // ContainerLanguages returns every registered container language plug-in.
 func ContainerLanguages() []ContainerLanguage {
-	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}}
+	return []ContainerLanguage{rustLanguage{}, javascriptLanguage{}, pythonLanguage{}, javaLanguage{}, golangLanguage{}}
 }
 
 // Timeouts for the container phases.
@@ -160,6 +160,14 @@ func NewContainerRunner(fixturesDir, cacheDir string, require bool) *ContainerRu
 		Require:     require,
 		languages:   languages,
 		available:   DockerAvailable,
+	}
+}
+
+// Register adds language, replacing the plug-in registered for any of its
+// tags. Use it for a plug-in that needs configuration, such as NewGoLanguage.
+func (r *ContainerRunner) Register(language ContainerLanguage) {
+	for _, tag := range language.Tags() {
+		r.languages[tag] = language
 	}
 }
 

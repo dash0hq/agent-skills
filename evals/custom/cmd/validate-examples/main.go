@@ -81,6 +81,12 @@ func run(opts options) error {
 		if err != nil {
 			return err
 		}
+		// The Go go.mod, and so the key, carries the OpenTelemetry Go pins.
+		versions, err := harness.LoadVersions(versionsEnv)
+		if err != nil {
+			return err
+		}
+		containers.Register(examples.NewGoLanguage(versions.OtelGoCoreVersion, versions.OtelGoLogVersion))
 		key, err := containers.CacheKey(blocks)
 		if err != nil {
 			return err
@@ -106,7 +112,6 @@ func run(opts options) error {
 		collector = &examples.CollectorValidator{BinaryPath: binaryPath}
 		code = examples.NewCodeValidator(versions.OtelGoCoreVersion, versions.OtelGoLogVersion)
 		code.Containers = containers
-		defer code.Cleanup()
 	}
 
 	validator, err := examples.NewValidator(collector, code, dryRun)

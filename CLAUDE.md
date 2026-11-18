@@ -59,6 +59,8 @@ Follow these rules when changing skill content:
   The validator compiles every block with a top-level type against `evals/custom/examples/containers/java/pom.xml`, so undefined names fail: declare stand-ins such as `record Order(...)` for application types, add an artifact a new example imports to that pin, and keep each public type at the path its `package` and name imply, or name the file with a `// src/main/java/<path>.java` first line.
 - **Make complete C# examples compile on their own.**
   The validator compiles every C# block that declares a `namespace` or a top-level type, or starts with a `// <path>.cs` comment line, against `evals/custom/examples/containers/csharp/Examples.csproj`; declare every type, field, and method the block uses, and put top-level statements only in a block that starts with `// Program.cs`.
+- **Require only pinned gems in Ruby examples.**
+  A Ruby block with a top-level `require` or a `# <path>.rb` first line is checked against `evals/custom/examples/containers/ruby/Gemfile`: add a gem a new example requires to that pin with an exact version, and require the standard libraries a block uses, such as `net/http`, because constants and methods under a loaded library are resolved.
 - **Mark deliberately wrong examples.**
   Use a `// BAD`-style line comment or `<!-- eval:bad -->` so the validator exempts them.
 - **Keep fixture data synthetic.**

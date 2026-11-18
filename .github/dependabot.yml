@@ -106,9 +106,12 @@ updates:
         patterns:
           - "*"
 
+  # The examples/containers/ruby entry is the gem set the Ruby examples in
+  # skills/ are checked against.
   - package-ecosystem: "bundler"
     directories:
       - "/evals/custom/fixtures/*"
+      - "/evals/custom/examples/containers/ruby"
     schedule:
       interval: "monthly"
     labels:

@@ -62,8 +62,8 @@ Summary: 96 validated (1 code compiled), 328 exempt (154 bash, 70 code-fragment,
 ```
 
 SDK code blocks are classified into complete versus fragment, and only complete blocks are compiled.
-Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, a Java block only when it declares a top-level type (`class`, `interface`, `enum`, `record`, or `@interface` at column 0) or its first line is a `// src/main/java/<path>.java` comment, a C# block only when it declares a `namespace` or a top-level type at column 0 or its first line is a `// <path>.cs` comment, and the other languages use conservative heuristics that bias to fragment.
-Complete Go, Rust, JavaScript, TypeScript, Python, Java, and C# blocks are checked inside a container, as described in the next section; no language compiles with a host toolchain.
+Most code blocks in `skills/` are intentional fragments — import snippets, method bodies, and elided examples — so compiling every block would be wrong; a Go block is complete only when it declares a top-level `package`, a Rust block only when its first line is a `// src/<path>.rs` comment or it declares `fn main`, a JavaScript or TypeScript block only when it has a top-level `import` or `require` or its first line is a `// <path>` comment naming a script file, a Python block only when it has a top-level `import`, `from`, `def`, or `class` line or its first line is a `# <path>.py` comment, a Java block only when it declares a top-level type (`class`, `interface`, `enum`, `record`, or `@interface` at column 0) or its first line is a `// src/main/java/<path>.java` comment, a C# block only when it declares a `namespace` or a top-level type at column 0 or its first line is a `// <path>.cs` comment, a Ruby block only when its first line is a `# <path>.rb` comment or it has a `require` of a library at column 0, and the other languages use conservative heuristics that bias to fragment.
+Complete Go, Rust, JavaScript, TypeScript, Python, Java, C#, and Ruby blocks are checked inside a container, as described in the next section; no language compiles with a host toolchain.
 Complete blocks in every other language report `skipped-no-toolchain`, naming the language, until a container plug-in is wired for it.
 Fragments are reported in the `code-fragment` category and exempted from compilation, never silently dropped.
 
@@ -82,6 +82,7 @@ Languages whose rule files carry no dependency manifest check against a pinned p
 | Java | `java` | `java-service` | [`examples/containers/java/`](./examples/containers/java) | `mvn --offline compile` |
 | Go | `go` | `go-service` | `OTEL_GO_CORE_VERSION` and `OTEL_GO_LOG_VERSION` in [`versions.env`](./versions.env) | `go build` and `go vet` |
 | C# | `csharp` | `dotnet-service` | [`examples/containers/csharp/`](./examples/containers/csharp) | `dotnet build --no-restore` |
+| Ruby | `ruby` | `ruby-service` | [`examples/containers/ruby/`](./examples/containers/ruby) | `ruby -wc` plus require, constant, and method checks |
 
 #### Rust
 
@@ -148,6 +149,20 @@ The C# blocks of a rule file become 1 project, restored with `dotnet restore`, t
 5. Compiler errors are reported on the block they occur in, at the rule-file line, and the other blocks of the project fail with a pointer to it; warnings never fail a block.
 
 The container runs as the host user, so the plug-in mounts a generated `/etc/passwd` naming that user: without an entry, the .NET runtime cannot create the named mutex NuGet takes on every `dotnet` command.
+
+#### Ruby
+
+The Ruby blocks of a rule file become 1 project whose gems are downloaded as `.gem` files with network access, then installed with `bundle install --local` and checked by [`examples/containers/ruby/check.rb`](./examples/containers/ruby/check.rb) with `--network none`, so native extensions build offline.
+Ruby has no standard type checker, and the check never executes example code:
+
+1. A block whose first line is a `# <path>.rb` comment is written to that path, and any other complete block to `examples/block_<line>.rb`.
+2. `ruby -wc` parses every file; a syntax error fails the block, and warnings are printed but do not fail it.
+3. Every top-level `require '<library>'` with a literal argument must load against the pinned [`examples/containers/ruby/Gemfile`](./examples/containers/ruby/Gemfile) or the standard library; requiring runs library code, never example code.
+4. Every constant path whose root a required library defines, such as `OpenTelemetry::Trace::Status`, must resolve, and every method called on it, such as `OpenTelemetry::Trace::Status.error(...)`, must exist and accept the call's positional and keyword arguments, unless the file guards the call with `<Constant>.respond_to?(:<method>)`.
+5. Names rooted elsewhere, such as `order`, `logger`, `Rails`, or a class the block defines, are not checked, and neither are methods called on local variables or block parameters, such as `c.use_all` in `OpenTelemetry::SDK.configure do |c|`.
+
+Add a gem an example requires to the `Gemfile` with an exact version and regenerate `Gemfile.lock` with `bundle lock --add-platform ruby x86_64-linux aarch64-linux` in the `ruby-service` image.
+RBS and Steep were not adopted: the OpenTelemetry gems ship no type signatures, so a type checker would only add failures on the application state that examples leave undefined.
 
 Without Docker, the fixture Dockerfile, or the image, complete blocks of container languages report `skipped-no-toolchain` locally.
 CI fails closed instead: the `validate-examples` job passes `--require-containers` (or set `EVAL_REQUIRE_CONTAINERS=1`), which makes any of those a failure.

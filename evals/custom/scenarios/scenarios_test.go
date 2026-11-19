@@ -20,6 +20,7 @@ var allScenarioIDs = []string{
 	PythonHTTPID, JavaHTTPID, RubyHTTPID, PHPHTTPID, ScalaHTTPID,
 	DotnetHTTPID, DotnetNuGetID, DotnetEnrichmentID,
 	NextJSHTTPID, BrowserHTTPID,
+	RustHTTPID, RustLogsID, RustEnrichmentID, RustMetricsID, RustResourceID, RustGRPCID,
 	CollectorPipelineHardeningID, OTTLRedactionID, OTTLEnrichmentID, SemconvAttributesID,
 	K8sDownwardAPIID, K8sOTelOperatorID, K8sHelmChartID, K8sRawManifestsID, K8sDash0OperatorID,
 	PythonRetiredInstrumentationUpgradeID,
@@ -34,6 +35,8 @@ var allScenarioIDs = []string{
 	LambdaDotnetUpstreamLayersID,
 	LambdaGoDash0LayerID,
 	LambdaGoUpstreamLayersID,
+	LambdaRustDash0LayerID,
+	LambdaRustUpstreamLayersID,
 }
 
 // instrumentationSelectable is every otel-instrumentation scenario reachable
@@ -43,6 +46,7 @@ var instrumentationSelectable = []string{
 	PythonHTTPID, JavaHTTPID, RubyHTTPID, PHPHTTPID, ScalaHTTPID,
 	DotnetHTTPID, DotnetNuGetID, DotnetEnrichmentID,
 	NextJSHTTPID, BrowserHTTPID,
+	RustHTTPID, RustLogsID, RustEnrichmentID, RustMetricsID, RustResourceID, RustGRPCID,
 	PythonRetiredInstrumentationUpgradeID,
 }
 

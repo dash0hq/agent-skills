@@ -1,0 +1,25 @@
+{
+  "name": "rust-upstream-layers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AWS CDK example: a Rust Lambda function instrumented with the OpenTelemetry Rust SDK, exporting to the upstream OpenTelemetry Collector Lambda layer.",
+  "bin": {
+    "rust-upstream-layers": "bin/app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "build:function": "cd lambda && cargo lambda build --release --arm64"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "aws-cdk": "^2.1146.1",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.9.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.275.0",
+    "constructs": "^10.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+[package]
+name = "rust-grpc-service"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = "=0.8.9"
+prost = "=0.14.6"
+# Plain HTTP only: the downstream the handler calls is an http:// URL.
+reqwest = { version = "=0.13.5", default-features = false, features = ["json"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread"] }
+tonic = "=0.14.9"
+tonic-prost = "=0.14.9"
+tracing = "=0.1.44"
+tracing-subscriber = { version = "=0.3.23", features = ["json"] }
+
+[build-dependencies]
+protoc-bin-vendored = "=3.3.0"
+tonic-prost-build = "=0.14.9"

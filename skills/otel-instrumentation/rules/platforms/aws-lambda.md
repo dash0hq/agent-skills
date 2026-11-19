@@ -41,8 +41,8 @@ Stop at the first match.
    Use [path B: the Dash0 Lambda layers](./aws-lambda-dash0-layers.md).
 4. The runtime is Node.js, Python, Java, or Ruby **and** the backend is not Dash0, or telemetry must fan out to more than one backend.
    Use [path A: upstream OpenTelemetry layers](./aws-lambda-otel-layers.md).
-5. The runtime is Go or .NET.
-   No auto-instrumentation layer exists for either, so the function must be instrumented in code — see [runtimes without an auto-instrumentation layer](#runtimes-without-an-auto-instrumentation-layer).
+5. The runtime is Go, .NET, or Rust.
+   No auto-instrumentation layer exists for any of them, so the function must be instrumented in code — see [runtimes without an auto-instrumentation layer](#runtimes-without-an-auto-instrumentation-layer).
    Choose the exporter side by backend: with Dash0 as the only backend, attach the `dash0-extension-manual` layer, which exports for you and resolves `DASH0_TOKEN_SECRET_ARN` at runtime; otherwise attach the upstream Collector layer and write a Collector configuration.
 
 | | Path A: upstream layers | Path B: Dash0 extension | Manual SDK |
@@ -57,7 +57,7 @@ Stop at the first match.
 
 ## Runtimes without an auto-instrumentation layer
 
-Go and .NET have no upstream instrumentation layer.
+Go, .NET, and Rust have no upstream instrumentation layer.
 Instrument in code, and attach a layer that owns the export so the handler never blocks on a round trip to the backend: the upstream Collector layer, or `dash0-extension-manual` when Dash0 is the only backend.
 Both run as external Lambda extensions — separate processes in the execution environment — so the in-process SDK exports over loopback and the upstream call happens on the extension's lifecycle rather than the handler's.
 
@@ -175,6 +175,121 @@ public async Task<Response> Handler(Request input, ILambdaContext context)
 
 The function's configured handler must be the wrapper method, in the form `Assembly::Namespace.Type::Method`.
 Pointing the handler at the original method bypasses the instrumentation entirely.
+
+### Rust
+
+Set up the SDK as described in [Rust instrumentation](../sdks/rust.md), then apply the Lambda-specific requirements below.
+Omitting any of them produces a function that succeeds while exporting nothing, or exporting spans that cannot be attributed to the function.
+
+1. **Build for the function's architecture.**
+   Use [`cargo lambda`](https://www.cargo-lambda.info/) and name the binary `bootstrap`; the `provided.al2023` runtime starts the executable with that name.
+   `cargo lambda build --release --arm64` writes it to `target/lambda/bootstrap/bootstrap`, and the function deploys that directory.
+2. **Detect the Lambda resource.**
+   Add `LambdaResourceDetector` from [`opentelemetry-aws`](https://docs.rs/opentelemetry-aws) with the `detector-aws-lambda` feature.
+   It sets `faas.name`, `faas.version`, `faas.max_memory`, `cloud.provider`, `cloud.platform`, and `cloud.region`; nothing else sets them on this path.
+   Add it before the environment detectors, as below, so `OTEL_RESOURCE_ATTRIBUTES` keeps precedence; see [resource detectors](../sdks/rust.md#1-activate-the-sdk).
+3. **Create the invocation span yourself, with kind SERVER.**
+   The `OpenTelemetryLayer` of `lambda_runtime` creates an INTERNAL span and enters it before the handler runs, after which `tracing-opentelemetry` ignores a changed `otel.kind`.
+   Create the span in the `service_fn` closure with `otel.kind = "server"` and `faas.invocation_id` set to the request ID.
+4. **End the span, then flush, before returning.**
+   Drop every handle to the invocation span, then call `force_flush()` on the tracer provider.
+   The execution environment freezes on return; an open span is never exported and a buffered one is exported only on the next invocation, if one comes.
+5. **Export over HTTP to the layer on loopback.**
+   Set `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` and point `OTEL_EXPORTER_OTLP_ENDPOINT` at the exporter layer: `http://localhost:4318` for the upstream Collector layer, `http://127.0.0.1:9009` for `dash0-extension-manual`.
+
+```toml
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
+
+[dependencies]
+lambda_runtime = "=1.5.0"
+tokio = { version = "=1.54.1", features = ["macros"] }
+serde_json = "=1.0.145"
+opentelemetry = "=0.33.1"
+opentelemetry_sdk = "=0.33.1"
+opentelemetry-aws = { version = "=0.21.0", default-features = false, features = ["detector-aws-lambda"] }
+opentelemetry-otlp = { version = "=0.33.1", default-features = false, features = ["http-proto", "reqwest-blocking-client", "trace"] }
+tracing = "=0.1.44"
+tracing-opentelemetry = "=0.34.0"
+tracing-subscriber = { version = "=0.3.23", features = ["registry"] }
+```
+
+```rust
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use lambda_runtime::{Error, LambdaEvent, service_fn};
+use opentelemetry::trace::{Status, TracerProvider as _};
+use opentelemetry_aws::detector::LambdaResourceDetector;
+use opentelemetry_otlp::SpanExporter;
+use opentelemetry_sdk::{
+    Resource,
+    resource::{EnvResourceDetector, SdkProvidedResourceDetector, TelemetryResourceDetector},
+    trace::{Sampler, SdkTracerProvider},
+};
+use serde_json::{Value, json};
+use tracing::{Instrument, info_span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tracing_subscriber::prelude::*;
+
+static COLD_START: AtomicBool = AtomicBool::new(true);
+
+async fn handler(_event: LambdaEvent<Value>) -> Result<Value, Error> {
+    Ok(json!({ "status": "confirmed" }))
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    // Lambda resource attributes first, then OTEL_RESOURCE_ATTRIBUTES and
+    // OTEL_SERVICE_NAME, so the function's environment overrides the detector.
+    let resource = Resource::builder_empty()
+        .with_detector(Box::new(LambdaResourceDetector))
+        .with_detectors(&[
+            Box::new(TelemetryResourceDetector),
+            Box::new(EnvResourceDetector::new()),
+            Box::new(SdkProvidedResourceDetector),
+        ])
+        .build();
+    let provider = SdkTracerProvider::builder()
+        .with_sampler(Sampler::AlwaysOn)
+        .with_batch_exporter(SpanExporter::builder().build()?)
+        .with_resource(resource)
+        .build();
+    let tracer = provider.tracer(env!("CARGO_PKG_NAME"));
+    tracing_subscriber::registry()
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
+        .try_init()?;
+    let provider = &provider;
+
+    lambda_runtime::run(service_fn(move |event: LambdaEvent<Value>| async move {
+        let span = info_span!(
+            "invocation",
+            otel.name = %event.context.env_config.function_name,
+            otel.kind = "server",
+            faas.trigger = "other",
+            faas.invocation_id = %event.context.request_id,
+            faas.coldstart = COLD_START.swap(false, Ordering::Relaxed),
+        );
+        let result = handler(event).instrument(span.clone()).await;
+        if let Err(err) = &result {
+            span.set_status(Status::error(err.to_string()));
+        }
+        // End the span before flushing: an open span is not exported.
+        drop(span);
+        if let Err(err) = provider.force_flush() {
+            eprintln!("telemetry flush failed: {err}");
+        }
+        result
+    }))
+    .await
+}
+```
+
+Set `faas.trigger` to `http` for API Gateway and function URL events, `pubsub` for SQS, SNS, and EventBridge, `timer` for scheduled events, and `other` otherwise.
+Instrument outbound calls inside the handler as in [Rust HTTP clients](../sdks/rust.md#http-clients), so they appear as CLIENT spans under the invocation span.
+
+Do not call `lambda_runtime::tracing::init_default_subscriber()`.
+It installs its own global subscriber, and the `try_init()` above then fails, leaving the function without the OpenTelemetry layer.
 
 ## Container images
 

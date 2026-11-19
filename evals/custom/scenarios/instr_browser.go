@@ -69,14 +69,18 @@ Requirements:
 }
 
 // fixtureHooks selects the Docker-backed hooks for one scenario: the browser
-// scenario drives traffic with a headless Chromium page load, Node.js also
-// probes incoming parent contexts, and other scenarios use plain HTTP probes.
+// scenario drives traffic with a headless Chromium page load, the Node.js and
+// Rust HTTP scenarios also probe incoming parent contexts, and other
+// scenarios use plain HTTP probes.
 func fixtureHooks(fix *DockerFixture, sc harness.Scenario) harness.FixtureHooks {
 	if sc.ID == BrowserHTTPID {
 		return fix.BrowserHooks()
 	}
-	if sc.ID == NodeHTTPID {
+	if sc.ID == NodeHTTPID || sc.ID == RustHTTPID {
 		return fix.ParentTrafficHooks()
+	}
+	if sc.ID == RustResourceID {
+		return fix.ResourceOverrideHooks(rustResourceOverrides)
 	}
 	return fix.Hooks()
 }

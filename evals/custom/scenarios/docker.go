@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -106,7 +108,8 @@ func (d *DockerFixture) Hooks() harness.FixtureHooks {
 	return harness.FixtureHooks{Build: d.build, Run: d.run, AppOutput: d.appOutput}
 }
 
-// ParentTrafficHooks adds parent-context traffic for the Node.js scenario.
+// ParentTrafficHooks adds parent-context traffic for the Node.js and Rust HTTP
+// scenarios.
 // Probe a sampled and an unsampled remote parent as well as the existing root
 // requests; the unsampled probe is what separates the `always_on` sampler the
 // skill prescribes from the SDK default.
@@ -114,6 +117,21 @@ func (d *DockerFixture) ParentTrafficHooks() harness.FixtureHooks {
 	hooks := d.Hooks()
 	hooks.Run = func(ctx context.Context, workspace string, env map[string]string) error {
 		return d.runWithParents(ctx, workspace, env, []string{sampledTraceparent, unsampledTraceparent})
+	}
+	return hooks
+}
+
+// ResourceOverrideHooks appends attrs to the app's OTEL_RESOURCE_ATTRIBUTES,
+// the way a deployment spec sets resource attributes, for the scenarios that
+// check those values take precedence over the ones the service computes.
+func (d *DockerFixture) ResourceOverrideHooks(attrs map[string]string) harness.FixtureHooks {
+	hooks := d.Hooks()
+	hooks.Run = func(ctx context.Context, workspace string, env map[string]string) error {
+		withOverrides := maps.Clone(env)
+		for _, key := range slices.Sorted(maps.Keys(attrs)) {
+			withOverrides["OTEL_RESOURCE_ATTRIBUTES"] += "," + key + "=" + attrs[key]
+		}
+		return d.run(ctx, workspace, withOverrides)
 	}
 	return hooks
 }

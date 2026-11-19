@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether an agent instrumenting a Rust Lambda function applies the rules that are specific to manual SDK instrumentation on Lambda, where nothing outside the function flushes telemetry: the invocation span must be created by the function with kind SERVER (lambda_runtime's own span is INTERNAL and already entered), it must be ended before force_flush, the flush must happen before the handler returns because the environment freezes, the Lambda resource detector must come before the environment detectors, export must go to the Collector layer on loopback, and the default lambda_runtime subscriber must not be installed. The task says invocations are minutes apart and the environment freezes, without naming the flush or span-ordering requirements.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Flush before returning",
+      "description": "Every invocation calls force_flush() on the tracer provider after the handler future completes and before the service_fn closure returns its result. Relying on shutdown at process exit or on the batch processor's schedule scores zero, because the environment is frozen as soon as the handler returns",
+      "max_score": 16
+    },
+    {
+      "name": "Span ended before the flush",
+      "description": "Every handle to the invocation span is dropped (or the span is otherwise ended) BEFORE force_flush() is called, so the invocation span itself is exported in the same flush rather than left open",
+      "max_score": 12
+    },
+    {
+      "name": "SERVER invocation span created by the function",
+      "description": "The function creates its own invocation span inside the service_fn closure with otel.kind = \"server\" and instruments the handler with it, rather than relying on lambda_runtime's built-in span or trying to change otel.kind on a span that is already entered",
+      "max_score": 12
+    },
+    {
+      "name": "Invocation span attributes",
+      "description": "The invocation span carries faas.invocation_id from the request ID and faas.trigger set to 'http' (the function is invoked through a Function URL); faas.coldstart is a bonus but not required",
+      "max_score": 6
+    },
+    {
+      "name": "Default subscriber removed",
+      "description": "lambda_runtime::tracing::init_default_subscriber() is removed and a single subscriber with the tracing-opentelemetry layer is registered with try_init()",
+      "max_score": 8
+    },
+    {
+      "name": "Lambda resource detector before environment detectors",
+      "description": "LambdaResourceDetector from opentelemetry-aws (feature 'detector-aws-lambda') is added to the resource, and it is added BEFORE EnvResourceDetector and SdkProvidedResourceDetector so OTEL_RESOURCE_ATTRIBUTES and OTEL_SERVICE_NAME keep precedence",
+      "max_score": 10
+    },
+    {
+      "name": "Export to the Collector layer on loopback",
+      "description": "The exporter targets the Collector layer on loopback (OTEL_EXPORTER_OTLP_ENDPOINT 'http://localhost:4318' with OTEL_EXPORTER_OTLP_PROTOCOL 'http/protobuf', or the gRPC equivalent on localhost:4317 with a matching exporter feature), never a remote backend endpoint",
+      "max_score": 10
+    },
+    {
+      "name": "Outbound call produces a CLIENT span",
+      "description": "The reqwest client is wrapped so the ledger call produces a CLIENT span under the invocation span, for example with reqwest-middleware and reqwest-tracing, built once and reused across invocations",
+      "max_score": 8
+    },
+    {
+      "name": "bootstrap binary built for arm64",
+      "description": "Cargo.toml defines a [[bin]] named 'bootstrap', NOTES.md builds it with 'cargo lambda build --release --arm64' (or an equivalent aarch64 Linux build), and the CDK construct uses Runtime.PROVIDED_AL2023 with Architecture.ARM_64 and the directory holding the bootstrap executable as the code asset",
+      "max_score": 8
+    },
+    {
+      "name": "Service identity set through environment",
+      "description": "The CDK construct sets OTEL_SERVICE_NAME to 'payments' and OTEL_RESOURCE_ATTRIBUTES including 'deployment.environment.name=production', rather than leaving service.name to default to the function name",
+      "max_score": 6
+    },
+    {
+      "name": "Always-on sampling in code",
+      "description": "The tracer provider uses Sampler::AlwaysOn set in code and with_batch_exporter, not with_simple_exporter",
+      "max_score": 4
+    }
+  ]
+}

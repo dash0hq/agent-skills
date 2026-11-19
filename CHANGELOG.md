@@ -1,5 +1,41 @@
 # Changelog
 
+## v1.4.2 (2026-11-18)
+
+### Added
+
+- attach packaged .skill and .zip archives per skill to releases
+- pick the eval model from a dropdown, defaulting to Opus 5.5 (#173)
+
+### Fixed
+
+- attach skill archives at release creation and add a bundle
+
+### Changed
+
+- update plugin manifests for v1.4.2
+
+
+## v1.4.1 (2026-11-17)
+
+### Added
+
+- add Go Lambda scenarios (#169)
+- add .NET Lambda scenarios (#168)
+- add Java Lambda scenarios (#167)
+- add Python Lambda scenarios (#166)
+- run the Node.js Lambda scenario against a real AWS account (#165)
+
+### Fixed
+
+- probe operator kind scenarios after the instrumented rollout (#164)
+
+### Changed
+
+- update plugin manifests for v1.4.1
+- bump the Dash0 Lambda extension layers to v31 (#172)
+
+
 ## v1.4.0 (2026-11-13)
 
 ### Added

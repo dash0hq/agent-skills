@@ -8,6 +8,30 @@ npx skills add https://github.com/dash0hq/agent-skills --all
 npx skills add https://github.com/dash0hq/agent-skills --skill otel-semantic-conventions
 ```
 
+## Packaged archives
+
+Each [GitHub release](https://github.com/dash0hq/agent-skills/releases) attaches these archives:
+
+| Archive | Contents | Use it for |
+|---|---|---|
+| `dash0-agent-skills.zip` | Every skill folder, side by side | Installing all skills by hand into a tool's skills directory (preferred) |
+| `<skill>.skill` | 1 skill folder with `SKILL.md` inside it | Uploading to the Claude apps |
+| `<skill>.zip` | Same content as `<skill>.skill` | Installing a single skill by hand |
+
+The skills link to each other's rules, so you should install or upload all of them to keep those links working.
+
+To add the skills in the Claude apps, open Customize > Skills, select + > Create skill > Upload a skill, and upload each `.skill` file in turn.
+The Claude apps accept 1 skill per upload, so they refuse `dash0-agent-skills.zip`.
+
+To install by hand, unpack the bundle into the tool's skills directory.
+Remove the previous copies first, so rule files that a newer release deleted do not linger:
+
+```bash
+curl -fsSLO https://github.com/dash0hq/agent-skills/releases/latest/download/dash0-agent-skills.zip
+rm -rf "${HOME}"/.claude/skills/otel-*
+unzip -q dash0-agent-skills.zip -d "${HOME}/.claude/skills/"
+```
+
 ## Tessl
 
 ```bash

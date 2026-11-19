@@ -48,6 +48,18 @@ Those installs therefore contain `evals/` and `docs/`; the content is inert for 
 The release workflow passes `--eval-scenarios evals/tessl` to the publish command, so the authored scenarios in `evals/tessl/` are scored on the registry at publish time.
 The flag reads the scenarios from the working tree, which carries them regardless of the `.tesslignore` exclusion, so they contribute to the registry score without shipping inside the packaged tile.
 
+### Packaged skill archives
+
+The release workflow attaches a `<skill>.zip` and a `<skill>.skill` archive for each directory under `skills/` to the GitHub release, plus a `dash0-agent-skills.zip` bundle of every skill.
+A `.skill` file is a zip archive with a different extension; both per-skill formats contain a single top-level folder named after the skill, with `SKILL.md` directly inside it, which is the only layout the Claude apps accept as an upload.
+The bundle holds every skill folder side by side for manual installs, and ships as `.zip` only because the Claude apps refuse archives with more than 1 skill.
+The archives contain only `skills/`, so `evals/` and `docs/` are excluded by construction.
+
+[`package-skills.sh`](./.github/scripts/package-skills.sh) builds the archives and verifies their layout.
+`release.yml` runs it before anything is published and passes the archives to `gh release create`, so a release never appears without them.
+The archives are reproducible: building the same commit twice yields byte-identical files.
+To retrofit a release cut before packaging existed, or to restore missing assets, [dispatch `package-skills.yml`](https://github.com/dash0hq/agent-skills/actions/workflows/package-skills.yml) with the tag; it overwrites the existing assets with identical copies.
+
 ## Pre-release checklist
 
 1. Ensure all changes are merged to `main`.
@@ -77,7 +89,7 @@ The flag reads the scenarios from the working tree, which carries them regardles
 3. **Generate changelog** — collects commits since the last tag, groups them by conventional commit type (`feat` → Added, `fix` → Fixed, everything else → Changed), and prepends a new entry to `CHANGELOG.md`.
 4. **Commit changelog** — commits the updated `CHANGELOG.md` to `main`.
 5. **Create tag** — creates and pushes an annotated `vMAJOR.MINOR.PATCH` tag on the changelog commit.
-6. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag.
+6. **Create GitHub release** — publishes a release with auto-generated notes from the commit history since the previous tag, with the packaged skill archives attached.
 7. **Publish to npm** — publishes `@dash0/agent-skills` (the `skills/` trees only) to npmjs.com with provenance, authenticated via [OIDC trusted publishing](https://docs.npmjs.com/trusted-publishers). This runs as a separate job that dispatches [`publish-npm.yml`](./.github/workflows/publish-npm.yml) with the new tag, and the publish outcome appears on that workflow's own run rather than on the release run; the same workflow can also be [dispatched manually](https://github.com/dash0hq/agent-skills/actions/workflows/publish-npm.yml) with any existing tag — to retrofit a release cut before npm publishing existed, or to retry a failed publish without re-releasing.
 
 ## Post-release verification
@@ -93,4 +105,10 @@ The flag reads the scenarios from the working tree, which carries them regardles
 
    ```bash
    npm view @dash0/agent-skills version
+   ```
+
+4. Verify the release lists a `.zip` and a `.skill` asset for each directory under `skills/`, plus `dash0-agent-skills.zip`:
+
+   ```bash
+   gh release view --repo dash0hq/agent-skills --json assets --jq '.assets[].name'
    ```

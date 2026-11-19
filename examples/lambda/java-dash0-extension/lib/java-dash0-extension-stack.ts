@@ -9,12 +9,12 @@ import { Construct } from 'constructs';
  * Version of the Dash0 Lambda Extension layer.
  *
  * Source: https://github.com/dash0hq/dash0-lambda-extension/releases
- * Latest release at lookup time: v27, published 2026-10-27. Looked up on 2026-10-29.
+ * Latest release at lookup time: v31, published 2026-11-17. Looked up on 2026-11-17.
  *
- * The release tag and the Lambda layer version are the same number, so `v27` is published as
- * `...:layer:dash0-extension-java:27`.
+ * The release tag and the Lambda layer version are the same number, so `v31` is published as
+ * `...:layer:dash0-extension-java:31`.
  */
-const DASH0_EXTENSION_LAYER_VERSION = 27;
+const DASH0_EXTENSION_LAYER_VERSION = 31;
 
 /** Published by Dash0; see the layer ARN table in the AWS Lambda deployment rule. */
 const DASH0_LAYER_ACCOUNT = '115813213817';

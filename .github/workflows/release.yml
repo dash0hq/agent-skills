@@ -11,6 +11,19 @@ on:
           - patch
           - minor
           - major
+      # Keep these options in sync with the model input of evals-matrix.yml,
+      # and the default with EVAL_MODEL in evals/custom/versions.env.
+      model:
+        description: "Model the release eval matrix runs the agent with"
+        required: true
+        type: choice
+        default: claude-opus-5-5
+        options:
+          - claude-opus-5-5
+          - claude-sonnet-5-5
+          - claude-haiku-5-5
+          - claude-fable-5-1
+          - claude-opus-4-8
 
 permissions:
   contents: write
@@ -70,6 +83,7 @@ jobs:
       id-token: write
     with:
       ref: ${{ needs.resolve.outputs.sha }}
+      model: ${{ inputs.model }}
     secrets: inherit
 
   release:
@@ -240,6 +254,12 @@ jobs:
           fi
           echo "Publish exclusions verified: no evals/ or docs/ paths in the dry-run output."
 
+      # Built before anything is published so a packaging failure stops the
+      # release, and attached by `gh release create` so the release never
+      # appears without its archives. package-skills.yml retrofits older tags.
+      - name: Package skills
+        run: .github/scripts/package-skills.sh "${RUNNER_TEMP}/skill-archives"
+
       - name: Publish to Tessl
         run: |
           # Score the authored Tessl scenarios at publish time. --eval-scenarios
@@ -261,7 +281,8 @@ jobs:
         run: |
           gh release create "${TAG}" \
             --title "${TAG}" \
-            --generate-notes
+            --generate-notes \
+            "${RUNNER_TEMP}"/skill-archives/*
 
   # After the GitHub release so the tag/release stay the source of truth; a
   # failed publish is retried by dispatching publish-npm.yml with the tag,

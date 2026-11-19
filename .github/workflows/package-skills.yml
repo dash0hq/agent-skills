@@ -1,0 +1,50 @@
+name: Package skills
+
+# Attaches one <skill>.zip and one <skill>.skill archive per directory under
+# skills/, plus the dash0-agent-skills.zip bundle, to the GitHub release for an
+# existing tag. New releases get their
+# archives from release.yml, which attaches them when it creates the release;
+# dispatch this by hand to retrofit a tag that was released before packaging
+# existed, or to restore missing assets. Existing assets are overwritten, and
+# because the archives are reproducible their checksums stay the same.
+#
+# The build and layout check live in .github/scripts/package-skills.sh, shared
+# with release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to package (e.g. v1.3.1)"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: package-skills-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package skills for ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Build and verify archives
+        run: .github/scripts/package-skills.sh "${RUNNER_TEMP}/skill-archives"
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release upload "${TAG}" "${RUNNER_TEMP}"/skill-archives/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber

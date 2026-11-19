@@ -28,6 +28,11 @@ jobs:
           done
           exit $exit_code
 
+      # The release builds the same archives; catch a packaging failure here
+      # rather than in the middle of a release.
+      - name: Verify skill archives
+        run: .github/scripts/package-skills.sh "${RUNNER_TEMP}/skill-archives"
+
   lint-skills:
     name: Lint skills
     runs-on: ubuntu-latest

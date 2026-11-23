@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether an agent instrumenting a Rust axum service with a tonic gRPC client applies the Rust-specific rules that compile cleanly when broken but silently lose telemetry: the HTTPS exporter needs the reqwest-rustls feature and CA certificates, the environment resource detectors must come last so OTEL_RESOURCE_ATTRIBUTES wins, tonic-tracing-opentelemetry spans are filtered out at the default info level unless tracing_level_info is enabled, a second subscriber init fails, and the batch processors must be shut down before exit. The task names the outcomes (traces with the gRPC call, per-route latency, Kubernetes resource attributes) without naming any of these traps.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "TLS feature for the HTTPS exporter",
+      "description": "opentelemetry-otlp enables the 'reqwest-rustls' feature (or another TLS feature of the exporter's HTTP client), because the endpoint is https:// and opentelemetry-otlp builds reqwest without TLS",
+      "max_score": 12
+    },
+    {
+      "name": "CA certificates in the runtime image",
+      "description": "The Dockerfile's runtime stage based on debian:trixie-slim installs the 'ca-certificates' package, so the rustls client can verify the HTTPS endpoint against the system trust store",
+      "max_score": 8
+    },
+    {
+      "name": "Environment resource detectors last",
+      "description": "The resource is built from Resource::builder_empty() (or equivalent) with any custom detectors and a computed service.version added BEFORE EnvResourceDetector and SdkProvidedResourceDetector, so OTEL_RESOURCE_ATTRIBUTES and OTEL_SERVICE_NAME override them. Adding detectors or attributes after Resource::builder() scores zero, because later additions override the environment values",
+      "max_score": 12
+    },
+    {
+      "name": "No process command-line detector",
+      "description": "ProcessResourceDetector is not added, since it records process.command_args, which can carry credentials",
+      "max_score": 4
+    },
+    {
+      "name": "gRPC spans survive the level filter",
+      "description": "tonic-tracing-opentelemetry is added with the 'tracing_level_info' feature, or the EnvFilter includes a directive such as 'otel::tracing=trace'; without either, its TRACE-level spans are dropped by an info filter and the gRPC call never appears in the trace",
+      "max_score": 12
+    },
+    {
+      "name": "gRPC client layer injects context",
+      "description": "The tonic client channel is wrapped with the client OtelGrpcLayer from tonic-tracing-opentelemetry (or an equivalent layer that creates a CLIENT span and injects traceparent)",
+      "max_score": 8
+    },
+    {
+      "name": "HTTP server spans and per-route metrics",
+      "description": "The axum router gets a layer that creates one SERVER span per request with http.route (for example tower-http TraceLayer with an OpenTelemetry-aware span maker) and a layer that records http.server.request.duration with http.route (for example opentelemetry-instrumentation-tower with the axum feature). If both layers can create spans, the metrics layer has tracing disabled so each request produces exactly one SERVER span",
+      "max_score": 10
+    },
+    {
+      "name": "Single subscriber",
+      "description": "tracing_subscriber::fmt::init() is removed and exactly one subscriber is registered, with try_init() whose error is propagated rather than ignored",
+      "max_score": 8
+    },
+    {
+      "name": "Propagator and sampler",
+      "description": "A global TraceContextPropagator is installed, and the tracer provider uses Sampler::AlwaysOn set in code",
+      "max_score": 6
+    },
+    {
+      "name": "Batch export and shutdown",
+      "description": "The tracer provider uses with_batch_exporter (not with_simple_exporter with the blocking client), and main calls shutdown() on the tracer and meter providers after the server stops, returning from main rather than calling std::process::exit",
+      "max_score": 10
+    },
+    {
+      "name": "Configuration from environment",
+      "description": "The endpoint and token are supplied through OTEL_EXPORTER_OTLP_ENDPOINT (base URL, no /v1/traces suffix) and OTEL_EXPORTER_OTLP_HEADERS with 'Authorization=Bearer TEST-INGEST-0001', OTEL_SERVICE_NAME is 'order-service', and NOTES.md lists these variables",
+      "max_score": 6
+    },
+    {
+      "name": "Matching OpenTelemetry versions",
+      "description": "opentelemetry, opentelemetry_sdk, opentelemetry-otlp, and every instrumentation crate target the same opentelemetry release (tracing-opentelemetry, tonic-tracing-opentelemetry, and the tower metrics crate at versions that depend on it), and NOTES.md or the agent's actions verify this, for example with 'cargo tree -i opentelemetry'",
+      "max_score": 4
+    }
+  ]
+}

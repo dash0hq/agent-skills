@@ -27,6 +27,8 @@ var fixtureSourceFiles = map[string][]string{
 	"evals/custom/fixtures/python-elasticsearch-service": {"app.py"},
 	"evals/custom/fixtures/python-service":               {"app.py"},
 	"evals/custom/fixtures/ruby-service":                 {"config.ru", "Dockerfile"},
+	"evals/custom/fixtures/rust-service":                 {"src/main.rs"},
+	"evals/custom/fixtures/rust-grpc-service":            {"src/main.rs"},
 	"evals/custom/fixtures/scala-service":                {"src/main/scala/checkout/CheckoutServer.scala"},
 }
 

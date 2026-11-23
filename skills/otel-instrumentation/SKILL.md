@@ -24,7 +24,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 | [verify-dependencies](./rules/verify-dependencies.md) | Verifying instrumentation packages and versions exist before adding them |
 | [resources](./rules/resources.md) | Resource attributes — service identity and environment |
 | [k8s](./rules/platforms/k8s.md) | Kubernetes deployment — downward API, pod spec |
-| [aws-lambda](./rules/platforms/aws-lambda.md) | AWS Lambda deployment — decision process, manual SDK for Go and .NET, resource attributes, validation |
+| [aws-lambda](./rules/platforms/aws-lambda.md) | AWS Lambda deployment — decision process, manual SDK for Go, .NET, and Rust, resource attributes, validation |
 | [aws-lambda-otel-layers](./rules/platforms/aws-lambda-otel-layers.md) | Path A — upstream OTel layers, wrapper paths, per-runtime instrumentation tuning |
 | [aws-lambda-dash0-layers](./rules/platforms/aws-lambda-dash0-layers.md) | Path B — Dash0 Lambda Extension, `DASH0_*` variables, collection modes |
 | [spans](./rules/spans.md) | Spans — naming, kind, status, and hygiene |
@@ -41,6 +41,7 @@ Expert guidance for implementing high-quality, cost-efficient OpenTelemetry tele
 | [dotnet](./rules/sdks/dotnet.md) | .NET instrumentation setup |
 | [ruby](./rules/sdks/ruby.md) | Ruby instrumentation setup |
 | [php](./rules/sdks/php.md) | PHP instrumentation setup |
+| [rust](./rules/sdks/rust.md) | Rust instrumentation setup |
 | [browser](./rules/sdks/browser.md) | Browser instrumentation setup |
 | [nextjs](./rules/sdks/nextjs.md) | Next.js full-stack instrumentation (App Router) |
 

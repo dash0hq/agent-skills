@@ -119,6 +119,7 @@ Covers backend and browser instrumentation across multiple languages.
 - .NET (auto-instrumentation, ASP.NET Core, ActivitySource)
 - Ruby (SDK setup, Rails, Sinatra)
 - PHP (auto-instrumentation, Laravel, Symfony)
+- Rust (`tracing` bridge, axum and reqwest, log correlation)
 - Browser (OpenTelemetry JS, Dash0 SDK, server correlation)
 - Next.js (App Router, full-stack instrumentation, common gotchas)
 
@@ -130,6 +131,7 @@ Covers backend and browser instrumentation across multiple languages.
 - .NET (ASP.NET Core, Entity Framework, etc.)
 - Ruby (Rails, Sinatra, etc.)
 - PHP (Laravel, Symfony, etc.)
+- Rust (axum, tower, reqwest, etc.)
 - Browser (React, Vue, Next.js, etc.)
 - Any OTLP-compatible backend
 

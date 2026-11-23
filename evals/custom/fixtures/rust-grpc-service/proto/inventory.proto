@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package inventory.v1;
+
+// Inventory reserves stock for an order.
+service Inventory {
+  rpc Reserve(ReserveRequest) returns (ReserveReply);
+}
+
+message ReserveRequest {
+  string order_id = 1;
+  string sku = 2;
+  uint32 quantity = 3;
+}
+
+message ReserveReply {
+  bool reserved = 1;
+}

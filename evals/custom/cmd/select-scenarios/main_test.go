@@ -70,7 +70,7 @@ func TestBuildSelectionNightlyIsTheFullMatrix(t *testing.T) {
 	require.Contains(t, ids(out, boolPtr(true)), scenarios.K8sDownwardAPIID,
 		"nightly must include every RequiresKind scenario")
 	require.Equal(t, 5, out.KindCount, "the 5 Kubernetes scenarios form the kind matrix")
-	require.Equal(t, 11, out.AWSCount, "the 11 Lambda scenarios form the AWS matrix")
+	require.Equal(t, 13, out.AWSCount, "the 13 Lambda scenarios form the AWS matrix")
 }
 
 func TestBuildSelectionKindSplitting(t *testing.T) {

@@ -153,7 +153,7 @@ Two checks catch most of what a version bump breaks, and neither is covered by t
 ## Running the AWS Lambda examples as a live eval
 
 The Go harness in `evals/custom/` validates the Lambda examples as text only — the Collector configurations carry `<!-- eval:skip -->` because `telemetryapi` and `decouple` do not exist in `otelcol-contrib`, and no fixture deploys a function.
-The seven CDK projects under [`examples/lambda/`](examples/lambda/README.md) are the only thing that exercises the guidance against a real Lambda runtime, and they are run by hand.
+The eight CDK projects under [`examples/lambda/`](examples/lambda/README.md) are the only thing that exercises the guidance against a real Lambda runtime, and they are run by hand.
 
 Running them needs AWS credentials for an account you may create and delete resources in, and a Dash0 auth token with ingest and read scope.
 Everything the run creates is public and billable; the teardown step is not optional.
@@ -198,7 +198,7 @@ A run passes when, for every project:
 Tear down every stack and the secret when the run is finished:
 
 ```bash
-npx cdk destroy   # in each of the seven project directories
+npx cdk destroy   # in each of the eight project directories
 aws secretsmanager delete-secret --secret-id agent-skills-test/dash0-token --force-delete-without-recovery
 ```
 

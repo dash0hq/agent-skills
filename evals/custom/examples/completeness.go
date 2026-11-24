@@ -42,8 +42,9 @@ func isCompleteCode(tag, content string) bool {
 		return isCompleteRust(content)
 	case "python":
 		// Bias to fragment: require a top-level import, def, or class, which
-		// most snippet method bodies lack.
-		return pyTopLevelRe.MatchString(content)
+		// most snippet method bodies lack, or a "# <path>.py" first line
+		// naming the file; see python.go.
+		return pyTopLevelRe.MatchString(content) || pythonBlockPath(content) != ""
 	case "java":
 		// A full type declaration is the closest thing to a compilation unit.
 		return javaTypeRe.MatchString(content)

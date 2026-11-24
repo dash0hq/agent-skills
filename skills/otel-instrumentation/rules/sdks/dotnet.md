@@ -352,8 +352,16 @@ Add business context to auto-instrumented traces using `System.Diagnostics.Activ
 
 ```csharp
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
-public class OrderService
+public record Order(string Id, decimal Total);
+
+public interface IOrderRepository
+{
+    Task<Order> SaveAsync(Order order);
+}
+
+public class OrderService(IOrderRepository repository, ILogger<OrderService> logger)
 {
     private static readonly ActivitySource Source = new("MyService");
 
@@ -364,7 +372,7 @@ public class OrderService
         {
             activity?.SetTag("order.id", order.Id);
             activity?.SetTag("order.total", order.Total);
-            var result = await SaveOrder(order);
+            var result = await repository.SaveAsync(order);
             return result;
         }
         catch (Exception ex)

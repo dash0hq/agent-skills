@@ -14,7 +14,7 @@ structlog==26.1.0
 
 # Transitive dependencies of the packages above:
 ast_serialize==0.13.1
-librt==0.16.0
+librt==0.17.0
 mypy_extensions==1.2.0
 opentelemetry-instrumentation==0.66b2
 opentelemetry-instrumentation-dbapi==0.66b2

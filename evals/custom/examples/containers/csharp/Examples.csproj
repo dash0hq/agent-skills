@@ -19,8 +19,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Npgsql" Version="10.0.3" />
-    <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.3" />
+    <PackageReference Include="Npgsql" Version="10.0.4" />
+    <PackageReference Include="Npgsql.OpenTelemetry" Version="10.0.4" />
     <PackageReference Include="OpenTelemetry" Version="1.21.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.21.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.21.0" />

@@ -45,16 +45,14 @@ func testValidator(t *testing.T) *Validator {
 }
 
 // testCodeValidator returns a CodeValidator using the pinned OpenTelemetry Go
-// versions from the committed versions.env, cleaned up at test end.
+// versions from the committed versions.env.
 func testCodeValidator(t *testing.T) *CodeValidator {
 	t.Helper()
 	versions, err := harness.LoadVersions("../versions.env")
 	if err != nil {
 		t.Fatalf("LoadVersions: %v", err)
 	}
-	code := NewCodeValidator(versions.OtelGoCoreVersion, versions.OtelGoLogVersion)
-	t.Cleanup(code.Cleanup)
-	return code
+	return NewCodeValidator(versions.OtelGoCoreVersion, versions.OtelGoLogVersion)
 }
 
 func findResult(report *Report, category Category) *Result {
@@ -90,10 +88,12 @@ func TestValidateTreeBasic(t *testing.T) {
 		t.Errorf("BAD block not reported as exempt: %+v", bad)
 	}
 
-	// The self-contained Go block is complete and compiles.
+	// The self-contained Go block is complete; without a container runner
+	// it is not compiled (TestGoContainerCheck compiles Go in the fixture
+	// image).
 	code := findResult(report, CategoryCodeComplete)
-	if code == nil || code.Status != StatusValidated {
-		t.Errorf("go block not reported as compiled code-complete: %+v", code)
+	if code == nil || code.Status != StatusSkippedNoToolchain {
+		t.Errorf("go block not reported as code-complete and skipped-no-toolchain: %+v", code)
 	}
 
 	// The embedded CR config validates as Collector config, with

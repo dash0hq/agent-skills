@@ -57,8 +57,13 @@ func isCompleteCode(tag, content string) bool {
 		// Bias to fragment: require a top-level import or require, or a
 		// "// <path>" first line naming the file; see javascript.go.
 		return jsEntrypointRe.MatchString(content) || javascriptBlockPath(content) != ""
+	case "ruby":
+		// A Ruby block is a self-contained file iff its first line is a
+		// "# <path>.rb" comment or it requires a library at the top level;
+		// see ruby.go.
+		return isCompleteRuby(content)
 	default:
-		// ruby, php, scala, and anything else: bias to fragment. Their
+		// php, scala, and anything else: bias to fragment. Their
 		// complete blocks would be compile-skipped anyway, so treating them
 		// as fragments only changes the reported category, not the outcome.
 		return false

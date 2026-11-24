@@ -142,9 +142,9 @@ service:
 			want:    CategoryCodeFragment,
 		},
 		{
-			name:    "ruby always biases to fragment",
+			name:    "ruby without a top-level require is a fragment",
 			tag:     "ruby",
-			content: "require \"opentelemetry/sdk\"\nOpenTelemetry::SDK.configure\n",
+			content: "OpenTelemetry::SDK.configure do |c|\n  c.use_all\nend\n",
 			want:    CategoryCodeFragment,
 		},
 		{

@@ -7,4 +7,4 @@ source "https://rubygems.org"
 
 gem "opentelemetry-instrumentation-all", "0.102.0"
 gem "opentelemetry-sdk", "1.13.1"
-gem "semantic_logger", "5.2.0"
+gem "semantic_logger", "5.3.0"

@@ -11,9 +11,10 @@ import (
 
 // CodeValidator compiles complete SDK code blocks. Go blocks compile against a
 // pinned OpenTelemetry Go SDK dependency set via the host go toolchain; blocks
-// in other languages are reported skipped-no-toolchain until their
-// fixture-image compilers are wired (a follow-up). The zero value is not
-// usable; build one with NewCodeValidator.
+// of a language with a container plug-in (see ContainerLanguage) are queued
+// on Containers and compiled per rule file by Finish; blocks in every other
+// language are reported skipped-no-toolchain. The zero value is not usable;
+// build one with NewCodeValidator.
 type CodeValidator struct {
 	// goCoreVersion pins the stable OpenTelemetry Go modules
 	// (OTEL_GO_CORE_VERSION).
@@ -36,6 +37,10 @@ type CodeValidator struct {
 	// fileCounter serializes .go file names within moduleDir.
 	fileMu      sync.Mutex
 	fileCounter int
+
+	// Containers compiles the languages with a container plug-in; when nil,
+	// their complete blocks report skipped-no-toolchain.
+	Containers *ContainerRunner
 }
 
 // NewCodeValidator builds a CodeValidator with the pinned OpenTelemetry Go
@@ -54,15 +59,26 @@ func NewCodeValidator(goCoreVersion, goLogVersion string) *CodeValidator {
 }
 
 // Validate compiles one code-complete block and records the outcome on result.
-// It routes by the block's normalized tag: Go compiles, every other language
+// It routes by the block's normalized tag: Go compiles on the host, a
+// container language is queued until Finish, and every other language
 // reports StatusSkippedNoToolchain.
-func (c *CodeValidator) Validate(result *Result, tag, content string) {
-	switch tag {
-	case "go":
-		c.validateGo(result, content)
+func (c *CodeValidator) Validate(result *Result, block *Block) {
+	switch {
+	case block.Tag == "go":
+		c.validateGo(result, block.Content)
+	case c.Containers != nil && c.Containers.Handles(block.Tag):
+		c.Containers.Enqueue(result, block)
 	default:
 		result.Status = StatusSkippedNoToolchain
-		result.Detail = fmt.Sprintf("%s compiler not yet wired (fixture-image based, follow-up); complete block not compiled", tag)
+		result.Detail = fmt.Sprintf("no %s compiler wired (no container plug-in for the language yet); complete block not compiled", block.Tag)
+	}
+}
+
+// Finish compiles the queued container-language blocks, one container per
+// rule file and language. all is every block of the validated tree.
+func (c *CodeValidator) Finish(all []*Block) {
+	if c.Containers != nil {
+		c.Containers.Run(all)
 	}
 }
 

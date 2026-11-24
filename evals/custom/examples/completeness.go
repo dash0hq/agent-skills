@@ -8,9 +8,9 @@ import "regexp"
 // bodies, and elided examples. The detectors are deliberately conservative —
 // when a block is ambiguous they return false so it is treated as a fragment,
 // because a false "complete" wrongly fails a run while a false "fragment" only
-// skips a compile. Go and Rust complete blocks are compiled, so their
-// detectors follow explicit rules; the other languages have no compiler wired
-// yet, and their heuristics are simple and bias to fragment.
+// skips a compile. Every language with a container plug-in follows an
+// explicit rule documented in its plug-in file; an unknown tag is always a
+// fragment.
 
 // goPackageRe matches a top-level Go package declaration at column 0.
 var goPackageRe = regexp.MustCompile(`(?m)^package\s+\w+`)
@@ -67,10 +67,16 @@ func isCompleteCode(tag, content string) bool {
 		// with a "// <path>.php" first line, or has a top-level namespaced
 		// use statement; see php.go.
 		return isCompletePHP(content)
+	case "scala":
+		// A Scala block is a compilation unit iff it names its file with a
+		// "// src/main/scala/<path>.scala" first line, declares an @main
+		// method, or pairs a top-level package or import with a top-level
+		// object, class, trait, or enum; see scala.go.
+		return isCompleteScala(content)
 	default:
-		// scala and anything else: bias to fragment. Their
-		// complete blocks would be compile-skipped anyway, so treating them
-		// as fragments only changes the reported category, not the outcome.
+		// Any other tag: bias to fragment. No compiler is wired for it, so
+		// treating its blocks as fragments only changes the reported
+		// category, not the outcome.
 		return false
 	}
 }

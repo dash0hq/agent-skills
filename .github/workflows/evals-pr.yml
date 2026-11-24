@@ -110,9 +110,10 @@ jobs:
         with:
           # evals/custom/examples/container.go mounts <user cache dir>/
           # agent-skills-evals-containers/<language>/packages into the compile
-          # container (CARGO_HOME for Rust, the npm cache for JavaScript). The
-          # key carries the compile images and a hash of the generated
-          # manifests.
+          # container as that language's package download cache (CARGO_HOME,
+          # the npm, pip, NuGet, Composer, and coursier caches, the Maven
+          # repository, GOMODCACHE, and the gem cache). The key carries the
+          # compile images and a hash of the generated manifests.
           path: ~/.cache/agent-skills-evals-containers/*/packages
           key: ${{ steps.containers.outputs.key }}
           restore-keys: ${{ steps.containers.outputs.restore-prefix }}

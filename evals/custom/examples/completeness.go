@@ -50,8 +50,9 @@ func isCompleteCode(tag, content string) bool {
 	case "csharp":
 		return csharpTypeRe.MatchString(content)
 	case "javascript", "typescript":
-		// Bias to fragment: require a top-level import or require.
-		return jsEntrypointRe.MatchString(content)
+		// Bias to fragment: require a top-level import or require, or a
+		// "// <path>" first line naming the file; see javascript.go.
+		return jsEntrypointRe.MatchString(content) || javascriptBlockPath(content) != ""
 	default:
 		// ruby, php, scala, and anything else: bias to fragment. Their
 		// complete blocks would be compile-skipped anyway, so treating them

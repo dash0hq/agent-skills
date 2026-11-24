@@ -35,10 +35,13 @@ updates:
         patterns:
           - "*"
 
-  # Node.js fixture today; the nextjs and browser fixtures when U4 lands.
+  # Node.js fixture today; the nextjs and browser fixtures when U4 lands. The
+  # examples/containers/* entry is the package set the JavaScript and
+  # TypeScript examples in skills/ are type-checked against.
   - package-ecosystem: "npm"
     directories:
       - "/evals/custom/fixtures/*"
+      - "/evals/custom/examples/containers/*"
     schedule:
       interval: "monthly"
     labels:

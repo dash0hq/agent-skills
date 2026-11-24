@@ -51,6 +51,8 @@ Follow these rules when changing skill content:
   `<!-- eval:fragment -->` is context-aware: on a `yaml` or untagged block it marks a service-less Collector fragment, and on an SDK-code block it marks a code fragment that is reported but not compiled — use it on a genuinely-complete Go or Rust block only when the block is deliberately uncompilable, never to hide a real compile failure.
 - **Keep the Rust blocks of a rule file compilable as 1 crate.**
   The validator writes each `// src/<path>.rs` block to that path and a `fn main` block to `src/main.rs`, and builds `Cargo.toml` from every `toml` block of the file, so declare every crate the code uses in those `toml` blocks; the assembly rules are in [evals/custom/README.md](evals/custom/README.md).
+- **Import only pinned packages in JavaScript and TypeScript examples.**
+  The validator type-checks every complete block against `evals/custom/examples/containers/javascript/package.json`; add a package a new example imports to that pin, and start a block that other blocks import through `@/` with a `// src/<path>.ts` comment line.
 - **Mark deliberately wrong examples.**
   Use a `// BAD`-style line comment or `<!-- eval:bad -->` so the validator exempts them.
 - **Keep fixture data synthetic.**

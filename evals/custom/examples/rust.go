@@ -33,7 +33,8 @@ import (
 //     check.
 type rustLanguage struct{}
 
-func (rustLanguage) Tag() string     { return "rust" }
+func (rustLanguage) Name() string    { return "rust" }
+func (rustLanguage) Tags() []string  { return []string{"rust"} }
 func (rustLanguage) Fixture() string { return "rust-service" }
 
 func (rustLanguage) ManifestFiles() []string { return []string{"Cargo.toml"} }
@@ -56,6 +57,8 @@ func (rustLanguage) Env() []string {
 }
 
 func (rustLanguage) FetchCommand() []string { return []string{"cargo", "fetch"} }
+
+func (rustLanguage) CheckLabel() string { return "cargo check" }
 
 func (rustLanguage) CheckCommand() []string {
 	return []string{"cargo", "check", "--offline", "--locked", "--message-format", "short"}

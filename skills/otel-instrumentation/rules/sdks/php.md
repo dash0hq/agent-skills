@@ -402,15 +402,23 @@ Monolog's `JsonFormatter` serializes exceptions (including the stack trace) into
 PHP's traditional execution model is request-scoped: each HTTP request starts a new process (or reuses one from a pool), and the SDK flushes telemetry when the request ends.
 No explicit shutdown code is needed for standard web requests.
 
-For long-running PHP processes (queue workers, daemons), register a shutdown function to flush providers before exit:
+With `OTEL_PHP_AUTOLOAD_ENABLED=true`, the SDK registers the shutdown of the tracer, meter, and logger providers as a PHP shutdown function itself, so do not register another one.
+The batch span processor checks its export schedule only when a span ends, so a long-running PHP process (queue worker, daemon) holds finished spans while it is idle.
+Flush the tracer provider after each unit of work, for example after each job a queue worker processes:
 
 ```php
-register_shutdown_function(function () {
-    \OpenTelemetry\API\Globals::tracerProvider()->shutdown();
-});
+use OpenTelemetry\API\Globals;
+use OpenTelemetry\SDK\Trace\TracerProviderInterface;
+
+$tracerProvider = Globals::tracerProvider();
+if ($tracerProvider instanceof TracerProviderInterface) {
+    $tracerProvider->forceFlush();
+}
 ```
 
-`shutdown()` flushes pending batches and releases resources.
+Call `forceFlush()` or `shutdown()` only behind the `instanceof` check on the SDK `TracerProviderInterface`.
+`Globals::tracerProvider()` returns the API `TracerProviderInterface`, which declares neither method, and when the SDK is disabled (`OTEL_SDK_DISABLED=true`) or not autoloaded it is a no-op provider on which the call is a fatal error.
+PHP runs shutdown functions on `exit()` and at the end of the script, but not when a signal such as `SIGTERM` kills the process; a worker must handle the signal with `pcntl_signal()` and call `exit()` to flush on stop.
 
 ## Troubleshooting
 

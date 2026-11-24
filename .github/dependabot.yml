@@ -90,9 +90,12 @@ updates:
         patterns:
           - "*"
 
+  # The examples/containers/java entry is the dependency set the Java
+  # examples in skills/ are compiled against.
   - package-ecosystem: "maven"
     directories:
       - "/evals/custom/fixtures/*"
+      - "/evals/custom/examples/containers/java"
     schedule:
       interval: "monthly"
     labels:

@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.5.0 (2026-11-25)
+
+### Added
+
+- compile Scala examples in a container (#184)
+- check PHP examples in a container (#183)
+- check Ruby examples in a container (#182)
+- compile C# examples in a container (#181)
+- compile Go examples in the go-service image (#180)
+- compile Java examples in a container (#179)
+- type-check Python examples in a container (#178)
+- type-check JavaScript and TypeScript examples in a container (#177)
+- compile Rust examples inside the fixture build image (#176)
+- add Rust instrumentation guidance and Lambda evals (#171)
+
+### Changed
+
+- update plugin manifests for v1.5.0
+
+
 ## v1.4.2 (2026-11-18)
 
 ### Added

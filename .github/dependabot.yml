@@ -11,12 +11,19 @@
 # no directory containing a manifest for the ecosystem are a no-op; GitHub
 # does not document this behavior explicitly, so check the Dependabot job
 # logs after adding a new fixture ecosystem.
+#
+# Every entry sets commit-message so Dependabot commits read "chore(deps): ...";
+# the "Validate commit messages" check in pr.yml rejects any commit without a
+# conventional-commit type, and Dependabot's own style detection is unreliable.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     cooldown:
       default-days: 7
 
@@ -27,6 +34,9 @@ updates:
       - "/evals/custom/fixtures/*"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -44,6 +54,9 @@ updates:
       - "/evals/custom/examples/containers/*"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -58,6 +71,9 @@ updates:
       - "/evals/custom/fixtures/*"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -82,6 +98,9 @@ updates:
       - "/evals/custom/examples/containers/python"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -98,6 +117,9 @@ updates:
       - "/evals/custom/examples/containers/java"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -114,6 +136,9 @@ updates:
       - "/evals/custom/examples/containers/ruby"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -128,6 +153,9 @@ updates:
       - "/evals/custom/examples/containers/php"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -144,6 +172,9 @@ updates:
       - "/evals/custom/examples/containers/csharp"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
@@ -159,6 +190,9 @@ updates:
       - "/evals/custom/fixtures/*"
     schedule:
       interval: "monthly"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
     labels:
       - "dependencies"
       - "fixtures"
